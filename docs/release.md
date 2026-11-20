@@ -36,7 +36,7 @@ Release 上有三个安装包和 SHA256SUMS，共四个文件（1.0.0 另有源�
 
 ### 1.1 发布工作流
 
-`.github/workflows/release.yml` 在推送 `v*` 标签时运行（也可以手动运行，但只有标签才创建 Release）。每个 job 都在
+`.github/workflows/release.yml` 在推送 `v*` 标签时运行（预览版的 `v*-preview.*` 除外，见 1.2；也可以手动运行，但只有标签才创建 Release）。每个 job 都在
 `release` Environment 里，由它的审批人批准后才开始：先批准 macOS 和两个 Windows 架构的构建 job，它们成功后再批准创建 Release 的 job。
 
 1. **macOS universal** 和 **Windows x64 / ARM64** 三个构建任务分别构建、签名、公证（macOS）安装包，Windows 的安装包还在
@@ -69,6 +69,22 @@ Release 上有三个安装包和 SHA256SUMS，共四个文件（1.0.0 另有源�
 **发布说明**：模板 `.github/release-notes.md` 写下载、两个平台的安装提示（Windows 的发布者与可能出现的 SmartScreen 提示；
 macOS 允许系统扩展和 VPN 配置）、源代码与许可（标签、mihomo 的提交和其他 Go 依赖在哪里，第 5 节）、隐私说明的链接。
 GitHub 把正文里的换行原样显示，所以模板的段落不折行；除 `{{version}}` 以外不能有别的 `{{` 占位，否则这一步失败。
+
+### 1.2 分支与预览版
+
+日常开发提交到 `develop`，准备发布的代码合并到 `main`，在 `main` 上打 `v*` 标签发正式版（1.1）。
+
+`develop` 上的 CI 通过后，`.github/workflows/prerelease.yml` 把这次 CI 构建的未签名安装包发成 GitHub 预发布版本：tag 为
+`v<版本>-preview.<CI 运行编号>`，附件是 `OpenWeir-<版本>-preview.<n>-macos-universal-unsigned.dmg`、
+`OpenWeir-<版本>-preview.<n>-windows-<x64|arm64>-unsigned-setup.exe` 和 `SHA256SUMS`。测试人员从 Releases 页面下载，不必进
+Actions 找构建产物。
+
+- 只保留最新的一个预览版：发布新的之后，之前的连同 tag 一起删除。只改文档、CI 没有构建安装包时不发布。
+- 检查更新只读 `releases/latest`，GitHub 不把预发布版本算作 latest，所以预览版不会被当作更新推送（第 2 节）。
+- `release.yml` 的 tag 触发排除 `v*-preview.*`；而且 `GITHUB_TOKEN` 创建的 tag 本来就不会触发其他工作流。
+- `workflow_run` 只认默认分支（`main`）上的工作流文件，所以 `prerelease.yml` 在 `main` 上也要有。
+- 预览版不签名，签名和公证只在正式版（1.1）里做，所以预览版不需要任何证书或签名用的变量。Windows 安装时 SmartScreen 提示未知发布者；macOS 版可以打开界面，但系统扩展需要 Developer ID 签名与公证才能激活，
+  所以连不上。发布说明里写明这两点。
 
 ## 2. 检查更新
 

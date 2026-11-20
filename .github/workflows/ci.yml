@@ -2,7 +2,8 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    # develop also publishes each passing push as a preview (prerelease.yml).
+    branches: [main, develop]
   pull_request:
   workflow_dispatch:
 

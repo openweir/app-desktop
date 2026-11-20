@@ -10,7 +10,8 @@ name: Release
 on:
   workflow_dispatch:
   push:
-    tags: ["v*"]
+    # Previews are tagged v<version>-preview.<n> by prerelease.yml; they are not releases.
+    tags: ["v*", "!v*-preview.*"]
 
 permissions:
   contents: read
