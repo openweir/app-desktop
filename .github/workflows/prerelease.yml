@@ -84,6 +84,15 @@ jobs:
           VERSION: ${{ steps.files.outputs.version }}
         run: |
           cat > notes.md <<EOF
+          Preview of OpenWeir $VERSION, built from ${HEAD_SHA:0:7} on develop.
+
+          - **Previews are unsigned**; only stable releases published from main are signed and notarized. On Windows, SmartScreen warns about an unknown publisher: choose **More info → Run anyway**.
+          - **On macOS you can look around but not connect**: the system extension needs a Developer ID signature and notarization before it can be activated.
+          - In-app updates never offer previews; switch to the stable release once it is out.
+          - Verify the downloads with \`SHA256SUMS\`.
+
+          ---
+
           OpenWeir $VERSION 预览版，由 develop 上的 ${HEAD_SHA:0:7} 构建。
 
           - **预览版不签名**，只有 main 上发布的正式版才签名和公证。Windows 安装时 SmartScreen 会提示未知发布者，选择「更多信息 → 仍要运行」。

@@ -93,7 +93,7 @@ def select(paths: Iterable[str]) -> Plan:
         if path == "DESIGN.md":
             jobs.update(UI | {"installer-ui"})
         elif (
-            path in {"README.md", "PRIVACY.md", "apple/README.md"}
+            path in {"README.md", "README.zh-CN.md", "PRIVACY.md", "apple/README.md"}
             or (path.startswith("docs/") and path.endswith(".md"))
             or path.startswith("docs/images/")  # the screenshots
         ):

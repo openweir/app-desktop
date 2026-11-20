@@ -1,6 +1,31 @@
+## What's changed
+
+<!-- Before publishing, write this version's changes here and in the Chinese section below, then delete these comments. GitHub shows line breaks in the body as line breaks, so don't wrap paragraphs. -->
+
+## Downloads
+
+| System | File |
+| --- | --- |
+| Windows 10 / 11, x64 | `OpenWeir-{{version}}-windows-x64-setup.exe` |
+| Windows 11, ARM64 | `OpenWeir-{{version}}-windows-arm64-setup.exe` |
+| macOS 26 or later, Apple silicon / Intel x64 | `OpenWeir-{{version}}-macos-universal.dmg` |
+
+`SHA256SUMS` holds the SHA-256 of every file on this page. An installed OpenWeir checks for updates under **About** in Settings, and verifies the checksum of the download before opening the installer.
+
+- **Windows**: the installer is signed by OpenWeir (Azure Artifact Signing), and the administrator prompt names OpenWeir as the publisher. While the signature is still building SmartScreen reputation, opening a downloaded installer may show "Windows protected your PC": click **More info**, check that the publisher is OpenWeir, then click **Run anyway**.
+- **macOS**: open the disk image and drag OpenWeir to the Applications folder. On the first connection, macOS asks you to allow OpenWeir's system extension and VPN configuration; allow them in System Settings when prompted.
+
+## Source code and licenses
+
+The source code of this version is the [`v{{version}}`](https://github.com/openweir/app-desktop/tree/v{{version}}) tag of this repository. The mihomo linked into the service and the extension is a commit of [openweir/mihomo](https://github.com/openweir/mihomo), pinned by the `replace` in that tag's [`src/core/go.mod`](https://github.com/openweir/app-desktop/blob/v{{version}}/src/core/go.mod); the versions and checksums of the other Go dependencies are pinned by `go.mod` and `go.sum` in the same directory. Running `go mod download` in `src/core` fetches them and mihomo from the Go module proxy (`proxy.golang.org` by default). The "Source code" archives GitHub attaches to every release contain only this repository, without mihomo or the other Go dependencies.
+
+OpenWeir is released under GPL-3.0; the licenses of third-party components are under **Open-source licenses** in Settings. The data that leaves this computer is described in the [privacy notice](https://github.com/openweir/app-desktop/blob/v{{version}}/PRIVACY.md).
+
+---
+
 ## 更新内容
 
-<!-- 发布前在草稿里写这个版本的变化，再删掉这一行。GitHub 把正文里的换行显示为换行，段落不要折行。 -->
+<!-- 写这个版本的变化（中文），再删掉这一行。 -->
 
 ## 下载
 

@@ -4,118 +4,111 @@
 
 <h1 align="center">OpenWeir</h1>
 
-<p align="center"><strong>让 mihomo 融入操作系统。</strong></p>
+<p align="center"><strong>mihomo, built into the operating system.</strong></p>
 
-<p align="center">采用平台原生系统架构的开源网络代理客户端，支持 macOS 和 Windows。</p>
+<p align="center">An open-source proxy client for macOS and Windows, built on each platform's native system architecture.</p>
+
+<p align="center">English · <a href="README.zh-CN.md">简体中文</a></p>
 
 <p align="center">
-  <a href="https://github.com/openweir/app-desktop/releases">下载</a> ·
-  <a href="#原生系统集成">产品特点</a> ·
-  <a href="docs/usage.md">使用指南</a> ·
-  <a href="PRIVACY.md">隐私说明</a> ·
-  <a href="https://github.com/openweir/app-desktop/issues">反馈问题</a> ·
-  <a href="docs/development.md">开发文档</a>
+  <a href="https://github.com/openweir/app-desktop/releases">Download</a> ·
+  <a href="#native-system-integration">Features</a> ·
+  <a href="docs/usage.md">User guide</a> ·
+  <a href="PRIVACY.md">Privacy</a> ·
+  <a href="https://github.com/openweir/app-desktop/issues">Report an issue</a> ·
+  <a href="docs/development.md">Development</a>
 </p>
 
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/overview-dark.png">
     <source media="(prefers-color-scheme: light)" srcset="docs/images/overview-light.png">
-    <img src="docs/images/overview-light.png" alt="OpenWeir 概览页：已连接，显示出站模式、当前节点、实时流量、订阅用量和最近连接">
+    <img src="docs/images/overview-light.png" alt="OpenWeir overview: connected, showing the outbound mode, current node, live traffic, subscription usage and recent connections">
   </picture>
 </p>
 
 ---
 
-OpenWeir 用来管理你的代理订阅、节点和分流规则。无需注册 OpenWeir 账户，导入自己的订阅或配置即可使用。
+OpenWeir manages your proxy subscriptions, nodes and routing rules. There is no OpenWeir account to create: import your own subscription or configuration and start.
 
-## 原生系统集成
+The user guide, development and other documents under `docs/` are in Chinese.
 
-- **后台保持连接**：关闭窗口后 OpenWeir 留在托盘或菜单栏，连接继续运行；「退出 OpenWeir」会先断开连接再退出。
-- **日常使用无需管理员权限**：macOS 首次连接时请求系统扩展和 VPN 授权；Windows 安装时注册后台服务。
-- **随系统使用**：支持托盘操作、登录时打开及睡眠唤醒后的连接恢复。主动断开后不会自动重连。
-- **双平台签名**：正式版的 macOS 版使用 Developer ID 签名并经 Apple 公证，Windows 版使用 Authenticode 签名，
-  应用内更新会核对安装包的签名。签名证书就绪前发布的测试版没有签名。
+## Native system integration
 
-## 连接与分流
+- **Stays connected in the background**: closing the window leaves OpenWeir in the tray or menu bar with the connection running. **Quit OpenWeir** disconnects first, then quits.
+- **No administrator rights for daily use**: macOS asks for system extension and VPN approval on the first connection; on Windows the installer registers a background service.
+- **Part of the system**: tray controls, open at login, and reconnection after sleep. A connection you turn off stays off.
+- **Signed on both platforms**: stable macOS releases are signed with a Developer ID and notarized by Apple, Windows releases are Authenticode-signed, and in-app updates check the installer's signature. Test builds published before the signing certificates were ready are unsigned.
 
-- **一个开关连接**：Windows 可选择 TUN、系统代理或同时启用；macOS 通过 Network Extension 接管流量。
-  在概览页查看连接状态、当前模式和实时流量。
-- **集中管理订阅**：导入 mihomo（Clash）、sing-box 或分享链接订阅，或本地配置文件，设置定时更新，通过 `openweir://`、`clash://`、
-  `mihomo://`、`clashmeta://` 链接一键导入。支持全局覆写和单份订阅覆写。
-- **使用订阅规则，或建立自己的方案**：把多个订阅的节点合成节点池，按地区组织，自建策略组；按服务、域名和
-  IP 段设置分流。规则测试可以预览目标网站会走哪条规则，方案支持导入与导出。
-- **选择与排查节点**：切换规则、全局和直连模式，选择策略组与节点，进行 HTTP 或 TCP 握手延迟测试，查看连接列表
-  和内核日志。
+## Connections and routing
+
+- **One switch to connect**: on Windows choose TUN, the system proxy or both; on macOS a Network Extension takes over traffic. The overview shows the connection state, current mode and live traffic.
+- **Subscriptions in one place**: import mihomo (Clash), sing-box or share-link subscriptions, or local configuration files, refresh them on a schedule, and import with one click from `openweir://`, `clash://`, `mihomo://` and `clashmeta://` links. Overrides apply to all subscriptions or to one.
+- **Use the subscription's rules, or build your own**: pool nodes from several subscriptions, group them by region, create policy groups, and route by service, domain and IP range. The rule tester previews which rule a site will take; routing setups can be imported and exported.
+- **Choose and troubleshoot nodes**: switch between rule, global and direct modes, pick policy groups and nodes, run HTTP or TCP handshake latency tests, and view the connection list and core logs.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/routing-dark.png">
   <source media="(prefers-color-scheme: light)" srcset="docs/images/routing-light.png">
-  <img src="docs/images/routing-light.png" alt="分流页的「我的方案」：按服务、私有网络和国内常用设置的规则，及各自的目标策略组">
+  <img src="docs/images/routing-light.png" alt="My setup on the routing page: rules for services, private networks and common domestic settings, each with its target policy group">
 </picture>
 
-## 更多网络能力
+## More network capabilities
 
-OpenWeir 使用 [mihomo 增强版](https://github.com/openweir/mihomo)内核，在 mihomo 的协议能力上加入：
+OpenWeir uses the [enhanced mihomo](https://github.com/openweir/mihomo) core, which adds to mihomo's protocols:
 
-- **Naive**：支持 HTTP/2、QUIC，以及兼容服务端上的 UoT。
-- **AnyTLS + REALITY**：支持使用 REALITY 的 AnyTLS 节点。
-- **Nowhere NW3**：Nowhere 3.3 的客户端，经 TLS 或 QUIC 连接，转发 TCP 和 UDP。
+- **Naive**: HTTP/2, QUIC, and UoT on compatible servers.
+- **AnyTLS + REALITY**: AnyTLS nodes that use REALITY.
+- **Nowhere NW3**: a Nowhere 3.3 client over TLS or QUIC, forwarding TCP and UDP.
 
-节点怎么配置、哪些参数需要服务端支持，以及完整 YAML 示例，见 [mihomo 增强版配置指南](docs/mihomo-fork.md)。
+How to configure these nodes, which options need server support, and complete YAML examples are in the [enhanced mihomo guide](docs/mihomo-fork.md).
 
-此外，可以让流量经所选节点接入 **Cloudflare WARP 或 VPN Gate** 链式出口；也可以添加 **Tailscale、ZeroTier、
-EasyTier** 网络，通过分流规则访问网络中的设备。
+Traffic can also leave through a **Cloudflare WARP or VPN Gate** chained exit behind the selected node, and you can add **Tailscale, ZeroTier and EasyTier** networks to reach their devices through routing rules.
 
-## 日常使用
+## Everyday use
 
-- **贴合桌面习惯**：简体中文与英文，浅色与深色外观，托盘控制和登录时打开。
-- **备份与迁移**：导出本地数据，恢复时选择替换或合并；macOS 支持 iCloud 云备份。
-  云备份的可用条件见 [使用指南](docs/usage.md#备份与恢复)。
-- **应用内更新**：检查新版本、下载安装包并校验，经你确认后安装。
-- **本地诊断**：查看运行日志，导出诊断信息；原始崩溃报告单独确认导出，不会自动上传。
+- **Fits the desktop**: Simplified Chinese and English, light and dark appearance, tray controls and open at login.
+- **Backup and migration**: export local data and choose to replace or merge when restoring; macOS supports iCloud backup. When cloud backup is available is described in the [user guide](docs/usage.md#备份与恢复).
+- **In-app updates**: check for a new version, download and verify the installer, and install it once you confirm.
+- **Local diagnostics**: view run logs and export diagnostics; raw crash reports are exported only after a separate confirmation and are never uploaded automatically.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/settings-dark.png">
   <source media="(prefers-color-scheme: light)" srcset="docs/images/settings-light.png">
-  <img src="docs/images/settings-light.png" alt="设置页：接管方式、语言与外观、备份与同步、启动选项和关于">
+  <img src="docs/images/settings-light.png" alt="Settings: takeover method, language and appearance, backup and sync, startup options and about">
 </picture>
 
-## 下载与安装
+## Download and install
 
-从 [GitHub Releases](https://github.com/openweir/app-desktop/releases) 获取安装包：
+Get the installers from [GitHub Releases](https://github.com/openweir/app-desktop/releases):
 
-| 支持的平台 | 安装包 |
+| Platform | Installer |
 | --- | --- |
-| macOS 26 及以上，Apple Silicon / Intel x64 | `OpenWeir-<版本>-macos-universal.dmg` |
-| Windows 10 / 11，x64 | `OpenWeir-<版本>-windows-x64-setup.exe` |
-| Windows 11，ARM64 | `OpenWeir-<版本>-windows-arm64-setup.exe` |
+| macOS 26 or later, Apple silicon / Intel x64 | `OpenWeir-<version>-macos-universal.dmg` |
+| Windows 10 / 11, x64 | `OpenWeir-<version>-windows-x64-setup.exe` |
+| Windows 11, ARM64 | `OpenWeir-<version>-windows-arm64-setup.exe` |
 
-- **macOS**：打开 DMG，把 OpenWeir 拖入「应用程序」；首次连接时按提示允许网络扩展和 VPN 配置。
-- **Windows**：运行安装程序并允许管理员授权。
+- **macOS**: open the DMG and drag OpenWeir to Applications; on the first connection, allow the network extension and VPN configuration when asked.
+- **Windows**: run the installer and allow administrator access.
 
-安装位置、SmartScreen 提示、更新与卸载，见 [使用指南](docs/usage.md#安装)。`SHA256SUMS` 可用于核对下载文件。
+Install locations, the SmartScreen prompt, updating and uninstalling are covered in the [user guide](docs/usage.md#安装). Use `SHA256SUMS` to verify the downloads.
 
-## 隐私
+## Privacy
 
-OpenWeir 不收集使用统计，也不会自动上传日志或崩溃报告。订阅、配置和设置保存在本机；访问订阅服务器、代理节点、
-更新服务或所选云备份服务时，会产生对应功能所需的网络请求。
+OpenWeir collects no usage statistics and never uploads logs or crash reports automatically. Subscriptions, configuration and settings stay on this computer; it only makes the network requests a feature needs, to subscription servers, proxy nodes, the update service or the cloud backup service you choose.
 
-诊断文件可能包含访问过的域名、节点名或错误内容，由你决定是否导出和分享。数据存储、云备份和第三方服务的完整说明
-见 [隐私说明](PRIVACY.md)。
+Diagnostic files may contain visited domains, node names or error text, and you decide whether to export and share them. Data storage, cloud backup and third-party services are described in full in the [privacy notice](PRIVACY.md).
 
-## 支持与开发
+## Support and development
 
-- 使用问题与功能建议：[GitHub Issues](https://github.com/openweir/app-desktop/issues)。
-- 安装、连接、备份与常见问题：[使用指南](docs/usage.md)。
-- 从源码构建、运行测试和参与开发：[开发文档](docs/development.md)。
+- Questions and feature requests: [GitHub Issues](https://github.com/openweir/app-desktop/issues).
+- Installing, connecting, backups and common questions: [user guide](docs/usage.md).
+- Building from source, running tests and contributing: [development guide](docs/development.md).
 
-## 许可证
+## License
 
-OpenWeir 以 [GPL-3.0-only](LICENSE) 发布，使用基于 [mihomo](https://github.com/MetaCubeX/mihomo) 的
-[mihomo 增强版](https://github.com/openweir/mihomo)内核。第三方组件及其许可证可在应用的「设置 › 关于 › 开源许可」中查看。
+OpenWeir is released under [GPL-3.0-only](LICENSE) and uses the [enhanced mihomo](https://github.com/openweir/mihomo) core, based on [mihomo](https://github.com/MetaCubeX/mihomo). Third-party components and their licenses are listed in the app under **Settings › About › Open-source licenses**.
 
-## 致谢
+## Acknowledgements
 
-OpenWeir 桌面端基于 [Solaris](https://github.com/openweir/Solaris)（GPL-3.0-only，作者 Ember Moth）开发，
-保留其完整提交历史，此后独立维护。感谢 Solaris 及 mihomo 的作者与贡献者。
+The OpenWeir desktop app is based on [Solaris](https://github.com/openweir/Solaris) (GPL-3.0-only, by Ember Moth), keeps its full commit history and is maintained independently since. Thanks to the authors and contributors of Solaris and mihomo.
