@@ -211,11 +211,11 @@ def test_the_window_repaints_when_the_system_turns_dark(
         assert isinstance(color, QColor)
         return color.name().upper()
 
-    assert background() == "#F3F4F6"
+    assert background() == "#F5F7F8"
     system.switch(Qt.ColorScheme.Dark)
-    assert background() == "#1B1D20"
+    assert background() == "#0B0F12"
     loaded.view_models.appearance.setMode("light")
-    assert background() == "#F3F4F6"
+    assert background() == "#F5F7F8"
     assert loaded.warnings == []
 
 

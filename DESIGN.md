@@ -1,69 +1,71 @@
 ---
 version: alpha
 name: OpenWeir
-description: 石墨灰底、白色分组、单一信号蓝强调的原生风格桌面代理客户端；信息密集、控件紧凑，拒绝"AI 仪表盘"式的大按钮和数字卡片。
+description: 浅灰底、白色分组、单一深海青强调的原生风格桌面代理客户端；信息密集、控件紧凑，拒绝"AI 仪表盘"式的大按钮和数字卡片。
 colors:
-  primary: "#1F5EFF"
-  primary-hover: "#1B53E0"
-  primary-pressed: "#1749CC"
+  brand: "#00B3A4"
+  primary: "#00807A"
+  primary-hover: "#00736D"
+  primary-pressed: "#006560"
   on-primary: "#FFFFFF"
-  link: "#1846C7"
-  link-hover: "#123A9E"
-  background: "#F3F4F6"
-  sidebar: "#E9EBEF"
-  sidebar-hover: "#E0E3E8"
+  link: "#00665E"
+  link-hover: "#004F49"
+  background: "#F5F7F8"
+  sidebar: "#EEF0F2"
+  sidebar-hover: "#E5E8EB"
   surface: "#FFFFFF"
-  surface-subtle: "#F7F8FA"
-  surface-selected: "#ECEEF1"
-  control-track: "#E3E5E9"
-  divider: "#ECEEF1"
-  border: "#DCDFE4"
-  border-button: "#C9CDD4"
-  border-control: "#828893"
-  text: "#15171C"
-  text-secondary: "#3D4350"
-  text-tertiary: "#4B5260"
-  text-muted: "#5F6673"
-  success: "#0A6B5B"
-  warning: "#8A5300"
+  surface-subtle: "#F8F9FA"
+  surface-selected: "#E3F7F5"
+  control-track: "#EFEFF0"
+  divider: "#EBECEC"
+  border: "#DDE1E4"
+  border-button: "#C5CBD0"
+  border-control: "#7C8790"
+  text: "#0B0F12"
+  text-secondary: "#4A5560"
+  text-tertiary: "#53606B"
+  text-muted: "#5F6A75"
+  success: "#067647"
+  warning: "#A04A05"
   latency-poor: "#9A3412"
   danger: "#B42318"
-  info: "#1846C7"
+  info: "#0B5CC2"
   chart-upload: "#C2410C"
-  scrim: "#15171C33"
-  caption-hover: "#15171C0F"
-  caption-pressed: "#15171C0A"
+  scrim: "#0B0F1233"
+  caption-hover: "#0B0F120F"
+  caption-pressed: "#0B0F120A"
   caption-close: "#C42B1C"
-  shadow-overlay: "#15171C1F"
-  shadow-segment: "#15171C1F"
-  shadow-nav: "#15171C14"
+  shadow-overlay: "#0B0F121F"
+  shadow-segment: "#0B0F121F"
+  shadow-nav: "#0B0F1214"
   dark:
-    primary: "#6495FF"
-    primary-hover: "#76A1FF"
-    primary-pressed: "#88AEFF"
-    on-primary: "#101216"
-    link: "#8AAEFF"
-    link-hover: "#B5CBFF"
-    background: "#1B1D20"
-    sidebar: "#202227"
-    sidebar-hover: "#26292E"
-    surface: "#2B2D33"
-    surface-subtle: "#30343A"
-    surface-selected: "#383B43"
-    control-track: "#121416"
-    divider: "#34373E"
-    border: "#3B3F46"
-    border-button: "#4C505A"
-    border-control: "#818691"
-    text: "#E6E9ED"
-    text-secondary: "#CBCFD6"
-    text-tertiary: "#B7BCC4"
-    text-muted: "#A1A6AF"
-    success: "#45C4A6"
-    warning: "#E5A443"
+    brand: "#2EE6D2"
+    primary: "#26D0BE"
+    primary-hover: "#3ADBCA"
+    primary-pressed: "#4FE3D3"
+    on-primary: "#00201D"
+    link: "#5EEBDC"
+    link-hover: "#9FF3EA"
+    background: "#0B0F12"
+    sidebar: "#101519"
+    sidebar-hover: "#161C21"
+    surface: "#161B20"
+    surface-subtle: "#1B2127"
+    surface-selected: "#0F3B38"
+    control-track: "#05080A"
+    divider: "#292D32"
+    border: "#30363C"
+    border-button: "#414950"
+    border-control: "#7F8A93"
+    text: "#F2F5F7"
+    text-secondary: "#B4BDC4"
+    text-tertiary: "#A6B0B8"
+    text-muted: "#9AA4AC"
+    success: "#32D583"
+    warning: "#FDB022"
     latency-poor: "#F38B5E"
     danger: "#FF8077"
-    info: "#8AAEFF"
+    info: "#62AFFF"
     chart-upload: "#F28A4B"
     scrim: "#00000080"
     caption-hover: "#FFFFFF0F"
@@ -560,7 +562,7 @@ components:
 
 OpenWeir 是 Windows 与 macOS 上的 mihomo 图形客户端，界面用 PySide6 / QML 实现。用户主要做四件事：确认隧道是否在运行、切换出站模式和节点、管理订阅、排查连接和日志。界面要让这四件事一眼可见、一两下可改，其余时间保持安静。
 
-视觉主题是**原生系统工具**：像 macOS「系统设置」或 Windows 11「设置」，而不是营销页或数据大屏。浅灰石墨底，内容放在白色分组里，组内用细线分行；全局只有一个信号蓝强调色，只用在开关开启、主操作、焦点和当前项标记上。信息密度偏高，控件紧凑，数字用等宽字体。
+视觉主题是**原生系统工具**：像 macOS「系统设置」或 Windows 11「设置」，而不是营销页或数据大屏。浅灰底，内容放在白色分组里，组内用细线分行；全局只有一个深海青强调色，只用在开关开启、主操作、焦点和当前项标记上。品牌色、状态色和文字层级取自 OpenWeir 视觉规范（design 仓库的 SpecVisual），这里是它在桌面端的落地。信息密度偏高，控件紧凑，数字用等宽字体。
 
 不该用的做法列在 [Do's and Don'ts](#dos-and-donts) 里，是这份契约最重要的约束。
 
@@ -573,45 +575,47 @@ OpenWeir 是 Windows 与 macOS 上的 mihomo 图形客户端，界面用 PySide6
 
 ## Colors
 
-颜色 token 按语义角色命名。frontmatter 里 `colors` 下直接列出的是浅色取值；`colors.dark` 为每个角色给出深色取值，键名一一对应。组件引用的 `{colors.X}` 在深色外观下取 `{colors.dark.X}`。增删角色时两组同时改，`scripts/gen_theme.py` 发现两组的键不一致就报错。下面先写浅色，深色见 [深色](#深色)。其他章节说的「白底」「白色分组」指 `surface`，「浅灰底」指 `surface-selected`，深色外观下取各自的深色值。
+颜色 token 按语义角色命名。frontmatter 里 `colors` 下直接列出的是浅色取值；`colors.dark` 为每个角色给出深色取值，键名一一对应。组件引用的 `{colors.X}` 在深色外观下取 `{colors.dark.X}`。增删角色时两组同时改，`scripts/gen_theme.py` 发现两组的键不一致就报错。下面先写浅色，深色见 [深色](#深色)。其他章节说的「白底」「白色分组」指 `surface`，「选中底」「浅灰底」指 `surface-selected`（浅色下是淡青），深色外观下取各自的深色值。
 
-色彩分三层：窗口底色 `background` `#F3F4F6`，侧栏 `sidebar` `#E9EBEF`，内容容器 `surface` `#FFFFFF`。层级靠底色差和 1px 线条表达，不靠阴影。
+色彩分三层：窗口底色 `background` `#F5F7F8`（规范的 `bg.base`），侧栏 `sidebar` `#EEF0F2`，内容容器 `surface` `#FFFFFF`（`bg.surface`）。层级靠底色差和 1px 线条表达，不靠阴影。
 
-- **强调色** `primary` `#1F5EFF`：开关开启、主按钮、焦点环、当前导航项图标、下载速率的线与箭头。悬停 `primary-hover` `#1B53E0`，按下 `primary-pressed` `#1749CC`；三者上的白字对比度分别为 5.1、6.3、7.3。每个页面、每个对话框最多一个主色按钮。
-- **链接** `link` `#1846C7`，悬停 `link-hover` `#123A9E`。只用于跳转到其他页面的文字链接（如「管理」「全部 37 个」），以及跳到另一页同一操作的快捷方式（如概览页的「改用我的方案」）。唯一的例外是标题栏撤销提示里的「撤销」（见 Layout）。
-- **文字**四级：`text` `#15171C` 正文与标题；`text-secondary` `#3D4350` 侧栏导航、等宽数值；`text-tertiary` `#4B5260` 未选中的分段项、次要数值；`text-muted` `#5F6673` 分组标题、说明文字、表头。`text-muted` 在最深的侧栏底色上仍有 4.8:1。
-- **选中与悬停**：`surface-subtle` `#F7F8FA` 用于行悬停和表头；`surface-selected` `#ECEEF1` 用于选中行；`sidebar-hover` `#E0E3E8` 用于导航项悬停；`control-track` `#E3E5E9` 是分段控件的底槽。
+- **品牌色** `brand` `#00B3A4`（规范的 `brand.primary`）：只给 OpenWeir 标记用（见 Shapes「品牌标记」），不用于控件、文字或状态。
+- **强调色** `primary` `#00807A`：开关开启、主按钮、焦点环、当前导航项图标、下载速率的线与箭头。规范的品牌主色 `#00B3A4` 在白底上只有 2.6:1，当不了线条和图标，桌面端按规范给 WinUI 的映射取深一档的 `#00807A`，主按钮上的文字 `on-primary` 用白色。悬停 `primary-hover` `#00736D`，按下 `primary-pressed` `#006560`；三者上的白字对比度分别为 4.8、5.7、6.9。`primary` 在窗口底色上 4.5:1、`surface` 上 4.8:1、`surface-selected` 上 4.3:1。每个页面、每个对话框最多一个主色按钮。
+- **链接** `link` `#00665E`（规范的 `brand.text`），悬停 `link-hover` `#004F49`。只用于跳转到其他页面的文字链接（如「管理」「全部 37 个」），以及跳到另一页同一操作的快捷方式（如概览页的「改用我的方案」）。唯一的例外是标题栏撤销提示里的「撤销」（见 Layout）。
+- **文字**四级：`text` `#0B0F12` 正文与标题；`text-secondary` `#4A5560` 侧栏导航、等宽数值；`text-tertiary` `#53606B` 未选中的分段项、次要数值；`text-muted` `#5F6A75` 分组标题、说明文字、表头。`text-muted` 在侧栏底色上仍有 4.8:1。
+- **选中与悬停**：`surface-subtle` `#F8F9FA` 用于行悬停和表头；`surface-selected` `#E3F7F5`（规范的 `brand.container`）用于选中行；`sidebar-hover` `#E5E8EB` 用于导航项悬停；`control-track` `#EFEFF0`（`fill.secondary` 铺在白底上）是分段控件的底槽。
 - **线条**四种，按用途选，不混用：
-  - `divider` `#ECEEF1`：组内行分隔、进度条底槽；
-  - `border` `#DCDFE4`：分组外框、页面标题下方的分隔线、侧栏右边线；
-  - `border-button` `#C9CDD4`：带文字的按钮外框，文字本身已经标明这是按钮，所以不要求 3:1；
-  - `border-control` `#828893`：输入框、下拉框、单选圈和关闭状态的开关轨道。这些控件靠边框识别，在白底上 3.6:1、窗口底色上 3.2:1，满足非文字 3:1。
-- **状态色只用于文字和小圆点**，不铺底色：
-  - `success` `#0A6B5B`：服务运行中、延迟小于 150 ms；
-  - `warning` `#8A5300`：延迟 150–300 ms、WARN 日志、需要留意的提示（如开启局域网连接）、日志的暂停状态；
+  - `divider` `#EBECEC`（规范的 `separator`）：组内行分隔、进度条底槽；
+  - `border` `#DDE1E4`：分组外框、页面标题下方的分隔线、侧栏右边线；
+  - `border-button` `#C5CBD0`：带文字的按钮外框，文字本身已经标明这是按钮，所以不要求 3:1；
+  - `border-control` `#7C8790`：输入框、下拉框、单选圈和关闭状态的开关轨道。这些控件靠边框识别，在白底上 3.7:1、窗口底色上 3.4:1，满足非文字 3:1。
+- **状态色只用于文字和小圆点**，不铺底色，取规范 `status.*-text` 的值：
+  - `success` `#067647`：服务运行中、延迟小于 150 ms；
+  - `warning` `#A04A05`：延迟 150–300 ms、WARN 日志、需要留意的提示（如开启局域网连接）、日志的暂停状态；
   - `latency-poor` `#9A3412`：延迟 300 ms 以上；
   - `danger` `#B42318`：ERROR 日志、破坏性操作的文字；
-  - `info` `#1846C7`：INFO 日志级别。
+  - `info` `#0B5CC2`：INFO 日志级别。
 
-  这些颜色在白底上都在 6:1 以上。延迟和日志级别始终同时显示数字或文字，颜色只是辅助。
-- **图表**：下载用 `primary`，上传用 `chart-upload` `#C2410C`。蓝与橙在明度和色相上都能区分，不用红绿对比。
+  这些颜色在所有浅色底色上（包括 `surface-selected`）都不低于 4.5:1。延迟和日志级别始终同时显示数字或文字，颜色只是辅助。
+- **图表**：下载用 `primary`，上传用 `chart-upload` `#C2410C`。青与橙在明度和色相上都能区分，不用红绿对比。
 - **半透明色**只有四种，都以 `#RRGGBBAA` 书写（`scripts/gen_theme.py` 生成 Theme.qml 时换成 Qt 的 `#AARRGGBB` 顺序），浅色下都是文字色加不透明度：
-  - `scrim` `#15171C33`：20%，只铺在模态对话框背后；
-  - `shadow-overlay` `#15171C1F`：12%，只用于浮层阴影；
-  - `shadow-segment` `#15171C1F`、`shadow-nav` `#15171C14`：12% 和 8%，分别是分段控件选中项和当前导航项的凸起阴影（见 [Elevation & Depth](#elevation--depth)）。
+  - `scrim` `#0B0F1233`：20%，只铺在模态对话框背后；
+  - `shadow-overlay` `#0B0F121F`：12%，只用于浮层阴影；
+  - `shadow-segment` `#0B0F121F`、`shadow-nav` `#0B0F1214`：12% 和 8%，分别是分段控件选中项和当前导航项的凸起阴影（见 [Elevation & Depth](#elevation--depth)）。
 
 ### 深色
 
 参照 macOS 与 Windows 11 的原生深色外观：不用纯黑，层级靠明度差表达，越靠上的层越亮；仍然只有一个强调色。深色值只取 `colors.dark`，不要在实现里从浅色值反相、调暗或加透明度临时推导。以下括号里的数字是 CIE L\* 明度。
 
-- **底色分层**：窗口底色 `background` `#1B1D20`（11）→ 侧栏 `sidebar` `#202227`（13）→ 分组、浮层和输入框 `surface` `#2B2D33`（19）。行悬停和表头 `surface-subtle` `#30343A`（22），选中行 `surface-selected` `#383B43`（25），导航项悬停 `sidebar-hover` `#26292E`（17）。与浅色不同，侧栏比窗口底色亮一级，和 macOS 深色侧栏一致；当前导航项仍用 `surface`，比侧栏亮。
-- **分段控件底槽** `control-track` `#121416`（6）是唯一比窗口底色暗的颜色：底槽在深色下凹进去，选中项用 `surface`，与底槽差 12 个明度。
-- **文字**四级：`text` `#E6E9ED`（不用纯白，大面积暗底上不刺眼）、`text-secondary` `#CBCFD6`、`text-tertiary` `#B7BCC4`、`text-muted` `#A1A6AF`。深色下最亮的底色是 `surface-selected`，`text-muted` 在它上面仍有 4.6:1，在 `surface` 上 5.6:1。
-- **强调色** `primary` `#6495FF`，悬停 `primary-hover` `#76A1FF`，按下 `primary-pressed` `#88AEFF`：深色下越操作越亮，与浅色下越操作越暗一样，都是拉开与底色的差距。深色的主色是浅蓝，所以主按钮上的文字 `on-primary` 改为近黑 `#101216`（Windows 11 深色主按钮的做法），三种状态上的对比度为 6.5、7.4、8.5。`primary` 用作线条、图标和焦点环时，在窗口底色上 5.9:1、`surface` 上 4.8:1、`surface-selected` 上 3.9:1；下载速率的箭头是文字，只出现在 `surface` 上。
-- **链接**与 **INFO** 级别 `link` / `info` `#8AAEFF`，悬停 `link-hover` `#B5CBFF`，同样是悬停变亮。
-- **线条**都比 `surface` 亮，深色下靠亮线勾边：`divider` `#34373E`、`border` `#3B3F46`、`border-button` `#4C505A`。`border-control` `#818691` 在 `surface` 上 3.8:1、窗口底色上 4.6:1、`surface-selected` 上 3.1:1，满足非文字 3:1；开关的圆钮（`surface`）在关闭轨道上 3.8:1，在开启轨道（`primary`）上 4.8:1。
-- **状态色**保持浅色的色相，提高明度：`success` `#45C4A6`、`warning` `#E5A443`、`latency-poor` `#F38B5E`、`danger` `#FF8077`。它们在所有深色底色上（包括 `surface-selected`）都不低于 4.5:1。
-- **图表**：下载 `primary` `#6495FF`，上传 `chart-upload` `#F28A4B`（`surface` 上 5.6:1），参考线 `divider`。蓝与橙在深色下同样靠色相和明度区分。
+- **底色分层**：窗口底色 `background` `#0B0F12`（规范的 `bg.base`）→ 侧栏 `sidebar` `#101519` → 分组、浮层和输入框 `surface` `#161B20`（`bg.surface`）。行悬停和表头 `surface-subtle` `#1B2127`，选中行 `surface-selected` `#0F3B38`（`brand.container`），导航项悬停 `sidebar-hover` `#161C21`。侧栏比窗口底色亮一级，和 macOS 深色侧栏一致；当前导航项仍用 `surface`，比侧栏亮。
+- **分段控件底槽** `control-track` `#05080A` 是唯一比窗口底色暗的颜色：底槽在深色下凹进去，选中项用 `surface`。
+- **文字**四级：`text` `#F2F5F7`（规范的 `text.primary`，不用纯白）、`text-secondary` `#B4BDC4`、`text-tertiary` `#A6B0B8`、`text-muted` `#9AA4AC`。`text-muted` 在 `surface-selected` 上仍有 4.9:1，在 `surface` 上 6.8:1。
+- **品牌色** `brand` `#2EE6D2`，同样只给标记用。
+- **强调色** `primary` `#26D0BE`（规范的 `brand.fill`），悬停 `primary-hover` `#3ADBCA`，按下 `primary-pressed` `#4FE3D3`：深色下越操作越亮，与浅色下越操作越暗一样，都是拉开与底色的差距。主按钮上的文字 `on-primary` 用规范的 `brand.onPrimary` `#00201D`，三种状态上的对比度为 8.9、9.9、10.8。`primary` 用作线条、图标和焦点环时，在窗口底色上 9.9:1、`surface` 上 9.0:1、`surface-selected` 上 6.4:1。
+- **链接** `link` `#5EEBDC`（`brand.text`），悬停 `link-hover` `#9FF3EA`，同样是悬停变亮；**INFO** 级别 `info` `#62AFFF`。
+- **线条**都比 `surface` 亮，深色下靠亮线勾边：`divider` `#292D32`、`border` `#30363C`、`border-button` `#414950`。`border-control` `#7F8A93` 在 `surface` 上 4.9:1、窗口底色上 5.5:1、`surface-selected` 上 3.5:1，满足非文字 3:1；开关的圆钮（`surface`）在关闭轨道上 4.9:1，在开启轨道（`primary`）上 9.0:1。
+- **状态色**取规范的深色 `status.*-text`：`success` `#32D583`、`warning` `#FDB022`、`latency-poor` `#F38B5E`、`danger` `#FF8077`（规范的 `#FF6B60` 在 `surface-selected` 上不到 4.5:1，提亮一档）。它们在所有深色底色上都不低于 4.5:1。
+- **图表**：下载 `primary` `#26D0BE`，上传 `chart-upload` `#F28A4B`（`surface` 上 7.0:1），参考线 `divider`。
 - **半透明色**改为纯黑加不透明度。暗底上的阴影不明显，所以比浅色更深；浮层的层次主要靠 1px `border` 亮边和更亮的 `surface`：
   - `scrim` `#00000080`：50%；
   - `shadow-overlay` `#00000066`：40%；
@@ -759,11 +763,12 @@ Windows 与 macOS 共用随包字体，字号、字重和回退顺序一致。�
   嵌套时内层圆角等于外层减去内边距，例如分段控件底槽 6px、内边距 2px，选项 4px；菜单 8px、内边距 4px，菜单项 4px。浮层不使用比 `md` 更大的圆角。
 - **线宽**一律 1px；单选圈和复选框 1.5px。
 - **图标**：线性图标，24 网格、2px 描边、圆角端点与拐角（与 Lucide 同一风格）。导航 18px，行内 14–16px。不使用填充图标、插画或 emoji；
-  唯一的例外是品牌标记的实心内核。
-- **品牌标记"日冕"**：实心的圆形内核，外面一圈在右上方留缺口的圆环（24 网格：内核半径 3.6，圆环半径 8，从 -40° 顺时针到
-  250°，缺口 70°）。侧栏左上角的 30px `text` 色方块里画 `surface` 色的单色标记（浅色外观下是深底白标）；应用图标是石墨底（`#15171C`）的圆角方块、白色圆环和
-  `primary` 蓝色内核，macOS 按 1024 画布上 824 的网格留边，32px 及以下加粗圆环和内核。所有尺寸由
-  `scripts/gen_icons.py` 从同一组几何参数生成，母版在 `ui/brand/`，`.icns`、`.ico` 在 `package/icons/`。
+  唯一的例外是实心的品牌标记。
+- **品牌标记**：OpenWeir 标记，来源是 assets 仓库的 `openweir.svg`（100 单位视框，无填充色），用法按 design 仓库的品牌规则。
+  界面内只用不带底色的品牌色标记：侧栏左上角 30px，颜色 `brand`（浅色 `#00B3A4`，深色 `#2EE6D2`；`brand` 只给标记用，界面的强调色仍是
+  `primary`）；`Icons.qml` 里是缩放到 24 网格的实心路径。应用图标是 `#00B3A4` 底的圆角方块（圆角为边长的 22%）里 `#00201D` 的标记，macOS 按
+  1024 画布上 824 的网格留边。标记不加描边、阴影或渐变，最小 16px。所有尺寸由 `scripts/gen_icons.py` 生成，母版在 `ui/brand/`，
+  `.icns`、`.ico` 在 `package/icons/`。
 
 ## Components
 
@@ -772,7 +777,7 @@ Windows 与 macOS 共用随包字体，字号、字重和回退顺序一致。�
     上部内容区用 `surface`，24px 外边距；下部是 80px 高的按钮带，用 `background`，上沿一条 `border` 分隔线。
     Windows 11 上标题栏用 `DWMWA_CAPTION_COLOR` 设为内容区颜色，Windows 10 保留系统标题栏。标题栏写「OpenWeir 安装程序」，
     卸载时写「OpenWeir 卸载程序」。
-  - 头部只有一个：48px 应用图标（深色外观下仍是石墨底），右边是 `title` 标题和一行 `caption`、`text-muted` 的副标题
+  - 头部只有一个：48px 应用图标（深色外观下仍是深海青底），右边是 `title` 标题和一行 `caption`、`text-muted` 的副标题
     「版本 1.0.0 · Windows x64」（ARM64 包写 ARM64）；更新时写「0.9.4 → 1.0.0 · Windows x64」，旧版本取自卸载信息的
     `DisplayVersion`。下面是一段 `body-md`、`text-secondary` 的说明。
   - 安装：「安装位置」（`section-label`）下面是 32px 高的输入框（界面字体，不用等宽字体）和 88px 宽的「浏览…」。内容区底部是
@@ -808,8 +813,8 @@ Windows 与 macOS 共用随包字体，字号、字重和回退顺序一致。�
   - 当前项使用白底、600 字重，图标改为 `primary`，并带 Elevation 中规定的轻阴影。
   - 侧栏底部用 8px 圆角的浅底块显示服务状态：状态圆点、一行状态文字、内核与协议版本（中文一行，英文分两行，见「英文文案」）。内核版本只写版本号，如 `v1.19.33`，不带伪版本的时间戳和提交哈希，与设置页「关于」相同。
 - **托盘图标**：
-  - 图形是单色的"日冕"标记，画在 20 单位的视框里，圆环描边 2.4，比界面图标粗，在 16–22px 的托盘尺寸下仍清楚；导出为 32px 的 SVG，放在 `ui/tray/`，由 `scripts/gen_icons.py` 生成。
-  - macOS 用模板图（黑色加不透明度），由系统按菜单栏外观着色。Windows 按任务栏的深浅各备一套：浅色任务栏用浅色外观的 `text`（`#15171C`），深色任务栏用白色。任务栏的深浅取系统的「默认 Windows 模式」，不取应用的外观，应用固定为深色时托盘图标也不跟着变。
+  - 图形是单色的 OpenWeir 标记（实心，没有细线，在 16–22px 的托盘尺寸下仍清楚）；导出为 32px 的 SVG，放在 `ui/tray/`，由 `scripts/gen_icons.py` 生成。
+  - macOS 用模板图（黑色加不透明度），由系统按菜单栏外观着色。Windows 按任务栏的深浅各备一套：浅色任务栏用 `#0E0E0E`，深色任务栏用 `#EDEDED`（品牌规则的单色取值）。任务栏的深浅取系统的「默认 Windows 模式」，不取应用的外观，应用固定为深色时托盘图标也不跟着变。
   - 隧道未运行时整个图形 45% 不透明。不加彩色角标、状态圆点或第二种图形。
   - 提示文字写「应用名 · 状态」，如「OpenWeir · 已连接」。
   - 托盘菜单是系统原生菜单，外观跟随平台，不套用下文应用内菜单的样式。依次是：状态（不可点）、连接 / 断开、「出站模式」子菜单（单选）、打开主窗口、「退出 OpenWeir」（先断开连接再退出），各组之间用分隔线。子菜单只出现在这里，是「不做多级子菜单」的例外。

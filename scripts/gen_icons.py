@@ -1,24 +1,19 @@
-"""Generate OpenWeir's icons from one geometry: the corona mark (DESIGN.md "Shapes").
+"""Generate OpenWeir's icons from the OpenWeir mark (DESIGN.md "Shapes").
 
     uv run python scripts/gen_icons.py
 
-Writes the app icons (src/openweir/ui/brand/*.svg, package/icons/openweir.ico and, on macOS
-with iconutil, package/icons/openweir.icns) and the six tray SVGs in src/openweir/ui/tray/.
-The mark: a solid core and a ring with a gap at the upper right. The ring runs clockwise
-from -40 degrees to 250 degrees, leaving 70 degrees open; angles as in SVG, y down.
+Writes the app icons (src/openweir/ui/brand/*.svg, package/icons/openweir.ico and
+package/icons/openweir.icns) and the six tray SVGs in src/openweir/ui/tray/, all from the
+OpenWeir mark (assets/openweir.svg) and the design repository's brand colours.
 Everything is committed, so a build needs no renderer; run this after changing the
 geometry, and check the result by eye.
 """
 
 from __future__ import annotations
 
-import math
 import os
-import shutil
 import struct
-import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -26,61 +21,45 @@ BRAND = ROOT / "src" / "openweir" / "ui" / "brand"
 TRAY = ROOT / "src" / "openweir" / "ui" / "tray"
 PACKAGE = ROOT / "package" / "icons"
 
-GRAPHITE = "#15171C"  # DESIGN.md light `text`
-BLUE = "#1F5EFF"  # DESIGN.md light `primary`
-WHITE = "#FFFFFF"
-GAP_START, GAP_END = -40.0, 250.0  # the ring's ends; the gap is between them, at the top right
+# The OpenWeir mark from the assets repository (assets/openweir.svg), on its 100-unit view.
+MARK = (
+    "M15.56 54.92L15.56 34.01Q15.56 32.042 17.036 30.566L30.566 17.036Q32.042 15.56 34.01 15.56"
+    "L65.99 15.56Q67.958 15.56 69.434 17.036L83.456 31.058Q85.178 32.78 82.718 32.78L62.054 32.78"
+    "Q59.348 32.78 57.134 34.871L39.176 52.829Q37.085 54.92 34.256 54.92Z"
+    "M84.44 45.08L84.44 65.99Q84.44 67.958 82.964 69.434L69.434 82.964Q67.958 84.44 65.99 84.44"
+    "L34.01 84.44Q32.042 84.44 30.566 82.964L16.544 68.942Q14.822 67.22 17.282 67.22L37.946 67.22"
+    "Q40.652 67.22 42.866 65.129L60.824 47.171Q62.915 45.08 65.744 45.08Z"
+)
+# The design repository's brand rules (ComponentsMore "品牌标"): the app icon is the mark in
+# brand.onPrimary on a brand.fill rounded square; trays and menu bars take the mark in one colour.
+TILE = "#00B3A4"  # brand.fill
+ON_TILE = "#00201D"  # brand.onPrimary
+MONO_LIGHT = "#0E0E0E"  # the one-colour mark on light ground
+MONO_DARK = "#EDEDED"  # and on dark ground
 
 
-def ring_path(cx: float, cy: float, r: float) -> str:
-    """The ring as one open arc, drawn clockwise from GAP_START to GAP_END."""
-
-    def point(degrees: float) -> str:
-        a = math.radians(degrees)
-        return f"{cx + r * math.cos(a):.2f} {cy + r * math.sin(a):.2f}"
-
-    return f"M{point(GAP_START)}A{r:g} {r:g} 0 1 1 {point(GAP_END)}"
-
-
-def tile_svg(size: int, inset: float, small: bool) -> str:
-    """An app icon: the mark, white ring and blue core, on a graphite rounded square.
-    ``inset`` is the transparent margin as a share of the canvas (macOS draws its icons
-    on 824 of 1024 units); ``small`` thickens the ring and core for 32 px and below."""
+def tile_svg(size: int, inset: float) -> str:
+    """An app icon: the mark on a brand-coloured rounded square. ``inset`` is the transparent
+    margin as a share of the canvas (macOS draws its icons on 824 of 1024 units)."""
     body = size * (1 - 2 * inset)
     x = size * inset
-    c = size / 2
-    ring_r, stroke, core = (0.27, 0.10, 0.16) if small else (0.29, 0.06, 0.15)
-    rounded = body * 0.225
-    edge = (
-        ""
-        if small
-        else f'<rect x="{x + 1:g}" y="{x + 1:g}" width="{body - 2:g}" height="{body - 2:g}" '
-        f'rx="{rounded - 1:g}" fill="none" stroke="{WHITE}" stroke-opacity="0.08" '
-        'stroke-width="2"/>'
-    )
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" '
         f'viewBox="0 0 {size} {size}">'
-        f'<rect x="{x:g}" y="{x:g}" width="{body:g}" height="{body:g}" rx="{rounded:g}" '
-        f'fill="{GRAPHITE}"/>'
-        f"{edge}"
-        f'<circle cx="{c:g}" cy="{c:g}" r="{body * core:g}" fill="{BLUE}"/>'
-        f'<path d="{ring_path(c, c, body * ring_r)}" fill="none" stroke="{WHITE}" '
-        f'stroke-width="{body * stroke:g}" stroke-linecap="round"/>'
+        f'<rect x="{x:g}" y="{x:g}" width="{body:g}" height="{body:g}" rx="{body * 0.22:g}" '
+        f'fill="{TILE}"/>'
+        f'<path transform="translate({x:g} {x:g}) scale({body / 100:g})" fill="{ON_TILE}" '
+        f'd="{MARK}"/>'
         "</svg>\n"
     )
 
 
 def tray_svg(color: str, opacity: float) -> str:
-    """The mark in one colour, as DESIGN.md's tray rules ask: 32 px, on a 20-unit view."""
+    """The mark in one colour for the tray and the menu bar, 32 px. The mark keeps the
+    assets' margin, which is more than the eighth of the icon's width the rules ask for."""
     return (
-        '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="2 2 20 20">\n'
-        f'  <g fill="none" stroke="{color}" stroke-opacity="{opacity:g}" stroke-width="2.4" '
-        'stroke-linecap="round">\n'
-        f'    <circle cx="12" cy="12" r="3.6" fill="{color}" fill-opacity="{opacity:g}" '
-        'stroke="none"/>\n'
-        f'    <path d="{ring_path(12, 12, 8)}"/>\n'
-        "  </g>\n"
+        '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 100 100">\n'
+        f'  <path fill="{color}" fill-opacity="{opacity:g}" d="{MARK}"/>\n'
         "</svg>\n"
     )
 
@@ -116,6 +95,29 @@ def ico(images: dict[int, bytes]) -> bytes:
     return header + entries + data
 
 
+# The PNG entries of an .icns file by pixel size; a size names both its 1x and 2x slots.
+ICNS = {
+    16: [b"icp4"],
+    32: [b"icp5", b"ic11"],
+    64: [b"icp6", b"ic12"],
+    128: [b"ic07"],
+    256: [b"ic08", b"ic13"],
+    512: [b"ic09", b"ic14"],
+    1024: [b"ic10"],
+}
+
+
+def icns(images: dict[int, bytes]) -> bytes:
+    """A macOS icon file of PNG entries, as iconutil writes them (macOS 10.7 and later), so the
+    icons build on any system."""
+    entries = b"".join(
+        kind + struct.pack(">I", 8 + len(png)) + png
+        for size, png in sorted(images.items())
+        for kind in ICNS[size]
+    )
+    return b"icns" + struct.pack(">I", 8 + len(entries)) + entries
+
+
 def main() -> None:
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     from PySide6.QtGui import QGuiApplication
@@ -126,42 +128,24 @@ def main() -> None:
 
     # macOS: 824 of 1024 units, as Apple's icon grid; Windows and the window icon: nearly
     # full bleed, since Windows draws no shape of its own around an icon.
-    macos = tile_svg(1024, 100 / 1024, small=False)
-    windows = tile_svg(256, 8 / 256, small=False)
+    macos = tile_svg(1024, 100 / 1024)
+    windows = tile_svg(256, 8 / 256)
     (BRAND / "app-icon-macos.svg").write_text(macos)
     (BRAND / "app-icon.svg").write_text(windows)
 
-    def windows_tile(size: int) -> str:
-        return windows if size > 32 else tile_svg(size, 0.03, small=True)
-
     (PACKAGE / "openweir.ico").write_bytes(
-        ico({s: render(windows_tile(s), s) for s in (16, 20, 24, 32, 40, 48, 64, 128, 256)})
+        ico({s: render(windows, s) for s in (16, 20, 24, 32, 40, 48, 64, 128, 256)})
     )
 
     for variant, color in (
         ("template", "#000000"),
-        ("light-taskbar", GRAPHITE),
-        ("dark-taskbar", WHITE),
+        ("light-taskbar", MONO_LIGHT),
+        ("dark-taskbar", MONO_DARK),
     ):
         for state, opacity in (("on", 1.0), ("off", 0.45)):
             (TRAY / f"tray-{variant}-{state}.svg").write_text(tray_svg(color, opacity))
 
-    iconutil = shutil.which("iconutil")
-    if iconutil is None:
-        print("iconutil is macOS only; openweir.icns left as it is")
-        return
-    with tempfile.TemporaryDirectory() as temp:
-        iconset = Path(temp) / "openweir.iconset"
-        iconset.mkdir()
-        for points in (16, 32, 128, 256, 512):
-            for scale in (1, 2):
-                pixels = points * scale
-                svg = macos if pixels > 32 else tile_svg(pixels, 100 / 1024, small=True)
-                name = f"icon_{points}x{points}{'@2x' if scale == 2 else ''}.png"
-                (iconset / name).write_bytes(render(svg, pixels))
-        subprocess.run(
-            [iconutil, "-c", "icns", str(iconset), "-o", str(PACKAGE / "openweir.icns")], check=True
-        )
+    (PACKAGE / "openweir.icns").write_bytes(icns({size: render(macos, size) for size in ICNS}))
     print("wrote", ", ".join(str(p.relative_to(ROOT)) for p in (BRAND, PACKAGE, TRAY)))
 
 

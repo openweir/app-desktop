@@ -10,40 +10,41 @@ QtObject {
     readonly property bool dark: appearance?.dark ?? false
 
     // ---- colors: dark ? colors.dark.<role> : colors.<role> ----
-    readonly property color primary: dark ? "#6495FF" : "#1F5EFF"  // primary
-    readonly property color primaryHover: dark ? "#76A1FF" : "#1B53E0"  // primary-hover
-    readonly property color primaryPressed: dark ? "#88AEFF" : "#1749CC"  // primary-pressed
-    readonly property color textOnPrimary: dark ? "#101216" : "#FFFFFF"  // on-primary
-    readonly property color link: dark ? "#8AAEFF" : "#1846C7"  // link
-    readonly property color linkHover: dark ? "#B5CBFF" : "#123A9E"  // link-hover
-    readonly property color background: dark ? "#1B1D20" : "#F3F4F6"  // background
-    readonly property color sidebar: dark ? "#202227" : "#E9EBEF"  // sidebar
-    readonly property color sidebarHover: dark ? "#26292E" : "#E0E3E8"  // sidebar-hover
-    readonly property color surface: dark ? "#2B2D33" : "#FFFFFF"  // surface
-    readonly property color surfaceSubtle: dark ? "#30343A" : "#F7F8FA"  // surface-subtle
-    readonly property color surfaceSelected: dark ? "#383B43" : "#ECEEF1"  // surface-selected
-    readonly property color controlTrack: dark ? "#121416" : "#E3E5E9"  // control-track
-    readonly property color divider: dark ? "#34373E" : "#ECEEF1"  // divider
-    readonly property color border: dark ? "#3B3F46" : "#DCDFE4"  // border
-    readonly property color borderButton: dark ? "#4C505A" : "#C9CDD4"  // border-button
-    readonly property color borderControl: dark ? "#818691" : "#828893"  // border-control
-    readonly property color text: dark ? "#E6E9ED" : "#15171C"  // text
-    readonly property color textSecondary: dark ? "#CBCFD6" : "#3D4350"  // text-secondary
-    readonly property color textTertiary: dark ? "#B7BCC4" : "#4B5260"  // text-tertiary
-    readonly property color textMuted: dark ? "#A1A6AF" : "#5F6673"  // text-muted
-    readonly property color success: dark ? "#45C4A6" : "#0A6B5B"  // success
-    readonly property color warning: dark ? "#E5A443" : "#8A5300"  // warning
+    readonly property color brand: dark ? "#2EE6D2" : "#00B3A4"  // brand
+    readonly property color primary: dark ? "#26D0BE" : "#00807A"  // primary
+    readonly property color primaryHover: dark ? "#3ADBCA" : "#00736D"  // primary-hover
+    readonly property color primaryPressed: dark ? "#4FE3D3" : "#006560"  // primary-pressed
+    readonly property color textOnPrimary: dark ? "#00201D" : "#FFFFFF"  // on-primary
+    readonly property color link: dark ? "#5EEBDC" : "#00665E"  // link
+    readonly property color linkHover: dark ? "#9FF3EA" : "#004F49"  // link-hover
+    readonly property color background: dark ? "#0B0F12" : "#F5F7F8"  // background
+    readonly property color sidebar: dark ? "#101519" : "#EEF0F2"  // sidebar
+    readonly property color sidebarHover: dark ? "#161C21" : "#E5E8EB"  // sidebar-hover
+    readonly property color surface: dark ? "#161B20" : "#FFFFFF"  // surface
+    readonly property color surfaceSubtle: dark ? "#1B2127" : "#F8F9FA"  // surface-subtle
+    readonly property color surfaceSelected: dark ? "#0F3B38" : "#E3F7F5"  // surface-selected
+    readonly property color controlTrack: dark ? "#05080A" : "#EFEFF0"  // control-track
+    readonly property color divider: dark ? "#292D32" : "#EBECEC"  // divider
+    readonly property color border: dark ? "#30363C" : "#DDE1E4"  // border
+    readonly property color borderButton: dark ? "#414950" : "#C5CBD0"  // border-button
+    readonly property color borderControl: dark ? "#7F8A93" : "#7C8790"  // border-control
+    readonly property color text: dark ? "#F2F5F7" : "#0B0F12"  // text
+    readonly property color textSecondary: dark ? "#B4BDC4" : "#4A5560"  // text-secondary
+    readonly property color textTertiary: dark ? "#A6B0B8" : "#53606B"  // text-tertiary
+    readonly property color textMuted: dark ? "#9AA4AC" : "#5F6A75"  // text-muted
+    readonly property color success: dark ? "#32D583" : "#067647"  // success
+    readonly property color warning: dark ? "#FDB022" : "#A04A05"  // warning
     readonly property color latencyPoor: dark ? "#F38B5E" : "#9A3412"  // latency-poor
     readonly property color danger: dark ? "#FF8077" : "#B42318"  // danger
-    readonly property color info: dark ? "#8AAEFF" : "#1846C7"  // info
+    readonly property color info: dark ? "#62AFFF" : "#0B5CC2"  // info
     readonly property color chartUpload: dark ? "#F28A4B" : "#C2410C"  // chart-upload
-    readonly property color scrim: dark ? "#80000000" : "#3315171C"  // scrim
-    readonly property color captionHover: dark ? "#0FFFFFFF" : "#0F15171C"  // caption-hover
-    readonly property color captionPressed: dark ? "#0AFFFFFF" : "#0A15171C"  // caption-pressed
+    readonly property color scrim: dark ? "#80000000" : "#330B0F12"  // scrim
+    readonly property color captionHover: dark ? "#0FFFFFFF" : "#0F0B0F12"  // caption-hover
+    readonly property color captionPressed: dark ? "#0AFFFFFF" : "#0A0B0F12"  // caption-pressed
     readonly property color captionClose: dark ? "#C42B1C" : "#C42B1C"  // caption-close
-    readonly property color shadowOverlay: dark ? "#66000000" : "#1F15171C"  // shadow-overlay
-    readonly property color shadowSegment: dark ? "#52000000" : "#1F15171C"  // shadow-segment
-    readonly property color shadowNav: dark ? "#3D000000" : "#1415171C"  // shadow-nav
+    readonly property color shadowOverlay: dark ? "#66000000" : "#1F0B0F12"  // shadow-overlay
+    readonly property color shadowSegment: dark ? "#52000000" : "#1F0B0F12"  // shadow-segment
+    readonly property color shadowNav: dark ? "#3D000000" : "#140B0F12"  // shadow-nav
 
     // ---- typography (fontSize px, fontWeight 100-900, lineHeight multiplier) ----
     component TypeRole: QtObject {

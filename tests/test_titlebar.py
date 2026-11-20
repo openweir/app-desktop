@@ -311,7 +311,7 @@ def test_the_band_lays_out_as_designed(qtbot: QtBot, style: str, loaded: Loaded)
 
     sidebar = loaded.item(lambda i: kind(i) == "Sidebar")
     mark = loaded.item(lambda i: kind(i) == "Icon" and i.property("name") == "mark")
-    brand = mark.parentItem().parentItem()  # the mark's tile, the app's name and what is in use
+    brand = mark.parentItem()  # the mark, the app's name and what is in use
     assert scene_rect(brand).top() == SIDEBAR_TOP[style]
     assert scene_rect(sidebar).top() == 0
     if style == WINDOWS:

@@ -2,7 +2,7 @@ pragma Singleton
 import QtQuick
 
 // Stroke icons on a 24-unit grid, drawn by Icon.qml (DESIGN.md "Shapes"). `fills` holds the
-// filled parts of the few that have one: the corona mark's core.
+// filled icons: the OpenWeir mark (assets/openweir.svg, scaled to the grid), which has no stroke.
 QtObject {
     readonly property var paths: ({
         "overview": "M4.5 3h4A1.5 1.5 0 0 1 10 4.5v4A1.5 1.5 0 0 1 8.5 10h-4A1.5 1.5 0 0 1 3 8.5v-4A1.5 1.5 0 0 1 4.5 3zM15.5 3h4A1.5 1.5 0 0 1 21 4.5v4A1.5 1.5 0 0 1 19.5 10h-4A1.5 1.5 0 0 1 14 8.5v-4A1.5 1.5 0 0 1 15.5 3zM4.5 14h4A1.5 1.5 0 0 1 10 15.5v4A1.5 1.5 0 0 1 8.5 21h-4A1.5 1.5 0 0 1 3 19.5v-4A1.5 1.5 0 0 1 4.5 14zM15.5 14h4A1.5 1.5 0 0 1 21 15.5v4A1.5 1.5 0 0 1 19.5 21h-4A1.5 1.5 0 0 1 14 19.5v-4A1.5 1.5 0 0 1 15.5 14z",
@@ -13,7 +13,6 @@ QtObject {
         "connections": "M4 8h14l-4-4M20 16H6l4 4",
         "logs": "M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01",
         "settings": "M4 7h9M17 7h3M4 17h3M11 17h9M17 7a2 2 0 1 1-4 0a2 2 0 1 1 4 0zM11 17a2 2 0 1 1-4 0a2 2 0 1 1 4 0z",
-        "mark": "M18.13 6.86A8 8 0 1 1 9.26 4.48",
         "chevron": "M9 6l6 6-6 6",
         "chevronDown": "M6 9l6 6 6-6",
         "check": "M5 12l5 5 9-10",
@@ -24,6 +23,6 @@ QtObject {
         "arrowUp": "M12 19V5M5 12l7-7 7 7"
     })
     readonly property var fills: ({
-        "mark": "M15.6 12a3.6 3.6 0 1 1-7.2 0a3.6 3.6 0 1 1 7.2 0z"
+        "mark": "M3.734 13.181L3.734 8.162Q3.734 7.69 4.089 7.336L7.336 4.089Q7.69 3.734 8.162 3.734L15.838 3.734Q16.31 3.734 16.664 4.089L20.029 7.454Q20.443 7.867 19.852 7.867L14.893 7.867Q14.244 7.867 13.712 8.369L9.402 12.679Q8.9 13.181 8.221 13.181ZM20.266 10.819L20.266 15.838Q20.266 16.31 19.911 16.664L16.664 19.911Q16.31 20.266 15.838 20.266L8.162 20.266Q7.69 20.266 7.336 19.911L3.971 16.546Q3.557 16.133 4.148 16.133L9.107 16.133Q9.756 16.133 10.288 15.631L14.598 11.321Q15.1 10.819 15.779 10.819Z"
     })
 }
