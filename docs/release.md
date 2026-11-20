@@ -75,10 +75,11 @@ GitHub 把正文里的换行原样显示，所以模板的段落不折行；除 
 日常开发提交到 `develop`，准备发布的代码合并到 `main`，在 `main` 上打 `v*` 标签发正式版（1.1）。
 
 `develop` 上的 CI 通过后，`.github/workflows/prerelease.yml` 把这次 CI 构建的未签名安装包发成 GitHub 预发布版本：tag 为
-`v<版本>-preview.<CI 运行编号>`，附件是 `OpenWeir-<版本>-preview.<n>-macos-universal-unsigned.dmg`、
+`v<版本>-preview.<n>`（同一版本从 1 起编号，标题即 tag），附件是 `OpenWeir-<版本>-preview.<n>-macos-universal-unsigned.dmg`、
 `OpenWeir-<版本>-preview.<n>-windows-<x64|arm64>-unsigned-setup.exe` 和 `SHA256SUMS`。测试人员从 Releases 页面下载，不必进
 Actions 找构建产物。
 
+- develop 与 main 指向同一提交时（例如刚发布正式版），develop 的 CI 不跑任何检查，也不发预览版，由 main 那次运行覆盖。
 - 只保留最新的一个预览版：发布新的之后，之前的连同 tag 一起删除。只改文档、CI 没有构建安装包时不发布。
 - 检查更新只读 `releases/latest`，GitHub 不把预发布版本算作 latest，所以预览版不会被当作更新推送（第 2 节）。
 - `release.yml` 的 tag 触发排除 `v*-preview.*`；而且 `GITHUB_TOKEN` 创建的 tag 本来就不会触发其他工作流。

@@ -38,10 +38,24 @@ jobs:
       # The script cannot vouch for a change to itself. Unless the one that ran is the one at
       # the start of the range (the pull request's base; a push's successful baseline and
       # previous head), every check runs, whatever it selected. Read with the runner's Python.
+      # main and develop often point at one commit after a release; main's run covers it,
+      # so develop runs no checks and therefore publishes no preview.
+      - name: Skip develop when main has the same commit
+        id: same
+        if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          main=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)
+          if [ "$main" = "$GITHUB_SHA" ]; then
+            echo "main=true" >> "$GITHUB_OUTPUT"
+            echo "main is at this commit; its CI run covers it, so develop runs no checks." >> "$GITHUB_STEP_SUMMARY"
+          fi
       - name: Every check when the selection script changed
         id: select
         env:
           EVENT: ${{ github.event_name }}
+          SAME_AS_MAIN: ${{ steps.same.outputs.main }}
           PR_BASE: ${{ github.event.pull_request.base.sha }}
           BEFORE: ${{ github.event.before }}
           SELECTION: ${{ runner.temp }}/selection.json
@@ -83,6 +97,8 @@ jobs:
               trusted = False
           if not trusted:
               jobs, protocol = EVERY, True
+          if os.environ.get('SAME_AS_MAIN') == 'true':
+              jobs, protocol = [], False
           with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
               output.write(f"jobs={json.dumps(sorted(jobs), separators=(',', ':'))}\nprotocol={str(protocol).lower()}\n")
           if not trusted:
