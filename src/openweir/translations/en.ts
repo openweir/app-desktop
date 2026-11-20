@@ -2765,8 +2765,8 @@ prepend-rules:
         <translation>Import subscription file</translation>
     </message>
     <message>
-        <source>YAML 配置 (*.yaml *.yml)</source>
-        <translation>YAML profiles (*.yaml *.yml)</translation>
+        <source>订阅文件 (*.yaml *.yml *.json *.txt)</source>
+        <translation>Subscription files (*.yaml *.yml *.json *.txt)</translation>
     </message>
     <message>
         <source>所有文件 (*)</source>

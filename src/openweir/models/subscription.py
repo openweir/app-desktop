@@ -41,7 +41,7 @@ _USERINFO_HEADERS = (
     "X-Obs-Meta-Subscription-Userinfo",
     "X-Cos-Meta-Subscription-Userinfo",
 )
-_CONFIG_SUFFIXES = (".yaml", ".yml")
+_CONFIG_SUFFIXES = (".yaml", ".yml", ".json", ".txt")
 
 
 @dataclass(frozen=True)

@@ -714,7 +714,7 @@ ScrollView {
         id: fileDialog
 
         title: qsTr("导入订阅文件")
-        nameFilters: [qsTr("YAML 配置 (*.yaml *.yml)"), qsTr("所有文件 (*)")]
+        nameFilters: [qsTr("订阅文件 (*.yaml *.yml *.json *.txt)"), qsTr("所有文件 (*)")]
         onAccepted: page.profiles.importFile(selectedFile.toString())
     }
 }

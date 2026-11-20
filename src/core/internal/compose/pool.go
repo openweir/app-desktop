@@ -44,10 +44,15 @@ type subscription struct {
 }
 
 // parseSubscription reads a subscription the way mihomo's proxy providers do: a YAML
-// mapping with proxies, or else share links, one per line or base64-encoded.
+// mapping with proxies, or else share links, one per line or base64-encoded. A sing-box
+// config is converted first (Normalize).
 func parseSubscription(data []byte) (*subscription, error) {
 	if len(bytes.TrimSpace(data)) == 0 {
 		return nil, errors.New("the subscription is empty")
+	}
+	data, err := Normalize(data)
+	if err != nil {
+		return nil, err
 	}
 	var profile map[string]any
 	yamlErr := yaml.Unmarshal(data, &profile)

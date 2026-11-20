@@ -1,6 +1,6 @@
 # 决策
 
-本文记录 OpenWeir 的设计决策。代码注释和其他文档按编号引用它们（如"D19"），所以编号不变、不重用；新的决策从 D50
+本文记录 OpenWeir 的设计决策。代码注释和其他文档按编号引用它们（如"D19"），所以编号不变、不重用；新的决策从 D51
 接着编号。每条只写结论，理由和细节在"详见"一栏的文档里。
 
 ## 待决策
@@ -61,3 +61,4 @@
 | D47 | OpenWeir 桌面端从 [Solaris](https://github.com/openweir/Solaris) fork 而来，保留完整历史，之后独立维护：产品、系统标识和内部代码名（Python 包 `openweir`、Go 模块 `github.com/openweir/app-desktop/src/core`、proto 包 `openweir.control.v1`、`openweir_*` C 符号、`OpenWeirCore`/`OpenWeirManager`/`OpenWeirTunnel`、帧魔数 `WEIR`）都改为 OpenWeir；上游的修复按需挑选合并（远程 `upstream`）。签名身份（Apple Team ID、Windows 签名者与 EKU）不写进仓库，由发布环境的 `OPENWEIR_APPLE_TEAM_ID`、`OPENWEIR_WINDOWS_SIGNER`、`OPENWEIR_WINDOWS_SIGNER_EKU` 提供（D49） | [README.md](../README.md)「致谢」 |
 | D48 | 订阅下载的 User-Agent 为 `OpenWeir/<版本> (Windows\|macOS) clash.meta`：OpenWeir 面板按开头的 `OpenWeir/<版本>` 下发 OpenWeir 模板（OpenWeir 版 mihomo 的 YAML），其他服务商按 `clash.meta` 下发 Clash YAML；原为 `openweir/<版本> clash.meta` | [usage.md](usage.md) |
 | D49 | 产品标识集中在仓库根目录的 `product.json`（显示名、产品 id、bundle id、更新仓库、URL scheme、Windows 服务与可执行文件名，以及留空的签名身份），各处统一从它读取：界面运行时读随包的副本（`openweir.product`），Go 读 `scripts/gen_product.py` 生成的 `product_gen.go`，构建脚本、`sign.ps1`、NSIS（经构建脚本定义）和 Apple 工程（经 Xcode 构建变量）读它。签名构建从环境变量写入签名身份：界面的随包副本、服务的 `-X` 链接参数、entitlements；缺任一项时构建失败。运行中的程序不从环境变量读签名身份 | [development.md](development.md)「生成的文件」 |
+| D50 | sing-box 订阅由核心用 [openweir/subconv](https://github.com/openweir/subconv) 转换：`compose.Normalize` 把它变成基础段（`base.yaml`）加上转换出的节点、策略组、规则集和规则，节点池、InspectSource、转为方案和「订阅自带」的 admission 都经过它，之后与 mihomo 订阅走同一条路。mihomo 配置和分享链接仍由 mihomo 自己读取。转换时略去的内容暂不显示在界面上 | [subconv 的 docs/architecture.md](https://github.com/openweir/subconv/blob/main/docs/architecture.md) |

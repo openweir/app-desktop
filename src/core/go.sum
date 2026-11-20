@@ -220,6 +220,8 @@ github.com/openweir/cronet-go/all v0.0.0-20261120115440-78366bd1e919 h1:WJDQqStu
 github.com/openweir/cronet-go/all v0.0.0-20261120115440-78366bd1e919/go.mod h1:4BrLeQjQbVfkwfjNJwZWJsciTS0ao1e0hujf9N/UFSE=
 github.com/openweir/mihomo v1.19.34-0.20261120115516-04e8cc02b0d9 h1:dXBJUrp0dlGiczJbqPPlarX1WCFidAfuwdgwuxhcSJo=
 github.com/openweir/mihomo v1.19.34-0.20261120115516-04e8cc02b0d9/go.mod h1:PFXs+/LLigdiQDSCICCZcCIm8MknY1ckQXxbtz6Jq7E=
+github.com/openweir/subconv v0.2.1 h1:XLugOy2fYbJArJfChC3qacKC79uNAFEiSAPThgVmkRo=
+github.com/openweir/subconv v0.2.1/go.mod h1:e/uSHnlHC+oQe6j+inAn0agzwaIg6pxkJcBept8B8RQ=
 github.com/oschwald/maxminddb-golang v1.12.0 h1:9FnTOD0YOhP7DGxGsq4glzpGy5+w7pq50AS6wALUMYs=
 github.com/oschwald/maxminddb-golang v1.12.0/go.mod h1:q0Nob5lTCqyQ8WT6FYgS1L7PXKVVbgiymefNwIjPzgY=
 github.com/pierrec/lz4/v4 v4.1.14/go.mod h1:gZWDp/Ze/IJXGXf23ltt2EXimqmTUXEy0GFuRQyBid4=

@@ -176,10 +176,15 @@ func document(profile Profile) (map[string]any, *compose.Result, error) {
 }
 
 // decodeDocument reads the profile as a generic mapping. Decoding into a map resolves
-// anchors and merge keys, so a patch cannot be bypassed by an alias.
+// anchors and merge keys, so a patch cannot be bypassed by an alias. A sing-box
+// subscription is converted into a mihomo profile first (compose.Normalize).
 func decodeDocument(source []byte) (map[string]any, error) {
 	if len(bytes.TrimSpace(source)) == 0 {
 		return nil, errors.New("the configuration is empty")
+	}
+	source, err := compose.Normalize(source)
+	if err != nil {
+		return nil, err
 	}
 	var doc map[string]any
 	if err := yaml.Unmarshal(source, &doc); err != nil {
