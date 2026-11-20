@@ -1,0 +1,103 @@
+# Previews as GitHub pre-releases (docs/release.md "预览版"): after CI passes on develop, its
+# unsigned macOS disk image and Windows installers go out as v<version>-preview.<N> (N counts
+# from 1 per version), so testers download them from the release page instead of Actions artifacts. main
+# holds what is to be released, and its v* tags make the signed releases (release.yml). Pre-releases
+# are never offered as updates (src/openweir/update/releases.py reads releases/latest only), and
+# only the newest is kept. A CI run that built no installer (documentation only) publishes
+# nothing.
+name: Preview
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [develop]
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: prerelease
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+
+      # The Windows installers are kept for a day and the disk image for a week (ci.yml).
+      - name: Installers from the CI run
+        uses: actions/download-artifact@v7
+        with:
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          pattern: "{macos-universal,windows-installer}-*"
+          merge-multiple: true
+          path: dist
+
+      - name: Name the files after the preview version
+        id: files
+        run: |
+          shopt -s nullglob
+          version=$(python3 -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
+          # Previews of a version count from 1: the next number after this version's newest preview.
+          last=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName \
+            --jq "[.[].tagName | select(startswith(\"v$version-preview.\")) | ltrimstr(\"v$version-preview.\") | select(test(\"^[0-9]+\$\")) | tonumber] | max // 0")
+          preview="$version-preview.$((last + 1))"
+          echo "tag=v$preview" >> "$GITHUB_OUTPUT"
+          echo "version=$preview" >> "$GITHUB_OUTPUT"
+          cd dist
+          for dmg in *.dmg; do mv "$dmg" "OpenWeir-$preview-macos-universal-unsigned.dmg"; done
+          for exe in OpenWeir-*-windows-*-setup.exe; do
+            arch=$(echo "$exe" | sed -E 's/.*-windows-([a-z0-9]+)-setup\.exe/\1/')
+            mv "$exe" "OpenWeir-$preview-windows-$arch-unsigned-setup.exe"
+          done
+          files=(OpenWeir-*)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "This CI run built no installer; nothing to publish"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          sha256sum "${files[@]}" > SHA256SUMS
+          ls -l
+          echo "publish=true" >> "$GITHUB_OUTPUT"
+
+      - name: Publish the pre-release
+        if: steps.files.outputs.publish == 'true'
+        env:
+          TAG: ${{ steps.files.outputs.tag }}
+          VERSION: ${{ steps.files.outputs.version }}
+        run: |
+          cat > notes.md <<EOF
+          OpenWeir $VERSION 预览版，由 develop 上的 ${HEAD_SHA:0:7} 构建。
+
+          - **预览版不签名**，只有 main 上发布的正式版才签名和公证。Windows 安装时 SmartScreen 会提示未知发布者，选择「更多信息 → 仍要运行」。
+          - **macOS 只能查看界面，不能连接**：系统扩展需要 Developer ID 签名和公证才能激活。
+          - 预览版不会通过应用内更新推送；正式版发布后请改用正式版。
+          - 用 \`SHA256SUMS\` 核对下载的文件。
+          EOF
+          gh release create "$TAG" dist/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$HEAD_SHA" \
+            --title "$TAG" \
+            --notes-file notes.md \
+            --prerelease
+
+      # Only the newest preview stays; the older ones go, with their tags.
+      - name: Remove older previews
+        if: steps.files.outputs.publish == 'true'
+        run: |
+          gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName,isPrerelease,createdAt \
+            --jq '[.[] | select(.isPrerelease and (.tagName | test("^v.+-preview\\.[0-9]+$")))] | sort_by(.createdAt) | reverse | .[1:] | .[].tagName' |
+          while read -r tag; do
+            gh release delete "$tag" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
+          done
