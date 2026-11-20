@@ -81,6 +81,8 @@ Actions 找构建产物。
 
 - develop 与 main 指向同一提交时（例如刚发布正式版），develop 的 CI 不跑任何检查，也不发预览版，由 main 那次运行覆盖。
 - 只保留最新的一个预览版：发布新的之后，之前的连同 tag 一起删除。只改文档、CI 没有构建安装包时不发布。
+- 较新的提交会取消还在进行的 CI 和预览发布（main 的 CI 除外），每次发布预览版后删除已取消的运行记录。
+- 正式版发布后，`remove-previews.yml` 删除同一版本的全部预览版及其 tag。
 - 检查更新只读 `releases/latest`，GitHub 不把预发布版本算作 latest，所以预览版不会被当作更新推送（第 2 节）。
 - `release.yml` 的 tag 触发排除 `v*-preview.*`；而且 `GITHUB_TOKEN` 创建的 tag 本来就不会触发其他工作流。
 - `workflow_run` 只认默认分支（`main`）上的工作流文件，所以 `prerelease.yml` 在 `main` 上也要有。
