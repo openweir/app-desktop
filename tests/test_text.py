@@ -4,12 +4,12 @@ from pathlib import Path
 
 import pytest
 
-from solaris.models.backup import Backups, Snapshot
-from solaris.models.backup_google import _fit
-from solaris.models.profiles import KIND_FILE, Profile, ProfileError, ProfileList
-from solaris.models.store import ProfileStore
-from solaris.models.subscription import decode_config
-from solaris.text import utf8_prefix
+from openweir.models.backup import Backups, Snapshot
+from openweir.models.backup_google import _fit
+from openweir.models.profiles import KIND_FILE, Profile, ProfileError, ProfileList
+from openweir.models.store import ProfileStore
+from openweir.models.subscription import decode_config
+from openweir.text import utf8_prefix
 from tests.support.unicode import CLUSTERS, TEXT
 
 

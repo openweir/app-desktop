@@ -12,8 +12,8 @@ from pathlib import Path
 
 import pytest
 
+from openweir.desktop.links import SCHEMES
 from scripts import build_app, build_apple, build_dmg, macos
-from solaris.desktop.links import SCHEMES
 
 MANAGER = build_apple.APPLE / "Manager"
 NATIVE_MACOS = pytest.mark.skipif(
@@ -36,8 +36,8 @@ def _compile_swift(source: Path, executable: Path, manager_sources: tuple[str, .
 def test_app_minimum_keeps_product_floor_and_stricter_dependencies(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, library_minimum: str, expected: str
 ) -> None:
-    bundle = tmp_path / "Solaris.app"
-    binary = bundle / "Contents" / "MacOS" / "SolarisUI"
+    bundle = tmp_path / "OpenWeir.app"
+    binary = bundle / "Contents" / "MacOS" / "OpenWeirUI"
     monkeypatch.setattr(build_app, "_machos", lambda _: iter([binary]))
 
     def output(command: list[str | Path]) -> str:
@@ -53,7 +53,7 @@ def test_app_minimum_keeps_product_floor_and_stricter_dependencies(
 def test_the_app_registers_every_install_link_scheme(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # One-click import (D6, D45): LaunchServices opens Solaris for each scheme links.py takes.
+    # One-click import (D6, D45): LaunchServices opens OpenWeir for each scheme links.py takes.
     def ditto(command: list[str | Path], **_: object) -> None:
         assert command[0] == "ditto"
         source, target = Path(command[1]), Path(command[2])
@@ -61,10 +61,10 @@ def test_the_app_registers_every_install_link_scheme(
 
     monkeypatch.setattr(build_app, "BUILD", tmp_path / "build")
     monkeypatch.setattr(build_app, "_run", ditto)
-    ui = tmp_path / "SolarisUI.app"
+    ui = tmp_path / "OpenWeirUI.app"
     (ui / "Contents").mkdir(parents=True)
     (ui / "Contents" / "Info.plist").write_bytes(plistlib.dumps({"CFBundleExecutable": "ui"}))
-    dylib = tmp_path / "SolarisManager.framework"
+    dylib = tmp_path / "OpenWeirManager.framework"
     dylib.mkdir()
     extension = tmp_path / "Tunnel.systemextension"
     (extension / "Contents").mkdir(parents=True)
@@ -74,15 +74,15 @@ def test_the_app_registers_every_install_link_scheme(
     assert info["CFBundleURLTypes"] == [
         {"CFBundleURLName": build_apple.APP_ID, "CFBundleURLSchemes": list(SCHEMES)}
     ]
-    assert SCHEMES == ("solaris", "clash", "mihomo", "clashmeta")
+    assert SCHEMES == ("openweir", "clash", "mihomo", "clashmeta")
     assert info["CFBundleVersion"] == "7"
 
 
 def test_universal_ui_checks_the_minimum_and_dependencies_in_both_slices(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    bundle = tmp_path / "Solaris.app"
-    binary = bundle / "Contents" / "MacOS" / "SolarisUI"
+    bundle = tmp_path / "OpenWeir.app"
+    binary = bundle / "Contents" / "MacOS" / "OpenWeirUI"
     monkeypatch.setattr(build_app, "_machos", lambda _: iter([binary]))
     loads = (
         "Load command 0\n cmd LC_BUILD_VERSION\n minos 26.0\n"
@@ -147,7 +147,7 @@ def test_universal_merge_preserves_each_executable_slice_and_shared_resources(
         )
     output = tmp_path / "universal"
     subprocess.run(
-        ["xattr", "-w", "com.solaris.merge-test", "preserved", str(inputs["arm64"] / "data")],
+        ["xattr", "-w", "com.openweir.merge-test", "preserved", str(inputs["arm64"] / "data")],
         check=True,
     )
     macos.merge_bundle(inputs, output)
@@ -157,7 +157,7 @@ def test_universal_merge_preserves_each_executable_slice_and_shared_resources(
     assert not (output / "_CodeSignature").exists()
     assert (
         subprocess.check_output(
-            ["xattr", "-p", "com.solaris.merge-test", str(output / "data")], text=True
+            ["xattr", "-p", "com.openweir.merge-test", str(output / "data")], text=True
         ).strip()
         == "preserved"
     )
@@ -206,7 +206,7 @@ def test_the_background_fills_the_window_at_both_scales() -> None:
 
 
 def test_the_app_sits_left_of_applications_inside_the_window() -> None:
-    settings = build_dmg.settings(Path("build/app/Solaris.app"))
+    settings = build_dmg.settings(Path("build/app/OpenWeir.app"))
     (app_x, app_y), (applications_x, applications_y) = (
         settings["icon_locations"][name] for name in (build_dmg.APP_NAME, build_dmg.APPLICATIONS)
     )
@@ -227,14 +227,14 @@ def test_native_deadline_includes_queue_and_all_callback_steps(tmp_path: Path) -
     main = tmp_path / "main.swift"
     main.write_text(r"""
 import Foundation
-import SolarisManagerHeader
+import OpenWeirManagerHeader
 
 func timedOut(_ work: () throws -> Void) {
   do {
     try work()
     fatalError("operation unexpectedly completed")
   } catch let error as ManagerError {
-    precondition(error.result == SOLARIS_MANAGER_TIMED_OUT)
+    precondition(error.result == OPENWEIR_MANAGER_TIMED_OUT)
   } catch { fatalError("unexpected error: \(error)") }
 }
 
@@ -290,11 +290,11 @@ def test_native_extension_request_lifecycle_without_submitting_to_the_system(
     main.write_text(r"""
 import Foundation
 import SystemExtensions
-import SolarisManagerHeader
+import OpenWeirManagerHeader
 import os
 
-let tunnelBundleIdentifier = "dev.tschen.solaris.tunnel"
-let logger = Logger(subsystem: "dev.tschen.solaris.tests", category: "fake-extensions")
+let tunnelBundleIdentifier = "org.openweir.app.tunnel"
+let logger = Logger(subsystem: "org.openweir.app.tests", category: "fake-extensions")
 
 final class Submitter {
   var mode = "approval"
@@ -338,8 +338,8 @@ func expect(_ result: Int, _ action: () throws -> Void) {
 
 let fake = Submitter()
 let controller = SystemExtensionRequests(submit: fake.submit)
-expect(SOLARIS_MANAGER_NEEDS_APPROVAL) { try controller.activate(timeout: 0.2) }
-expect(SOLARIS_MANAGER_NEEDS_APPROVAL) { try controller.activate(timeout: 0.2) }
+expect(OPENWEIR_MANAGER_NEEDS_APPROVAL) { try controller.activate(timeout: 0.2) }
+expect(OPENWEIR_MANAGER_NEEDS_APPROVAL) { try controller.activate(timeout: 0.2) }
 precondition(fake.requests.count == 1)
 // Deactivation replaces an activation that waits for approval; the replaced request's late
 // callbacks finish nothing.
@@ -354,33 +354,33 @@ precondition(fake.requests.count == 3)
 
 // An activation the system is still working on keeps a deactivation out, and the other way round.
 fake.mode = "silent"
-expect(SOLARIS_MANAGER_TIMED_OUT) { try controller.activate(timeout: 0.02) }
-expect(SOLARIS_MANAGER_BUSY) { try controller.deactivate(timeout: 0.2) }
+expect(OPENWEIR_MANAGER_TIMED_OUT) { try controller.activate(timeout: 0.02) }
+expect(OPENWEIR_MANAGER_BUSY) { try controller.deactivate(timeout: 0.2) }
 let working = fake.requests.last!
 working.delegate!.request(working, didFinishWithResult: .completed)
 
 fake.mode = "absent"
 try controller.deactivate(timeout: 0.2)
 fake.mode = "pending"
-expect(SOLARIS_MANAGER_NEEDS_REBOOT) { try controller.deactivate(timeout: 0.2) }
+expect(OPENWEIR_MANAGER_NEEDS_REBOOT) { try controller.deactivate(timeout: 0.2) }
 fake.mode = "complete"
 try controller.deactivate(timeout: 0.2) // pending completion was not cached as an eternal refusal
 fake.mode = "cancelled"
-expect(SOLARIS_MANAGER_CANCELLED) { try controller.deactivate(timeout: 0.2) }
+expect(OPENWEIR_MANAGER_CANCELLED) { try controller.deactivate(timeout: 0.2) }
 fake.mode = "complete"
 try controller.activate(timeout: 0.2)
 
 fake.mode = "silent"
-expect(SOLARIS_MANAGER_TIMED_OUT) { try controller.deactivate(timeout: 0.02) }
+expect(OPENWEIR_MANAGER_TIMED_OUT) { try controller.deactivate(timeout: 0.02) }
 let count = fake.requests.count
-expect(SOLARIS_MANAGER_TIMED_OUT) { try controller.deactivate(timeout: 0.02) }
-expect(SOLARIS_MANAGER_BUSY) { try controller.activate(timeout: 0.2) }
+expect(OPENWEIR_MANAGER_TIMED_OUT) { try controller.deactivate(timeout: 0.02) }
+expect(OPENWEIR_MANAGER_BUSY) { try controller.activate(timeout: 0.2) }
 precondition(fake.requests.count == count)
 let pending = fake.requests.last!
 pending.delegate!.request(pending, didFinishWithResult: .completed)
 
 fake.mode = "late"
-expect(SOLARIS_MANAGER_TIMED_OUT) { try controller.deactivate(timeout: 0.01) }
+expect(OPENWEIR_MANAGER_TIMED_OUT) { try controller.deactivate(timeout: 0.01) }
 fake.mode = "complete"
 try controller.deactivate(timeout: 0.2)
 print("extension request checks passed")
@@ -397,7 +397,7 @@ print("extension request checks passed")
 
 @pytest.fixture
 def extension(tmp_path: Path) -> Path:
-    bundle = tmp_path / "Solaris.systemextension"
+    bundle = tmp_path / "OpenWeir.systemextension"
     contents = bundle / "Contents"
     resources = contents / "Resources"
     resources.mkdir(parents=True)
@@ -428,7 +428,7 @@ print(String(data: try! JSONSerialization.data(withJSONObject: [value]), encodin
         plistlib.dumps(
             {
                 "CFBundleExecutable": "lookup",
-                "CFBundleIdentifier": "dev.tschen.solaris.localization-test",
+                "CFBundleIdentifier": "org.openweir.app.localization-test",
                 "CFBundleDevelopmentRegion": "en",
                 "CFBundleLocalizations": list(build_apple.LOCALIZATIONS),
             }

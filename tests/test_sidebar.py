@@ -12,9 +12,9 @@ from PySide6.QtGui import QAccessible
 from PySide6.QtQuick import QQuickItem
 from pytestqt.qtbot import QtBot
 
-from solaris.host.base import HostError, HostStatus
-from solaris.models.store import ProfileStore
-from solaris.viewmodels.composition import ViewModels, compose
+from openweir.host.base import HostError, HostStatus
+from openweir.models.store import ProfileStore
+from openweir.viewmodels.composition import ViewModels, compose
 from tests.support.simulated import SimulatedFetcher, SimulatedHost, seed_profiles
 from tests.support.window import Loaded, accessible, find, find_all, kind
 

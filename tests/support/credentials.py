@@ -3,7 +3,7 @@ Credential Manager."""
 
 from __future__ import annotations
 
-from solaris.models.credentials import CredentialError
+from openweir.models.credentials import CredentialError
 
 
 class MemoryKeyring:

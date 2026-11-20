@@ -18,7 +18,7 @@ import (
 	"strings"
 )
 
-// The layout under the service's root, %ProgramData%\Solaris (§5.1).
+// The layout under the service's root, %ProgramData%\OpenWeir (§5.1).
 const (
 	recordFile = "owner.json"
 	usersDir   = "users"

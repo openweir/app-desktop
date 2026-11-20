@@ -15,7 +15,7 @@ import (
 
 type handleConn interface{ Fd() uintptr }
 
-// PipeClientVerifier accepts only installedUI, the Solaris.exe beside the service, run in a
+// PipeClientVerifier accepts only installedUI, the OpenWeir.exe beside the service, run in a
 // user's session (docs/architecture.md §5.3), and returns that user's SID and session. It
 // also accepts helper, the service's own executable, when an administrator runs it elevated
 // to take over another user's tunnel (decision D5b, §5.4); run without those rights it is
@@ -212,7 +212,7 @@ type providerCertificate struct {
 }
 
 // TrustedSigner is the certificate that signed file at path, its display name and DER
-// encoding, when Windows trusts the signature; src/solaris/update/signature.py reads
+// encoding, when Windows trusts the signature; src/openweir/update/signature.py reads
 // installers the same way. Revocation is not checked: that may need the network, and runs
 // on every connection.
 func TrustedSigner(path string, file windows.Handle) (string, []byte, error) {

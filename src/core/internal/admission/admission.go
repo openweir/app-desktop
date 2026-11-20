@@ -16,7 +16,7 @@ import (
 
 	"github.com/metacubex/mihomo/common/yaml"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/compose"
+	"github.com/openweir/app-desktop/src/core/internal/compose"
 )
 
 var (

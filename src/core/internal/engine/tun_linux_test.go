@@ -4,7 +4,7 @@ package engine
 
 // The owned-TUN test creates a real TUN, so it only ever runs inside a network
 // namespace (docs/architecture.md §11): it compiles only with -tags tuntest, runs only
-// with SOLARIS_TUN_TEST=1, and refuses the host's namespace. CI builds the
+// with OPENWEIR_TUN_TEST=1, and refuses the host's namespace. CI builds the
 // namespaces; see the tun job in .github/workflows/ci.yml.
 
 import (
@@ -20,24 +20,24 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/admission"
-	"github.com/Ember-Moth/Solaris/src/core/internal/controlpb"
+	"github.com/openweir/app-desktop/src/core/internal/admission"
+	"github.com/openweir/app-desktop/src/core/internal/controlpb"
 )
 
 const tunDevice = "mdtun0"
 
 func TestOwnedTUN(t *testing.T) {
-	if os.Getenv("SOLARIS_TUN_TEST") != "1" {
-		t.Skip("set SOLARIS_TUN_TEST=1 and run inside a network namespace")
+	if os.Getenv("OPENWEIR_TUN_TEST") != "1" {
+		t.Skip("set OPENWEIR_TUN_TEST=1 and run inside a network namespace")
 	}
 	requireIsolatedNamespace(t)
-	target := os.Getenv("SOLARIS_TUN_TARGET")
-	outbound := os.Getenv("SOLARIS_TUN_OUTBOUND")
+	target := os.Getenv("OPENWEIR_TUN_TARGET")
+	outbound := os.Getenv("OPENWEIR_TUN_OUTBOUND")
 	if target == "" || outbound == "" {
-		t.Fatal("SOLARIS_TUN_TARGET names the HTTP server outside the namespace, SOLARIS_TUN_OUTBOUND the link to it")
+		t.Fatal("OPENWEIR_TUN_TARGET names the HTTP server outside the namespace, OPENWEIR_TUN_OUTBOUND the link to it")
 	}
 	udp := udpTarget(t)
-	stacks := strings.Split(os.Getenv("SOLARIS_TUN_STACKS"), ",")
+	stacks := strings.Split(os.Getenv("OPENWEIR_TUN_STACKS"), ",")
 	if stacks[0] == "" {
 		stacks = []string{"system"}
 	}

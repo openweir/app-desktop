@@ -12,9 +12,9 @@ import (
 
 	C "github.com/metacubex/mihomo/constant"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/admission"
-	"github.com/Ember-Moth/Solaris/src/core/internal/compose"
-	"github.com/Ember-Moth/Solaris/src/core/internal/controlpb"
+	"github.com/openweir/app-desktop/src/core/internal/admission"
+	"github.com/openweir/app-desktop/src/core/internal/compose"
+	"github.com/openweir/app-desktop/src/core/internal/controlpb"
 )
 
 // warpDevice is a WARP device with keys mihomo reads as Cloudflare's would be; nothing

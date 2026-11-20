@@ -13,15 +13,15 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/admission"
-	"github.com/Ember-Moth/Solaris/src/core/internal/compose"
-	"github.com/Ember-Moth/Solaris/src/core/internal/controlpb"
-	"github.com/Ember-Moth/Solaris/src/core/internal/engine"
-	"github.com/Ember-Moth/Solaris/src/core/internal/frame"
-	"github.com/Ember-Moth/Solaris/src/core/internal/operation"
-	"github.com/Ember-Moth/Solaris/src/core/internal/peer"
-	"github.com/Ember-Moth/Solaris/src/core/internal/product"
-	"github.com/Ember-Moth/Solaris/src/core/internal/warp"
+	"github.com/openweir/app-desktop/src/core/internal/admission"
+	"github.com/openweir/app-desktop/src/core/internal/compose"
+	"github.com/openweir/app-desktop/src/core/internal/controlpb"
+	"github.com/openweir/app-desktop/src/core/internal/engine"
+	"github.com/openweir/app-desktop/src/core/internal/frame"
+	"github.com/openweir/app-desktop/src/core/internal/operation"
+	"github.com/openweir/app-desktop/src/core/internal/peer"
+	"github.com/openweir/app-desktop/src/core/internal/product"
+	"github.com/openweir/app-desktop/src/core/internal/warp"
 )
 
 const (

@@ -1,5 +1,5 @@
 // Lets Exports.swift check its exports against the header.
-module SolarisManagerHeader {
-  header "SolarisManager.h"
+module OpenWeirManagerHeader {
+  header "OpenWeirManager.h"
   export *
 }

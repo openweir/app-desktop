@@ -5,8 +5,8 @@ import sys
 
 import pytest
 
-from solaris import platforms
-from solaris.update.releases import installer_name
+from openweir import platforms
+from openweir.update.releases import installer_name
 
 
 @pytest.mark.parametrize(
@@ -21,9 +21,9 @@ def test_emulated_x64_uses_arm64_installer(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setattr(platforms.platform, "machine", lambda: "AMD64")
     monkeypatch.setattr(platforms, "_windows_native_machine", lambda: "arm64")
     assert platforms.native_machine("win32") == "arm64"
-    assert installer_name("1.0.0", "win32") == "Solaris-1.0.0-windows-arm64-setup.exe"
+    assert installer_name("1.0.0", "win32") == "OpenWeir-1.0.0-windows-arm64-setup.exe"
     # Explicit overrides, used by callers/tests, still select the requested package.
-    assert installer_name("1.0.0", "win32", "AMD64") == "Solaris-1.0.0-windows-x64-setup.exe"
+    assert installer_name("1.0.0", "win32", "AMD64") == "OpenWeir-1.0.0-windows-x64-setup.exe"
 
 
 def test_machine_falls_back_when_native_query_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:

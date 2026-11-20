@@ -2,8 +2,8 @@
 
 import pytest
 
-from solaris.host.base import WarpAccount
-from solaris.models.credentials import (
+from openweir.host.base import WarpAccount
+from openweir.models.credentials import (
     SERVICE,
     WARP_ACCOUNT,
     CredentialError,

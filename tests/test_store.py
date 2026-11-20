@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from solaris.models.profiles import (
+from openweir.models.profiles import (
     KIND_FILE,
     KIND_SUBSCRIPTION,
     Profile,
@@ -13,8 +13,8 @@ from solaris.models.profiles import (
     ProfileList,
     Usage,
 )
-from solaris.models.settings import DatabaseSettingsStore
-from solaris.models.store import ProfileStore, default_data_dir
+from openweir.models.settings import DatabaseSettingsStore
+from openweir.models.store import ProfileStore, default_data_dir
 from tests.support.storage import refuse_writes, stored
 
 SUBSCRIPTION = Profile(
@@ -269,9 +269,9 @@ def test_threads_share_the_store(tmp_path: Path) -> None:
 @pytest.mark.parametrize(
     ("platform", "env", "expected"),
     [
-        ("darwin", {}, "Library/Application Support/Solaris"),
-        ("win32", {"LOCALAPPDATA": "{home}/Local"}, "Local/Solaris"),
-        ("linux", {"XDG_DATA_HOME": ""}, ".local/share/Solaris"),
+        ("darwin", {}, "Library/Application Support/OpenWeir"),
+        ("win32", {"LOCALAPPDATA": "{home}/Local"}, "Local/OpenWeir"),
+        ("linux", {"XDG_DATA_HOME": ""}, ".local/share/OpenWeir"),
     ],
 )
 def test_default_data_dir(

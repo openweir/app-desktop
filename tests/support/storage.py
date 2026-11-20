@@ -7,7 +7,7 @@ from contextlib import closing
 from pathlib import Path
 from typing import Any
 
-from solaris.models.database import DATABASE_NAME
+from openweir.models.database import DATABASE_NAME
 
 
 def refuse_writes(directory: Path, table: str, message: str = "disk is full") -> None:

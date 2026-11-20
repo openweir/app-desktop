@@ -13,7 +13,7 @@ from PySide6.QtQuick import QQuickItem, QQuickWindow
 from PySide6.QtTest import QTest
 from pytestqt.qtbot import QtBot
 
-from solaris.app import MAIN_QML
+from openweir.app import MAIN_QML
 from tests.support.i18n import ui_language
 from tests.support.window import Loaded, find, find_all, kind
 

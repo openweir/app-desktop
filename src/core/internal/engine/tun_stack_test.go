@@ -33,9 +33,9 @@ import (
 
 	C "github.com/metacubex/mihomo/constant"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/admission"
-	"github.com/Ember-Moth/Solaris/src/core/internal/controlpb"
-	"github.com/Ember-Moth/Solaris/src/core/internal/porttest"
+	"github.com/openweir/app-desktop/src/core/internal/admission"
+	"github.com/openweir/app-desktop/src/core/internal/controlpb"
+	"github.com/openweir/app-desktop/src/core/internal/porttest"
 )
 
 // memoryTUN is a TUN device in memory: in holds the system's packets for the stack, out

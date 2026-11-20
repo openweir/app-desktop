@@ -7,8 +7,8 @@ import (
 	"github.com/metacubex/mihomo/component/proxydialer"
 	"github.com/metacubex/mihomo/tunnel"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/controlpb"
-	"github.com/Ember-Moth/Solaris/src/core/internal/vpngate"
+	"github.com/openweir/app-desktop/src/core/internal/controlpb"
+	"github.com/openweir/app-desktop/src/core/internal/vpngate"
 )
 
 // vpnGateAPI is where ListVpnGate fetches the list; tests point it at a server of their own.

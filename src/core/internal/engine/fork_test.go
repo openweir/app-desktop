@@ -11,8 +11,8 @@ import (
 	C "github.com/metacubex/mihomo/constant"
 	"github.com/metacubex/mihomo/listener/inbound"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/admission"
-	"github.com/Ember-Moth/Solaris/src/core/internal/compose"
+	"github.com/openweir/app-desktop/src/core/internal/admission"
+	"github.com/openweir/app-desktop/src/core/internal/compose"
 )
 
 func forkNode(cfg *config.Config) C.Proxy {
@@ -87,7 +87,7 @@ func TestForkSnellSurvivesAdmissionAndComposition(t *testing.T) {
 			userKey string
 		}{
 			{3, "", ""}, {4, "", ""}, {5, "", ""}, {6, "default", ""}, {6, "unshaped", ""}, {6, "unsafe-raw", ""},
-			{6, "default", "solaris-client"},
+			{6, "default", "openweir-client"},
 		} {
 			t.Run(fmt.Sprintf("composed=%t/v%d/%s/userkey=%t", composed, sample.version, sample.mode, sample.userKey != ""), func(t *testing.T) {
 				node := map[string]any{
@@ -136,7 +136,7 @@ func TestForkSnellSurvivesAdmissionAndComposition(t *testing.T) {
 			{6, "mode", "invalid"},
 			{6, "psk", "short"},
 			{6, "obfs-opts", map[string]any{"mode": "tls"}},
-			{4, "userkey", "solaris-client"}, // v6 only
+			{4, "userkey", "openweir-client"}, // v6 only
 			{6, "userkey", strings.Repeat("k", 256)},
 		} {
 			node := map[string]any{

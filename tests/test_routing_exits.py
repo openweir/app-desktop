@@ -16,16 +16,16 @@ import pytest
 from PySide6.QtCore import QObject, QUrl
 from pytestqt.qtbot import QtBot
 
-from solaris.host.base import HostError
-from solaris.models import plans
-from solaris.models import vpngate as vpngate_list
-from solaris.models.backup import Backups
-from solaris.models.credentials import WARP_ACCOUNT
-from solaris.models.store import ProfileStore
-from solaris.viewmodels.composition import ViewModels, compose
-from solaris.viewmodels.routing import RoutingViewModel
-from solaris.viewmodels.routing_exits import VpnGateExit, WarpExit
-from solaris.viewmodels.rule_editor import RuleEditor
+from openweir.host.base import HostError
+from openweir.models import plans
+from openweir.models import vpngate as vpngate_list
+from openweir.models.backup import Backups
+from openweir.models.credentials import WARP_ACCOUNT
+from openweir.models.store import ProfileStore
+from openweir.viewmodels.composition import ViewModels, compose
+from openweir.viewmodels.routing import RoutingViewModel
+from openweir.viewmodels.routing_exits import VpnGateExit, WarpExit
+from openweir.viewmodels.rule_editor import RuleEditor
 from tests.support.credentials import MemoryCredentials
 from tests.support.simulated import (
     VPNGATE_SERVERS,
@@ -36,7 +36,7 @@ from tests.support.simulated import (
 
 NOW = datetime(2026, 10, 29, 12).timestamp()
 MESH_CONFIG = """proxies:
-  - {name: 家里, type: tailscale, auth-key: tskey-sample, hostname: solaris}
+  - {name: 家里, type: tailscale, auth-key: tskey-sample, hostname: openweir}
   - {name: 公司, type: zerotier, network-id: 8056c2e21c000001}
 """
 
@@ -230,7 +230,7 @@ def test_warp_registers_and_its_rules_follow_the_account(
     # The account is a credential: in the store, not in the database.
     stored = json.loads(credentials.secrets[WARP_ACCOUNT])
     assert stored["device_id"].startswith("a1b2c3d4")
-    database = (tmp_path / "solaris.db").read_bytes()
+    database = (tmp_path / "openweir.db").read_bytes()
     assert b"simulated-token" not in database
     # OpenAI → WARP 出口 goes out through it.
     openai_to(qtbot, routing, plans.WARP)

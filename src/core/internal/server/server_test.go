@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/frame"
-	"github.com/Ember-Moth/Solaris/src/core/internal/peer"
+	"github.com/openweir/app-desktop/src/core/internal/frame"
+	"github.com/openweir/app-desktop/src/core/internal/peer"
 )
 
 type echo struct{}

@@ -1,13 +1,15 @@
 import Foundation
 import NetworkExtension
 import os
-import SolarisManagerHeader
+import OpenWeirManagerHeader
 
-let tunnelBundleIdentifier = "dev.tschen.solaris.tunnel"
-let logger = Logger(subsystem: "dev.tschen.solaris", category: "manager")
+// The app's bundle id comes from product.json through the build; the extension is under it.
+let appBundleIdentifier = Bundle.main.bundleIdentifier ?? ""
+let tunnelBundleIdentifier = appBundleIdentifier + ".tunnel"
+let logger = Logger(subsystem: appBundleIdentifier, category: "manager")
 
 /// The configuration's name in System Settings > VPN.
-private let configurationName = "Solaris"
+private let configurationName = "OpenWeir"
 private let preferencesTimeout: TimeInterval = 20
 
 /// The app's VPN configuration for the extension (NETunnelProviderManager) and its connection.
@@ -93,25 +95,25 @@ final class TunnelController {
       // Read again: macOS may have removed some entries itself. Only this provider's
       // configurations are eligible, regardless of their user-visible names.
       for manager in try loadOwned(before: deadline) {
-        try deadline.wait("remove the Solaris VPN configuration") { done in
+        try deadline.wait("remove the OpenWeir VPN configuration") { done in
           manager.removeFromPreferences { done($0.map { .failure($0) } ?? .success(())) }
         }
       }
     }
   }
 
-  /// A SOLARIS_TUNNEL_ value from SolarisManager.h.
+  /// A OPENWEIR_TUNNEL_ value from OpenWeirManager.h.
   func status() throws -> Int {
     let deadline = try Deadline(seconds: preferencesTimeout)
-    guard let manager = try current(before: deadline) else { return SOLARIS_TUNNEL_NOT_CONFIGURED }
+    guard let manager = try current(before: deadline) else { return OPENWEIR_TUNNEL_NOT_CONFIGURED }
     switch manager.connection.status {
-    case .invalid: return SOLARIS_TUNNEL_INVALID
-    case .disconnected: return SOLARIS_TUNNEL_DISCONNECTED
-    case .connecting: return SOLARIS_TUNNEL_CONNECTING
-    case .connected: return SOLARIS_TUNNEL_CONNECTED
-    case .reasserting: return SOLARIS_TUNNEL_REASSERTING
-    case .disconnecting: return SOLARIS_TUNNEL_DISCONNECTING
-    @unknown default: return SOLARIS_TUNNEL_INVALID
+    case .invalid: return OPENWEIR_TUNNEL_INVALID
+    case .disconnected: return OPENWEIR_TUNNEL_DISCONNECTED
+    case .connecting: return OPENWEIR_TUNNEL_CONNECTING
+    case .connected: return OPENWEIR_TUNNEL_CONNECTED
+    case .reasserting: return OPENWEIR_TUNNEL_REASSERTING
+    case .disconnecting: return OPENWEIR_TUNNEL_DISCONNECTING
+    @unknown default: return OPENWEIR_TUNNEL_INVALID
     }
   }
 
@@ -129,7 +131,7 @@ final class TunnelController {
         done(.failure(error))
       }
     }
-    guard let reply else { throw ManagerError.failed("The Solaris extension did not answer") }
+    guard let reply else { throw ManagerError.failed("The OpenWeir extension did not answer") }
     return reply
   }
 
@@ -213,8 +215,8 @@ final class TunnelController {
     let error: Error? = try deadline.wait("read why the tunnel stopped") { done in
       connection.fetchLastDisconnectError { done(.success($0)) }
     }
-    guard let error else { return "The Solaris tunnel stopped while connecting" }
-    return "The Solaris tunnel stopped while connecting: \(error.localizedDescription)"
+    guard let error else { return "The OpenWeir tunnel stopped while connecting" }
+    return "The OpenWeir tunnel stopped while connecting: \(error.localizedDescription)"
   }
 }
 

@@ -8,7 +8,7 @@ import (
 
 	"golang.org/x/sys/windows"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/power"
+	"github.com/openweir/app-desktop/src/core/internal/power"
 )
 
 var (

@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from solaris.host.extension import (
+from openweir.host.extension import (
     FAILED,
     NOT_SIGNED_IN,
     QUOTA_EXCEEDED,
@@ -19,16 +19,16 @@ from solaris.host.extension import (
     UNREACHABLE,
     ManagerError,
 )
-from solaris.models.backup import BackupError, Backups
-from solaris.models.backup_icloud import (
+from openweir.models.backup import BackupError, Backups
+from openweir.models.backup_icloud import (
     ACCOUNT,
     AVAILABLE,
     COULD_NOT_DETERMINE,
     NO_ACCOUNT,
     ICloudProvider,
 )
-from solaris.models.profiles import KIND_SUBSCRIPTION, Profile, ProfileList
-from solaris.models.store import ProfileStore
+from openweir.models.profiles import KIND_SUBSCRIPTION, Profile, ProfileList
+from openweir.models.store import ProfileStore
 from tests.support.icloud import FakeICloud
 
 
@@ -67,7 +67,7 @@ def test_records_carry_their_info(backups: Backups) -> None:
 
     entry = asyncio.run(provider.upload(snapshot))
 
-    assert entry.id == f"solaris-backup-20270115-080000-{snapshot.digest[:12]}"
+    assert entry.id == f"openweir-backup-20270115-080000-{snapshot.digest[:12]}"
     info, data = icloud.records[entry.id]
     assert data == snapshot.encode()
     assert json.loads(info) == {
@@ -90,8 +90,8 @@ def test_lists_only_its_own_records(backups: Backups) -> None:
     entry = asyncio.run(provider.upload(backups.snapshot()))
     _, data = icloud.records[entry.id]
     icloud.records["notes"] = ("{}", b"")
-    icloud.records["solaris-backup-20260101-000000-000000000000"] = ("not json", data)
-    icloud.records["solaris-backup-20260101-000000-111111111111"] = ('{"device": 1}', data)
+    icloud.records["openweir-backup-20260101-000000-000000000000"] = ("not json", data)
+    icloud.records["openweir-backup-20260101-000000-111111111111"] = ('{"device": 1}', data)
 
     async def scenario() -> None:
         assert [e.id for e in await provider.list()] == [entry.id]

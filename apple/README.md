@@ -6,17 +6,17 @@ Xcode 工程由 XcodeGen 从 `project.yml` 生成，包含两个 target（docs/a
 
 | target | 产物 | 职责 |
 | --- | --- | --- |
-| SolarisManager | `SolarisManager.dylib`，C ABI | 激活、替换与停用系统扩展、配置及移除 `NETunnelProviderManager`、启停隧道、查询状态、用 `sendProviderMessage` 收发控制消息；iCloud 备份（CloudKit） |
-| SolarisTunnel | `dev.tschen.solaris.tunnel.systemextension` | `NEPacketTunnelProvider`：设置隧道网络和 DNS、取得 utun fd、运行内核；`handleAppMessage` 把消息交给 Go 分发器 |
+| OpenWeirManager | `OpenWeirManager.dylib`，C ABI | 激活、替换与停用系统扩展、配置及移除 `NETunnelProviderManager`、启停隧道、查询状态、用 `sendProviderMessage` 收发控制消息；iCloud 备份（CloudKit） |
+| OpenWeirTunnel | `org.openweir.app.tunnel.systemextension` | `NEPacketTunnelProvider`：设置隧道网络和 DNS、取得 utun fd、运行内核；`handleAppMessage` 把消息交给 Go 分发器 |
 
-构建 arm64 + x86_64 通用二进制（D2），扩展和管理库的最低系统版本是 macOS 15.0（主应用实际要求的版本见“组装 Solaris.app”）。决策
+构建 arm64 + x86_64 通用二进制（D2），扩展和管理库的最低系统版本是 macOS 15.0（主应用实际要求的版本见“组装 OpenWeir.app”）。决策
 编号见 docs/decisions.md，测试 Mac 上的验收见 docs/maintenance.md 2.2、2.3 节。
 
 扩展用途说明位于 `Tunnel/en.lproj/InfoPlist.strings` 与 `Tunnel/zh-Hans.lproj/InfoPlist.strings`，
 由 XcodeGen 的 Tunnel 资源扫描进入最终扩展。基础 `Info.plist` 保留英文回退；主 app 声明 `en`、`zh-Hans`。
 构建时校验本地化资源；系统授权提示按 [维护清单](../docs/maintenance.md) 验收（D36）。
 
-provider 初始化时即为 Go 注册本地崩溃日志，保存到扩展自己的 `Solaris/core/crashes`；未配置的 TUN 在连续两分钟
+provider 初始化时即为 Go 注册本地崩溃日志，保存到扩展自己的 `OpenWeir/core/crashes`；未配置的 TUN 在连续两分钟
 没有界面消息后终止，避免 UI 崩溃后遗留空隧道，批量解析期间的消息会刷新预算。系统身份的容器及原生系统报告由管理员提取，不假定它与用户 App Group 相同，
 也不为读日志启动隧道。管理库、扩展与 Nuitka UI 的 dSYM 按 UUID 校验并独立保留，见 D37 与维护文档。
 
@@ -24,10 +24,10 @@ provider 初始化时即为 Go 注册本地崩溃日志，保存到扩展自己�
 
 ```text
 apple/
-├── project.yml                      XcodeGen 定义；生成的 Solaris.xcodeproj 不提交
-├── App/Solaris.entitlements         主应用（Nuitka 产出的 .app）的 entitlement，由 build_app.py 签上
-├── Manager/                         SolarisManager.dylib
-│   ├── SolarisManager.h             C 接口，见下文
+├── project.yml                      XcodeGen 定义；生成的 OpenWeir.xcodeproj 不提交
+├── App/OpenWeir.entitlements         主应用（Nuitka 产出的 .app）的 entitlement，由 build_app.py 签上
+├── Manager/                         OpenWeirManager.dylib
+│   ├── OpenWeirManager.h             C 接口，见下文
 │   ├── module.modulemap             让 Swift 导入头文件，逐个检查导出函数的签名
 │   ├── Exports.swift                @_cdecl 导出
 │   ├── SystemExtensionRequests.swift OSSystemExtensionRequest 的激活、替换与停用
@@ -35,9 +35,9 @@ apple/
 │   ├── TunnelController.swift       VPN 配置、启停、状态、provider message
 │   ├── CloudBackup.swift            iCloud 备份：CloudKit 私有数据库里的快照
 │   └── ManagerError.swift
-└── Tunnel/                          dev.tschen.solaris.tunnel.systemextension
+└── Tunnel/                          org.openweir.app.tunnel.systemextension
     ├── Info.plist                   NEProviderClasses、NEMachServiceName
-    ├── SolarisTunnel.entitlements
+    ├── OpenWeirTunnel.entitlements
     ├── main.swift                   NEProvider.startSystemExtensionMode()
     ├── PacketTunnelProvider.swift   startTunnel、stopTunnel、handleAppMessage
     ├── TunnelNetwork.swift          Go 给出的隧道网络 → NEPacketTunnelNetworkSettings
@@ -45,12 +45,12 @@ apple/
     └── Core.swift                   调 Go 归档导出的函数
 ```
 
-`project.yml` 是工程配置的唯一来源；用 XcodeGen 生成的 `Solaris.xcodeproj` 不提交。
+`project.yml` 是工程配置的唯一来源；用 XcodeGen 生成的 `OpenWeir.xcodeproj` 不提交。
 
 ## 构建
 
 需要 Xcode、XcodeGen（`brew install xcodegen`）和 Go，在仓库根目录运行（只构建原生部分；整个 app 见
-“组装 Solaris.app”）：
+“组装 OpenWeir.app”）：
 
 ```bash
 uv run python scripts/build_apple.py
@@ -66,52 +66,52 @@ Developer ID 证书签名并校验。脚本依次：
 1. 用 `scripts/fetch_geodata.py` 取得钉住的 `GeoSite.dat`、`GeoIP.dat`、`geoip.metadb`、`ASN.mmdb`（缓存在 `build/geodata/`），
    `project.yml` 把它们放进扩展的 `Contents/Resources`（见“GEO 数据”）；
 2. 把 `src/core/apple` 分别编成 arm64 和 amd64 的 C archive，各链接同架构 Cronet，再合并为通用 archive（`GOPROXY=https://goproxy.cn,direct`），`-ldflags -X` 把版本号写进
-   `product.Version`（`GetInfo` 的服务版本），连同 cgo 生成的 `libsolaris.h` 和一份 module map 包成
-   `SolarisCore.xcframework`。module map 把模块命名为 `SolarisCore`，并自动链接 Go 的 `net` 包要用的 `libresolv`；
+   `product.Version`（`GetInfo` 的服务版本），连同 cgo 生成的 `libopenweir.h` 和一份 module map 包成
+   `OpenWeirCore.xcframework`。module map 把模块命名为 `OpenWeirCore`，并自动链接 Go 的 `net` 包要用的 `libresolv`；
 3. 用 XcodeGen 生成工程，`xcodebuild` 构建 Release。扩展的可执行文件在签名前由 Xcode 做 `strip -x`
    （`STRIP_STYLE: non-global`），73.3 MiB 减到 61.3 MiB；
 4. 检查产物：同时含 arm64 和 x86_64，每个切片的 dylib 导出函数均与头文件一致，扩展的 Info.plist 正确，扩展带的 GEO 数据就是钉住的那份；
-5. 组装一个检查用的 `Solaris.app`（见“签名”），`--sign` 时签名并校验。
+5. 组装一个检查用的 `OpenWeir.app`（见“签名”），`--sign` 时签名并校验。
 
 产物都在 `build/apple/`（已被 git 忽略）：
 
 | 路径 | 内容 |
 | --- | --- |
-| `SolarisManager.dylib` | 管理库 |
-| `dev.tschen.solaris.tunnel.systemextension` | 系统扩展 |
-| `check/Solaris.app` | 检查用的 app，带上面两个产物 |
-| `SolarisCore.xcframework`、`go/` | Go 归档 |
+| `OpenWeirManager.dylib` | 管理库 |
+| `org.openweir.app.tunnel.systemextension` | 系统扩展 |
+| `check/OpenWeir.app` | 检查用的 app，带上面两个产物 |
+| `OpenWeirCore.xcframework`、`go/` | Go 归档 |
 | `xcode/` | DerivedData；每次构建前清掉其中的产物，重新链接和签名 |
 
 - 版本号取自 `pyproject.toml`；`CFBundleVersion` 默认是构建时的 UTC 时间（`--build-number` 可改）。
   系统只会用不同版本的扩展替换已激活的扩展，这样测试 Mac 上每次构建都能替换上去。
 - Go 构建标签默认 `with_gvisor,with_naive`（D3、D38），`--tags` 可以改。Naive 的 Cronet 静态库版本由
-  Go 模块图选择；脚本将它合并进 `libsolaris.a`，module map 声明它需要的系统库和 framework，再生成 xcframework。
+  Go 模块图选择；脚本将它合并进 `libopenweir.a`，module map 声明它需要的系统库和 framework，再生成 xcframework。
   扩展包不依赖额外的 Cronet dylib。
-- 想在 Xcode 里打开工程，先跑一次脚本（生成 xcframework 和工程），再打开 `apple/Solaris.xcodeproj`；
+- 想在 Xcode 里打开工程，先跑一次脚本（生成 xcframework 和工程），再打开 `apple/OpenWeir.xcodeproj`；
   改了 `project.yml` 后重跑脚本，或者 `xcodegen generate --spec apple/project.yml --project apple`。
 
 ## 签名
 
-`project.yml` 用手动签名：Team `GY9ZKZMAZA`，证书 `Developer ID Application`，启用 hardened runtime，
+`project.yml` 用手动签名：Team 取自环境变量 `OPENWEIR_APPLE_TEAM_ID`（`product.json` 留空，D47），证书 `Developer ID Application`，启用 hardened runtime，
 签名带安全时间戳（公证需要）。`CODE_SIGN_INJECT_BASE_ENTITLEMENTS` 关掉：否则 Xcode 在 archive 以外的构建里
 会给扩展加上 `get-task-allow`，描述文件不允许，公证也会拒绝。
 
 | 产物 | 签名方 | 描述文件 | entitlement |
 | --- | --- | --- | --- |
-| `SolarisManager.dylib` | Xcode | 无（库不带描述文件） | 无 |
-| 系统扩展 | Xcode | `Solaris Tunnel Developer ID`，按名称指定 | `Tunnel/SolarisTunnel.entitlements` |
-| 主应用 | 脚本（`codesign`） | `Solaris Developer ID` | `App/Solaris.entitlements` |
+| `OpenWeirManager.dylib` | Xcode | 无（库不带描述文件） | 无 |
+| 系统扩展 | Xcode | `OpenWeir Tunnel Developer ID`，按名称指定 | `Tunnel/OpenWeirTunnel.entitlements` |
+| 主应用 | 脚本（`codesign`） | `OpenWeir Developer ID` | `App/OpenWeir.entitlements` |
 
-主应用是 Nuitka 产出的 .app，由 `scripts/build_app.py` 签名（见“组装 Solaris.app”）。`build_apple.py` 另用
-检查用的 `check/Solaris.app` 验证同一条路径：把 dylib 放进 `Contents/Frameworks`、扩展放进
+主应用是 Nuitka 产出的 .app，由 `scripts/build_app.py` 签名（见“组装 OpenWeir.app”）。`build_apple.py` 另用
+检查用的 `check/OpenWeir.app` 验证同一条路径：把 dylib 放进 `Contents/Frameworks`、扩展放进
 `Contents/Library/SystemExtensions`，可执行文件是一个链接了头文件里全部函数的桩程序（从不运行）。
 
 `--sign` 时脚本：
 
 - 按名称找两份描述文件（取未过期、Team 匹配、最新的一份），再从钥匙串里找两份描述文件都授权的
   Developer ID Application 证书，以 SHA-1 交给 `xcodebuild` 和 `codesign`；
-- 嵌入主应用的描述文件，用 `App/Solaris.entitlements` 签检查用的 app；
+- 嵌入主应用的描述文件，用 `App/OpenWeir.entitlements` 签检查用的 app；
 - 校验：app 通过 `codesign --verify --deep --strict`，扩展再单独 `--verify --strict` 一次（app 把
   `Contents/Library/SystemExtensions` 当资源而不是嵌套代码封存，`--deep` 只核对扩展的文件，不验证扩展自己的
   签名）；dylib、扩展、app 都由这张证书签名，Team 正确，带
@@ -121,7 +121,7 @@ Developer ID 证书签名并校验。脚本依次：
 脚本不公证，不安装也不激活系统扩展。两份 entitlement 文件都写明了 `com.apple.application-identifier`
 和 `com.apple.developer.team-identifier`，这样签上的内容与文件逐字一致。
 
-## 组装 Solaris.app
+## 组装 OpenWeir.app
 
 ```bash
 uv run --with nuitka==4.2.2 python scripts/build_app.py
@@ -133,25 +133,25 @@ uv run --with nuitka==4.2.2 python scripts/build_app.py --unsigned
 
 脚本先按 `build_apple.py` 的步骤构建原生部分（带签名，或 `--unsigned` 时不签名），再：
 
-1. 在 `build/app/python/arm64` 和 `x86_64` 建立隔离且锁定依赖的 Python 环境，分别用 Nuitka 4.2.2 把 `package/entry.py` 编成 app（`--mode=app`），带上 `src/solaris/ui`（QML、托盘图标、
+1. 在 `build/app/python/arm64` 和 `x86_64` 建立隔离且锁定依赖的 Python 环境，分别用 Nuitka 4.2.2 把 `package/entry.py` 编成 app（`--mode=app`），带上 `src/openweir/ui`（QML、托盘图标、
    字体）和编译好的翻译。`--include-qt-plugins=qml` 会带进全部 QML 模块，脚本按清单排除界面用不到的
    （3D、图表、多媒体、WebEngine、其他控件样式等）；Qt 的 TLS 只留 Secure Transport。
    编译用 Xcode 的 clang，不用 ccache（ccache 要求 PATH 里同名的 clang 就是所用的那个）；
 2. 检查各 UI 的 Mach-O 架构与依赖；install name 和 rpath 里残留的构建机路径（uv 的 Python 的 `libpython`）改成 `@rpath` 或删掉。
    `scripts/macos.py` 将对应的可执行文件合并为 arm64 + x86_64；共享资源必须逐字节相同，缺文件、不同资源或越界符号链接会中止构建。
    两份 UI 的 dSYM 也合并，并核对最终二进制的两个 UUID；最终 UI 的每个 Mach-O 必须同时包含两个架构；
-3. 组装 `build/app/Solaris.app`：Nuitka 产物在 `Contents/MacOS`，管理库在 `Contents/Frameworks`，扩展在
-   `Contents/Library/SystemExtensions`。Info.plist：bundle id `dev.tschen.solaris`，版本与扩展相同，注册
-   URL scheme `solaris` 和 `clash`（D6，链接由界面处理），`SolarisCoreVersion` 是 mihomo 的版本（隧道未连接时
+3. 组装 `build/app/OpenWeir.app`：Nuitka 产物在 `Contents/MacOS`，管理库在 `Contents/Frameworks`，扩展在
+   `Contents/Library/SystemExtensions`。Info.plist：bundle id `org.openweir.app`，版本与扩展相同，注册
+   URL scheme `openweir` 和 `clash`（D6，链接由界面处理），`OpenWeirCoreVersion` 是 mihomo 的版本（隧道未连接时
    `MacExtensionHost` 用它回答 `GetInfo`）；
-4. 签名：UI 的 Mach-O 逐个用 Developer ID 签（hardened runtime、时间戳），再嵌入 `Solaris Developer ID`
-   描述文件，用 `App/Solaris.entitlements` 签整个 app；dylib 和扩展保留 Xcode 的签名。`--unsigned` 时整个 app
+4. 签名：UI 的 Mach-O 逐个用 Developer ID 签（hardened runtime、时间戳），再嵌入 `OpenWeir Developer ID`
+   描述文件，用 `App/OpenWeir.entitlements` 签整个 app；dylib 和扩展保留 Xcode 的签名。`--unsigned` 时整个 app
    做 ad hoc 签名，只供查看，不能激活扩展；
 5. 校验：除 `build_apple.py` 的各项外，`Contents/MacOS` 里每个 Mach-O 都由这个 Team 签名、带 hardened runtime
    和时间戳。
 
-- **可执行文件叫 `SolarisUI`**：卷不区分大小写，而 `Contents/MacOS/solaris/` 是 Python 包的数据目录（`ui/`、
-  `translations/`），编译后的模块在那里找它们。程序坞、菜单栏和“登录项”显示的是 `CFBundleName`（Solaris）。
+- **可执行文件叫 `OpenWeirUI`**：卷不区分大小写，而 `Contents/MacOS/openweir/` 是 Python 包的数据目录（`ui/`、
+  `translations/`），编译后的模块在那里找它们。程序坞、菜单栏和“登录项”显示的是 `CFBundleName`（OpenWeir）。
 - `Contents/MacOS` 里的数据文件（QML、字体、翻译）带 Nuitka 的 ad hoc 签名，签名存在扩展属性里，复制时要用
   `ditto` 保留；hypervpn 同样的布局能通过公证。
 - **最低系统版本**：主应用固定以 macOS 26.0 为最低支持版本（D28），Nuitka、编译环境与 app 的
@@ -166,13 +166,13 @@ uv run --with nuitka==4.2.2 python scripts/build_app.py --unsigned
 
 ```bash
 uv run --no-project --with dmgbuild==1.6.7 python scripts/build_dmg.py \
-  build/app/Solaris.app build/release/Solaris-<版本>-macos-universal.dmg
+  build/app/OpenWeir.app build/release/OpenWeir-<版本>-macos-universal.dmg
 ```
 
-`scripts/build_dmg.py` 用 dmgbuild 1.6.7 把构建好的 `Solaris.app`（签名的或 `--unsigned` 的都行）做成磁盘映像：
+`scripts/build_dmg.py` 用 dmgbuild 1.6.7 把构建好的 `OpenWeir.app`（签名的或 `--unsigned` 的都行）做成磁盘映像：
 
-- 卷名 Solaris，卷图标是 `package/icons/solaris.icns`（`scripts/gen_icons.py`）；
-- 挂载后打开一个固定的 Finder 窗口，600 × 360 点，不显示工具栏、侧边栏和状态栏，128 点的大图标：左边 Solaris.app，
+- 卷名 OpenWeir，卷图标是 `package/icons/openweir.icns`（`scripts/gen_icons.py`）；
+- 挂载后打开一个固定的 Finder 窗口，600 × 360 点，不显示工具栏、侧边栏和状态栏，128 点的大图标：左边 OpenWeir.app，
   右边“应用程序”的快捷方式，中间一条细箭头，没有文字。效果见 `package/dmg/preview.png`；
 - 背景是 `package/dmg/background.png` 和 `background@2x.png`，由 `scripts/gen_dmg_background.py` 按
   `build_dmg.py` 里的布局画出后提交，dmgbuild 把两张合成一个多分辨率 TIFF。Finder 的背景不随深色模式切换，
@@ -192,14 +192,14 @@ app 做一次映像。改了布局后运行 `uv run python scripts/gen_dmg_backg
 Environment，Ember-Moth 批准后才拿到机密。标签必须是 `v<pyproject.toml 的版本>`。步骤：
 
 1. 建临时钥匙串，导入证书和签发它的 Developer ID G2 中间证书（`apple/certificates/DeveloperIDG2CA.cer`，不依赖
-   runner 镜像带不带它），核对 `MACOS_CERTIFICATE_NAME` 属于 `APPLE_TEAM_ID`，且是有效的身份；找不到时列出钥匙串里
+   runner 镜像带不带它），核对 `MACOS_CERTIFICATE_NAME` 属于 `OPENWEIR_APPLE_TEAM_ID`，且是有效的身份；找不到时列出钥匙串里
    每个身份和它无效的原因；两份描述文件
    装进 `~/Library/Developer/Xcode/UserData/Provisioning Profiles`，Xcode 和 `build_apple.py` 按名称找；
 2. `scripts/build_app.py` 构建、签名、校验；
 3. 用 `notarytool`（App Store Connect API Key）公证 app 并 staple，`spctl` 评估；
-4. `scripts/build_dmg.py` 做 `Solaris-<版本>-macos-universal.dmg`（见“磁盘映像”），签名、公证、staple，生成
-   `Solaris-<版本>-macos-universal.dmg.sha256`；
-5. 两个文件作为 workflow artifact `solaris-<版本>-macos-universal` 上传，保留 30 天；
+4. `scripts/build_dmg.py` 做 `OpenWeir-<版本>-macos-universal.dmg`（见“磁盘映像”），签名、公证、staple，生成
+   `OpenWeir-<版本>-macos-universal.dmg.sha256`；
+5. 两个文件作为 workflow artifact `openweir-<版本>-macos-universal` 上传，保留 30 天；
 6. 无论成败都删除钥匙串、描述文件和 API Key。
 
 公证由 `scripts/notarize.py` 完成，它只在 GitHub Actions 里运行。对 `v*` 标签，工作流最后的 release job 把两个平台的
@@ -209,36 +209,36 @@ Environment，Ember-Moth 批准后才拿到机密。标签必须是 `v<pyproject
 
 安装包附带的 `GeoSite.dat`、`GeoIP.dat`、`geoip.metadb`、`ASN.mmdb`（docs/routing.md §8.4）在扩展的
 `Contents/Resources` 里。扩展的
-mihomo home 在扩展容器的 `Application Support/Solaris/core`，`startTunnel` 把资源目录交给
-`solaris_attach_tun`，Go 在打开 engine 前把 home 里缺少的文件复制过去（先写临时文件再改名，不会留下半个
+mihomo home 在扩展容器的 `Application Support/OpenWeir/core`，`startTunnel` 把资源目录交给
+`openweir_attach_tun`，Go 在打开 engine 前把 home 里缺少的文件复制过去（先写临时文件再改名，不会留下半个
 文件）；已有的文件不动，engine 的 GEO 自动更新会替换它们。复制失败时 attach 失败，隧道不启动。
 
-## C 接口（`Manager/SolarisManager.h`）
+## C 接口（`Manager/OpenWeirManager.h`）
 
 | 函数 | 作用 |
 | --- | --- |
-| `solaris_manager_activate(timeout, &error)` | 激活包内的系统扩展，替换其他构建激活的扩展 |
-| `solaris_manager_configure(include_all_networks, &error)` | 创建或修复 VPN 配置并启用，按 `include_all_networks` 写 `includeAllNetworks` 和 `excludeLocalNetworks`（D19）；第一次保存时系统请用户允许 |
-| `solaris_manager_start(timeout, include_all_networks, &error)` | 必要时先配置（同上），再启动隧道，等到已连接 |
-| `solaris_manager_stop(timeout, &error)` | 停止隧道，等到断开；本来就没运行时直接成功 |
-| `solaris_manager_status(&status, &error)` | 隧道状态：`SOLARIS_TUNNEL_*`，对应 `NEVPNStatus`，另加“未配置” |
-| `solaris_manager_send(request, length, timeout, &response, &response_length, &error)` | 发一条编码好的 Request，取回 Response |
-| `solaris_manager_icloud_status(timeout, &status, &error)` | 系统 iCloud 账户的状态：`SOLARIS_ICLOUD_*`，对应 `CKAccountStatus`，另加"这个构建没有 iCloud entitlement"（`UNSUPPORTED`） |
-| `solaris_manager_icloud_save(name, info, snapshot, length, timeout, &error)` | 把一份快照存成名为 `name` 的记录，同名的覆盖 |
-| `solaris_manager_icloud_list(timeout, &list, &error)` | 列出全部快照，不含内容：`[{"name", "info"}]` 的 JSON |
-| `solaris_manager_icloud_download(name, timeout, &snapshot, &length, &error)` | 下载一份快照；没有时返回 `NOT_FOUND` |
-| `solaris_manager_icloud_delete(name, timeout, &error)` | 删除一份快照；本来就没有时直接成功 |
-| `solaris_manager_free(pointer)` | 释放本库交出的字符串或缓冲区 |
+| `openweir_manager_activate(timeout, &error)` | 激活包内的系统扩展，替换其他构建激活的扩展 |
+| `openweir_manager_configure(include_all_networks, &error)` | 创建或修复 VPN 配置并启用，按 `include_all_networks` 写 `includeAllNetworks` 和 `excludeLocalNetworks`（D19）；第一次保存时系统请用户允许 |
+| `openweir_manager_start(timeout, include_all_networks, &error)` | 必要时先配置（同上），再启动隧道，等到已连接 |
+| `openweir_manager_stop(timeout, &error)` | 停止隧道，等到断开；本来就没运行时直接成功 |
+| `openweir_manager_status(&status, &error)` | 隧道状态：`OPENWEIR_TUNNEL_*`，对应 `NEVPNStatus`，另加“未配置” |
+| `openweir_manager_send(request, length, timeout, &response, &response_length, &error)` | 发一条编码好的 Request，取回 Response |
+| `openweir_manager_icloud_status(timeout, &status, &error)` | 系统 iCloud 账户的状态：`OPENWEIR_ICLOUD_*`，对应 `CKAccountStatus`，另加"这个构建没有 iCloud entitlement"（`UNSUPPORTED`） |
+| `openweir_manager_icloud_save(name, info, snapshot, length, timeout, &error)` | 把一份快照存成名为 `name` 的记录，同名的覆盖 |
+| `openweir_manager_icloud_list(timeout, &list, &error)` | 列出全部快照，不含内容：`[{"name", "info"}]` 的 JSON |
+| `openweir_manager_icloud_download(name, timeout, &snapshot, &length, &error)` | 下载一份快照；没有时返回 `NOT_FOUND` |
+| `openweir_manager_icloud_delete(name, timeout, &error)` | 删除一份快照；本来就没有时直接成功 |
+| `openweir_manager_free(pointer)` | 释放本库交出的字符串或缓冲区 |
 
 约定：
 
-- **返回值**：除 `solaris_manager_free` 外都返回 `SolarisManagerResult`（`int32_t`）：`OK`、`FAILED`、
+- **返回值**：除 `openweir_manager_free` 外都返回 `OpenWeirManagerResult`（`int32_t`）：`OK`、`FAILED`、
   `TIMED_OUT`、`NOT_CONFIGURED`（还没有 VPN 配置）、`NOT_CONNECTED`（隧道未连接，扩展没在运行）、
   `NEEDS_APPROVAL`（等用户在系统设置里允许扩展）、`NEEDS_REBOOT`（重启后完成激活），以及 iCloud 的
   `NOT_SIGNED_IN`、`NOT_FOUND`、`QUOTA_EXCEEDED`、`UNREACHABLE`（网络或服务暂时不可用）。
 - **错误信息**：结果不是 `OK` 且 `error` 不为 NULL 时，`*error` 是一段 UTF-8 说明；否则置为 NULL。
 - **内存**：传入的缓冲区归调用方所有，只在调用期间读取；经指针参数交出的字符串和缓冲区归调用方，
-  用 `solaris_manager_free` 释放（空的 Response 也是一块要释放的缓冲区）。
+  用 `openweir_manager_free` 释放（空的 Response 也是一块要释放的缓冲区）。
 - **线程**：调用会阻塞到完成或超时。NetworkExtension 在主队列上完成回调，所以要在后台线程调用，并且
   主线程在跑 run loop（Qt 的事件循环就是）；在主线程调用会直接返回 `FAILED`。`configure`、`start`、
   `stop` 依次执行，`status` 和 `send` 可以与它们并行，`icloud_*` 与所有调用都可以并行。
@@ -248,7 +248,7 @@ mihomo home 在扩展容器的 `Application Support/Solaris/core`，`startTunnel
 - **激活**：系统要用户批准时，`activate` 立即返回 `NEEDS_APPROVAL`，请求继续挂着；之后的调用复用同一个待批准请求，
   仍未允许就立即返回 `NEEDS_APPROVAL`，不再等一分钟。用户允许并完成激活后才能返回 `OK`。替换时总是用包内的扩展，因为只有它和
   这个 app 的控制协议一致。
-- **停用**：`solaris_manager_deactivate` 在同一份期限内停止所有指向 Solaris provider 的 VPN、请求停用扩展，只有系统返回
+- **停用**：`openweir_manager_deactivate` 在同一份期限内停止所有指向 OpenWeir provider 的 VPN、请求停用扩展，只有系统返回
   completed（或确认扩展已不存在）后，才重新读取并删除本应用的 VPN 配置。其他 VPN、订阅、设置与凭据不在删除范围内。
   需要用户处理或系统尚未完成时保留配置，Python 显示待处理状态并允许重试；`BUSY` 表示相反方向的请求仍未完成，
   `CANCELLED` 表示用户取消。超时请求保持到原回调结束，同方向重试复用它，不重复提交。系统结束请求后允许重新查询，
@@ -265,28 +265,28 @@ mihomo home 在扩展容器的 `Application Support/Solaris/core`，`startTunnel
 
 ## Go 归档
 
-`src/core/apple` 导出的函数（cgo 生成 `libsolaris.h`），扩展在 `Tunnel/Core.swift` 里调用：
+`src/core/apple` 导出的函数（cgo 生成 `libopenweir.h`），扩展在 `Tunnel/Core.swift` 里调用：
 
 | 函数 | 作用 |
 | --- | --- |
-| `solaris_tunnel_network(&length)` | 隧道的网络（`admission.FDNetwork`）的 JSON：IPv4 地址和掩码、IPv6 地址和前缀长度、DNS 服务器、MTU |
-| `solaris_attach_tun(fd, home, resources, include_all_networks)` | 把 `resources` 里的 GEO 数据复制进 `home`（缺少时），再以 fd 模式打开 engine 和分发器；`include_all_networks` 是扩展从 `protocolConfiguration` 读到的 `includeAllNetworks`，打开时 engine 把 `system`、`mixed` 栈换成 gVisor（D19）；返回 NULL 或错误字符串 |
-| `solaris_detach_tun()` | 取消在途消息并等它们结束，停止内核，关闭分发器和 Go 的描述符副本 |
-| `solaris_handle_message(request, length, &response_length)` | 处理一条编码好的 Request，返回 Response；没有 attach 时返回 `not_running` |
-| `solaris_free(pointer)` | 释放上面几个函数返回的缓冲区和字符串 |
+| `openweir_tunnel_network(&length)` | 隧道的网络（`admission.FDNetwork`）的 JSON：IPv4 地址和掩码、IPv6 地址和前缀长度、DNS 服务器、MTU |
+| `openweir_attach_tun(fd, home, resources, include_all_networks)` | 把 `resources` 里的 GEO 数据复制进 `home`（缺少时），再以 fd 模式打开 engine 和分发器；`include_all_networks` 是扩展从 `protocolConfiguration` 读到的 `includeAllNetworks`，打开时 engine 把 `system`、`mixed` 栈换成 gVisor（D19）；返回 NULL 或错误字符串 |
+| `openweir_detach_tun()` | 取消在途消息并等它们结束，停止内核，关闭分发器和 Go 的描述符副本 |
+| `openweir_handle_message(request, length, &response_length)` | 处理一条编码好的 Request，返回 Response；没有 attach 时返回 `not_running` |
+| `openweir_free(pointer)` | 释放上面几个函数返回的缓冲区和字符串 |
 
 - **地址只定义一处**：隧道的地址、DNS 服务器和 MTU 都在 Go 的 `admission.FDNetwork` 里，扩展从
-  `solaris_tunnel_network` 读来设置 utun，准入流水线的 fd 补丁也用它；Go 的测试核对补丁解析出的 TUN 与它一致。
+  `openweir_tunnel_network` 读来设置 utun，准入流水线的 fd 补丁也用它；Go 的测试核对补丁解析出的 TUN 与它一致。
 - **描述符归 NE**：`startTunnel` 在网络设置完成后找到 utun 的描述符（与 hypervpn 的
-  `AppleRawTunFileDescriptor.locate` 相同的做法），交给 `solaris_attach_tun`。Go 从不关闭它，mihomo 只用它的
-  副本。`stopTunnel` 先 `solaris_detach_tun`（Go 关掉自己的副本），再调用 completion handler，之后 NE 关闭
+  `AppleRawTunFileDescriptor.locate` 相同的做法），交给 `openweir_attach_tun`。Go 从不关闭它，mihomo 只用它的
+  副本。`stopTunnel` 先 `openweir_detach_tun`（Go 关掉自己的副本），再调用 completion handler，之后 NE 关闭
   描述符。attach 和 detach 在扩展的一个串行队列上按序执行。
 - 消息在并发队列上分发，状态变化由分发器内部的操作锁串行。Swift 只转发字节，不解析消息。
 
 ## Python 宿主
 
-`src/solaris/host/extension.py` 的 `MacExtensionHost` 是 macOS 正式版的宿主：`ManagerLibrary` 经 ctypes 绑定
-`SolarisManager.dylib`，每个 Request 用一次 `solaris_manager_send` 发给扩展，请求和响应的映射沿用
+`src/openweir/host/extension.py` 的 `MacExtensionHost` 是 macOS 正式版的宿主：`ManagerLibrary` 经 ctypes 绑定
+`OpenWeirManager.dylib`，每个 Request 用一次 `openweir_manager_send` 发给扩展，请求和响应的映射沿用
 `ServiceHost`。阻塞调用各在一个 daemon 线程里执行：NetworkExtension 在主队列上完成回调，app 退出时没人处理
 主队列，进行中的调用要等到超时，daemon 线程不会拖住退出。
 
@@ -301,7 +301,7 @@ mihomo home 在扩展容器的 `Application Support/Solaris/core`，`startTunnel
   得到 `NOT_CONNECTED` 等结果后为假，界面据此隐藏要内核的部分。
 - 其他结果：`TIMED_OUT` → `timeout`；`send` 的 `FAILED` → `connection_closed`，启停的 `FAILED` → `tunnel_failed`。
 - 选宿主：打包的 app 里（`Contents/Frameworks` 有管理库）用 `MacExtensionHost`，除非设了
-  `SOLARIS_DEV_SOCKET`；从源码运行时照旧用开发服务。
+  `OPENWEIR_DEV_SOCKET`；从源码运行时照旧用开发服务。
 - 单元测试用 Python 写的假管理库，以及用真实头文件编出的假 dylib（检查 ctypes 签名和每块缓冲区都被释放），
   不碰 NetworkExtension。
 
@@ -311,7 +311,7 @@ iCloud 备份可在受支持的签名安装版中，通过「设置 → 备份�
 私有数据库保存快照。源码运行和无相应授权的构建按不可用处理。
 
 设计见 docs/storage.md 第 5 节。管理库被加载进主应用的进程，所以 CloudKit 用的是主应用的签名和
-`App/Solaris.entitlements`：container `iCloud.dev.tschen.solaris`、服务 `CloudKit`、环境 `Production`（Developer ID
+`App/OpenWeir.entitlements`：container `iCloud.org.openweir.app`、服务 `CloudKit`、环境 `Production`（Developer ID
 只能用 Production）。扩展不访问 iCloud，它的 entitlement 不变。
 
 - 每份快照是私有数据库默认 zone 里一条 `Snapshot` 类型的记录：字符串字段 `info`（Python 写的 JSON：时间、设备、
@@ -331,12 +331,12 @@ Production 的 schema 之后只能加不能删，所以字段只加不改。步�
 
 ### 签名材料
 
-App ID `dev.tschen.solaris` 已开 iCloud（CloudKit），container 已建（见“Apple Developer 配置”）。`Solaris Developer ID`
-描述文件要授权 `com.apple.developer.icloud-container-identifiers`（含 `iCloud.dev.tschen.solaris`）、
+App ID `org.openweir.app` 已开 iCloud（CloudKit），container 已建（见“Apple Developer 配置”）。`OpenWeir Developer ID`
+描述文件要授权 `com.apple.developer.icloud-container-identifiers`（含 `iCloud.org.openweir.app`）、
 `icloud-services`（`CloudKit` 或 `*`）和 `icloud-container-environment`（含 `Production`）；`build_app.py` 的签名构建会
 逐项核对 entitlement 与描述文件，现在的签名构建能通过就说明已授权。若报"does not allow
 com.apple.developer.icloud-container-identifiers"，在开发者网站编辑 App ID 的 iCloud → Configure，勾上这个 container，
-重新生成 `Solaris Developer ID`，更新 `MACOS_APP_PROFILE_BASE64`。
+重新生成 `OpenWeir Developer ID`，更新 `MACOS_APP_PROFILE_BASE64`。
 
 ## Apple Developer 配置
 
@@ -346,17 +346,17 @@ com.apple.developer.icloud-container-identifiers"，在开发者网站编辑 App
 
 | 类型 | 标识 | 能力 |
 | --- | --- | --- |
-| App ID（主应用） | `dev.tschen.solaris` | System Extension、Network Extensions、App Groups、iCloud（CloudKit） |
-| App ID（系统扩展） | `dev.tschen.solaris.tunnel` | Network Extensions、App Groups |
-| App Group | `group.dev.tschen.solaris` | 留给大配置的共享容器（D8） |
-| iCloud Container | `iCloud.dev.tschen.solaris` | iCloud 备份（storage.md 第 5 节） |
+| App ID（主应用） | `org.openweir.app` | System Extension、Network Extensions、App Groups、iCloud（CloudKit） |
+| App ID（系统扩展） | `org.openweir.app.tunnel` | Network Extensions、App Groups |
+| App Group | `group.org.openweir.app` | 留给大配置的共享容器（D8） |
+| iCloud Container | `iCloud.org.openweir.app` | iCloud 备份（storage.md 第 5 节） |
 
 ### 证书与描述文件
 
 - **证书**：使用有效的 Developer ID Application 证书。续期或更换后重新生成两份描述文件，并更新
   `MACOS_CERTIFICATE_*` 和描述文件机密；有效期与指纹从当前签名材料读取。
-- **描述文件**：`Solaris Developer ID`、`Solaris Tunnel Developer ID`，都授权上面这张证书，都含 App Group
-  `group.dev.tschen.solaris`。
+- **描述文件**：`OpenWeir Developer ID`、`OpenWeir Tunnel Developer ID`，都授权上面这张证书，都含 App Group
+  `group.org.openweir.app`。
 - **公证**：使用发行团队授权的 App Store Connect API Key。
 
 ### 测试机与调试签名
@@ -368,7 +368,7 @@ com.apple.developer.icloud-container-identifiers"，在开发者网站编辑 App
 
 | 目标 | entitlement |
 | --- | --- |
-| 主应用 | `com.apple.developer.system-extension.install`；`com.apple.developer.networking.networkextension` 含 `packet-tunnel-provider-systemextension`；`com.apple.security.application-groups` 含 `group.dev.tschen.solaris`；iCloud 的 CloudKit 容器 `iCloud.dev.tschen.solaris`（环境 Production，管理库的 iCloud 备份在主应用进程里用它）；`com.apple.security.cs.allow-jit`（Qt Quick） |
+| 主应用 | `com.apple.developer.system-extension.install`；`com.apple.developer.networking.networkextension` 含 `packet-tunnel-provider-systemextension`；`com.apple.security.application-groups` 含 `group.org.openweir.app`；iCloud 的 CloudKit 容器 `iCloud.org.openweir.app`（环境 Production，管理库的 iCloud 备份在主应用进程里用它）；`com.apple.security.cs.allow-jit`（Qt Quick） |
 | 系统扩展 | `com.apple.developer.networking.networkextension` 含 `packet-tunnel-provider-systemextension`；App Sandbox；`network.client` / `network.server`；同一个 App Group |
 
 两份描述文件分别嵌入为主应用和扩展的 `embedded.provisionprofile`，签名时启用 hardened runtime。
@@ -380,14 +380,14 @@ Environment 读取它们；这个 Environment 只允许 `main` 分支和 `v*` �
 
 | 名称 | 类型 | 内容 |
 | --- | --- | --- |
-| `APPLE_TEAM_ID` | 变量 | 发行团队的 Team ID |
+| `OPENWEIR_APPLE_TEAM_ID` | 变量 | 发行团队的 Team ID，构建时写入 entitlements、Xcode 工程和随包的 `product.json` |
 | `MACOS_CERTIFICATE_NAME` | 变量 | 当前 Developer ID Application 证书的完整名称 |
 | `APP_STORE_CONNECT_KEY_ID` | 变量 | 公证 API Key 的 ID |
 | `APP_STORE_CONNECT_ISSUER_ID` | 变量 | API Key 的 Issuer ID |
 | `APP_STORE_CONNECT_API_KEY` | 机密 | API Key 的 `.p8` 私钥 |
 | `KEYCHAIN_PASSWORD` | 机密 | 临时钥匙串的密码（随机生成） |
 | `MACOS_CERTIFICATE_BASE64`、`MACOS_CERTIFICATE_PASSWORD` | 机密 | Developer ID Application 证书的 `.p12` 及其密码 |
-| `MACOS_APP_PROFILE_BASE64`、`MACOS_NETWORK_EXTENSION_PROFILE_BASE64` | 机密 | `Solaris Developer ID`、`Solaris Tunnel Developer ID`，都授权上面这张证书 |
+| `MACOS_APP_PROFILE_BASE64`、`MACOS_NETWORK_EXTENSION_PROFILE_BASE64` | 机密 | `OpenWeir Developer ID`、`OpenWeir Tunnel Developer ID`，都授权上面这张证书 |
 
 `.github/workflows/release.yml` 读取它们（见“发布工作流”）。它和 `build_app.py` 一起校验证书、Team、有效期，
 以及两份描述文件的权限：主应用必须有 `system-extension.install`，扩展必须有

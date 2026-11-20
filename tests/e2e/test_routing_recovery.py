@@ -3,8 +3,8 @@
 import pytest
 from PySide6.QtCore import QPointF, Qt
 
-from solaris.models.routing import Plan
-from solaris.models.store import ProfileStore
+from openweir.models.routing import Plan
+from openweir.models.store import ProfileStore
 from tests.e2e.app import App, nodes_profile
 from tests.e2e.servers import WebServer
 from tests.support.window import find_all, kind

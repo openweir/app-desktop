@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/controlpb"
+	"github.com/openweir/app-desktop/src/core/internal/controlpb"
 )
 
 // A WARP device as the UI keeps it; the keys only need to reach the configuration here.
@@ -198,7 +198,7 @@ func TestWarpExitNameIsReserved(t *testing.T) {
 
 const meshSource = `
 proxies:
-  - {name: 家里, type: tailscale, auth-key: tskey-auth-x, hostname: solaris}
+  - {name: 家里, type: tailscale, auth-key: tskey-auth-x, hostname: openweir}
   - {name: 香港 01, type: ss, server: h.example, port: 9, cipher: aes-128-gcm, password: x}
   - {name: 公司, type: zerotier, network: 8056c2e21c000001}
   - {name: 实验室, type: easytier, network-name: lab, network-secret: s}

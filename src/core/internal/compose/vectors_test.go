@@ -10,7 +10,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/controlpb"
+	"github.com/openweir/app-desktop/src/core/internal/controlpb"
 )
 
 // The core's answers that the UI's tests rely on, shared with tests/test_simulated.py: the

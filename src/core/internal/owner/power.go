@@ -8,10 +8,10 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/controlpb"
-	"github.com/Ember-Moth/Solaris/src/core/internal/engine"
-	"github.com/Ember-Moth/Solaris/src/core/internal/operation"
-	"github.com/Ember-Moth/Solaris/src/core/internal/power"
+	"github.com/openweir/app-desktop/src/core/internal/controlpb"
+	"github.com/openweir/app-desktop/src/core/internal/engine"
+	"github.com/openweir/app-desktop/src/core/internal/operation"
+	"github.com/openweir/app-desktop/src/core/internal/power"
 )
 
 type powerState struct {

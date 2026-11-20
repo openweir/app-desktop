@@ -1,19 +1,19 @@
 <p align="center">
-  <img src="src/solaris/ui/brand/app-icon-macos.svg" width="128" height="128" alt="Solaris">
+  <img src="src/openweir/ui/brand/app-icon-macos.svg" width="128" height="128" alt="OpenWeir">
 </p>
 
-<h1 align="center">Solaris</h1>
+<h1 align="center">OpenWeir</h1>
 
 <p align="center"><strong>让 mihomo 融入操作系统。</strong></p>
 
 <p align="center">采用平台原生系统架构的开源网络代理客户端，支持 macOS 和 Windows。</p>
 
 <p align="center">
-  <a href="https://github.com/Ember-Moth/Solaris/releases">下载</a> ·
+  <a href="https://github.com/openweir/app-desktop/releases">下载</a> ·
   <a href="#原生系统集成">产品特点</a> ·
   <a href="docs/usage.md">使用指南</a> ·
   <a href="PRIVACY.md">隐私说明</a> ·
-  <a href="https://github.com/Ember-Moth/Solaris/issues">反馈问题</a> ·
+  <a href="https://github.com/openweir/app-desktop/issues">反馈问题</a> ·
   <a href="docs/development.md">开发文档</a>
 </p>
 
@@ -21,27 +21,27 @@
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/overview-dark.png">
     <source media="(prefers-color-scheme: light)" srcset="docs/images/overview-light.png">
-    <img src="docs/images/overview-light.png" alt="Solaris 概览页：已连接，显示出站模式、当前节点、实时流量、订阅用量和最近连接">
+    <img src="docs/images/overview-light.png" alt="OpenWeir 概览页：已连接，显示出站模式、当前节点、实时流量、订阅用量和最近连接">
   </picture>
 </p>
 
 ---
 
-Solaris 用来管理你的代理订阅、节点和分流规则。无需注册 Solaris 账户，导入自己的订阅或配置即可使用。
+OpenWeir 用来管理你的代理订阅、节点和分流规则。无需注册 OpenWeir 账户，导入自己的订阅或配置即可使用。
 
 ## 原生系统集成
 
-- **后台保持连接**：关闭窗口后 Solaris 留在托盘或菜单栏，连接继续运行；「退出 Solaris」会先断开连接再退出。
+- **后台保持连接**：关闭窗口后 OpenWeir 留在托盘或菜单栏，连接继续运行；「退出 OpenWeir」会先断开连接再退出。
 - **日常使用无需管理员权限**：macOS 首次连接时请求系统扩展和 VPN 授权；Windows 安装时注册后台服务。
 - **随系统使用**：支持托盘操作、登录时打开及睡眠唤醒后的连接恢复。主动断开后不会自动重连。
-- **双平台签名**：macOS 版使用 Developer ID 签名并经 Apple 公证；Windows 版由 Herta Network LLC 签名，
-  安装时显示已验证的发布者。应用内更新也会核对安装包的签名。
+- **双平台签名**：正式版的 macOS 版使用 Developer ID 签名并经 Apple 公证，Windows 版使用 Authenticode 签名，
+  应用内更新会核对安装包的签名。签名证书就绪前发布的测试版没有签名。
 
 ## 连接与分流
 
 - **一个开关连接**：Windows 可选择 TUN、系统代理或同时启用；macOS 通过 Network Extension 接管流量。
   在概览页查看连接状态、当前模式和实时流量。
-- **集中管理订阅**：导入 mihomo（Clash）订阅链接或本地配置，设置定时更新，通过 `solaris://`、`clash://`、
+- **集中管理订阅**：导入 mihomo（Clash）订阅链接或本地配置，设置定时更新，通过 `openweir://`、`clash://`、
   `mihomo://`、`clashmeta://` 链接一键导入。支持全局覆写和单份订阅覆写。
 - **使用订阅规则，或建立自己的方案**：把多个订阅的节点合成节点池，按地区组织，自建策略组；按服务、域名和
   IP 段设置分流。规则测试可以预览目标网站会走哪条规则，方案支持导入与导出。
@@ -56,7 +56,7 @@ Solaris 用来管理你的代理订阅、节点和分流规则。无需注册 So
 
 ## 更多网络能力
 
-Solaris 使用 [mihomo 增强版](https://github.com/openweir/mihomo)内核，在 mihomo 的协议能力上加入：
+OpenWeir 使用 [mihomo 增强版](https://github.com/openweir/mihomo)内核，在 mihomo 的协议能力上加入：
 
 - **Naive**：支持 HTTP/2、QUIC，以及兼容服务端上的 UoT。
 - **AnyTLS + REALITY**：支持使用 REALITY 的 AnyTLS 节点。
@@ -83,22 +83,22 @@ EasyTier** 网络，通过分流规则访问网络中的设备。
 
 ## 下载与安装
 
-从 [GitHub Releases](https://github.com/Ember-Moth/Solaris/releases) 获取安装包：
+从 [GitHub Releases](https://github.com/openweir/app-desktop/releases) 获取安装包：
 
 | 支持的平台 | 安装包 |
 | --- | --- |
-| macOS 26 及以上，Apple Silicon / Intel x64 | `Solaris-<版本>-macos-universal.dmg` |
-| Windows 10 / 11，x64 | `Solaris-<版本>-windows-x64-setup.exe` |
-| Windows 11，ARM64 | `Solaris-<版本>-windows-arm64-setup.exe` |
+| macOS 26 及以上，Apple Silicon / Intel x64 | `OpenWeir-<版本>-macos-universal.dmg` |
+| Windows 10 / 11，x64 | `OpenWeir-<版本>-windows-x64-setup.exe` |
+| Windows 11，ARM64 | `OpenWeir-<版本>-windows-arm64-setup.exe` |
 
-- **macOS**：打开 DMG，把 Solaris 拖入「应用程序」；首次连接时按提示允许网络扩展和 VPN 配置。
-- **Windows**：运行安装程序并允许管理员授权，发布者显示为 Herta Network LLC。
+- **macOS**：打开 DMG，把 OpenWeir 拖入「应用程序」；首次连接时按提示允许网络扩展和 VPN 配置。
+- **Windows**：运行安装程序并允许管理员授权。
 
 安装位置、SmartScreen 提示、更新与卸载，见 [使用指南](docs/usage.md#安装)。`SHA256SUMS` 可用于核对下载文件。
 
 ## 隐私
 
-Solaris 不收集使用统计，也不会自动上传日志或崩溃报告。订阅、配置和设置保存在本机；访问订阅服务器、代理节点、
+OpenWeir 不收集使用统计，也不会自动上传日志或崩溃报告。订阅、配置和设置保存在本机；访问订阅服务器、代理节点、
 更新服务或所选云备份服务时，会产生对应功能所需的网络请求。
 
 诊断文件可能包含访问过的域名、节点名或错误内容，由你决定是否导出和分享。数据存储、云备份和第三方服务的完整说明
@@ -106,18 +106,16 @@ Solaris 不收集使用统计，也不会自动上传日志或崩溃报告。订
 
 ## 支持与开发
 
-- 使用问题与功能建议：[GitHub Issues](https://github.com/Ember-Moth/Solaris/issues)。
+- 使用问题与功能建议：[GitHub Issues](https://github.com/openweir/app-desktop/issues)。
 - 安装、连接、备份与常见问题：[使用指南](docs/usage.md)。
 - 从源码构建、运行测试和参与开发：[开发文档](docs/development.md)。
 
 ## 许可证
 
-Solaris 以 [GPL-3.0-only](LICENSE) 发布，使用基于 [mihomo](https://github.com/MetaCubeX/mihomo) 的
+OpenWeir 以 [GPL-3.0-only](LICENSE) 发布，使用基于 [mihomo](https://github.com/MetaCubeX/mihomo) 的
 [mihomo 增强版](https://github.com/openweir/mihomo)内核。第三方组件及其许可证可在应用的「设置 › 关于 › 开源许可」中查看。
 
-## 赞助与商务合作
+## 致谢
 
-如果 Solaris 对你有帮助，欢迎赞助项目的持续开发与维护。
-
-- **TRON**：`TSNLCUnYzasf7zUv932igYkeLDu4DXj5oc`
-- **商务合作**：[Telegram · @EmberMoth_bot](https://t.me/EmberMoth_bot)
+OpenWeir 桌面端基于 [Solaris](https://github.com/openweir/Solaris)（GPL-3.0-only，作者 Ember Moth）开发，
+保留其完整提交历史，此后独立维护。感谢 Solaris 及 mihomo 的作者与贡献者。

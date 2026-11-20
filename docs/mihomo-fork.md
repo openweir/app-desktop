@@ -1,6 +1,6 @@
 # mihomo 增强版配置指南
 
-本文面向使用 Solaris 的用户，介绍 [mihomo 增强版](https://github.com/openweir/mihomo)的扩展能力及其客户端配置方法。
+本文面向使用 OpenWeir 的用户，介绍 [mihomo 增强版](https://github.com/openweir/mihomo)的扩展能力及其客户端配置方法。
 不同版本的安装包可能支持不同参数，请在「设置 → 关于 → 内核」和对应版本的发布说明中核对支持情况。
 
 | 能力 | 主要变化 | 服务端要求 |
@@ -12,7 +12,7 @@
 | Nowhere NW3 | `type: nowhere`，经 TLS 或 QUIC 连接，转发 TCP 和 UDP，支持 Morph | Nowhere 3.3 的 Portal，共享密钥和 Morph 设置一致 |
 | VLESS 反向代理 | `type: vless-reverse` 虚拟入站，经 VLESS 节点回连公网端 | 公网端配置反向 VLESS 用户和同名 `vless-reverse` 出站 |
 
-使用完整的 Solaris 安装包，以获得配套的协议支持。
+使用完整的 OpenWeir 安装包，以获得配套的协议支持。
 
 ## 先导入一个完整示例
 
@@ -32,7 +32,7 @@
 | [nowhere.yaml](examples/mihomo-fork/nowhere.yaml) | Nowhere NW3，经 TLS 连接 |
 
 1. 打开需要的示例文件，下载原始内容，修改参数后保存为 UTF-8 的 `.yaml` 文件。
-2. 在 Solaris 的「订阅」页点击「导入文件」。
+2. 在 OpenWeir 的「订阅」页点击「导入文件」。
 3. macOS 未连接时可能显示「连接后读取」；此时先按应用提示完成授权并连接，等待订阅读取完成。
 4. 打开这份订阅的「更多」菜单，选择「使用它的规则」，确认出站模式为「规则」；在「代理」页确认 `PROXY` 组使用了目标节点。
 5. 在应用中选择接管方式并连接，再通过 HTTP 测速或实际请求验证。
@@ -44,7 +44,7 @@
 如果只复制下文的节点片段，将它放在现有 YAML 的 `proxies` 列表中，保持 `name` 唯一，再把名称加入所用策略组的
 `proxies` 列表。远程订阅会按链接更新；需要自定义节点时，建议保留一份独立的本地订阅。
 
-Solaris 的连接、混合端口和 TUN 受应用设置管理，`external-controller`、`secret` 等控制器字段会被清空。
+OpenWeir 的连接、混合端口和 TUN 受应用设置管理，`external-controller`、`secret` 等控制器字段会被清空。
 本文的客户端出站示例不需要添加 `listeners`。入站配置还受宿主和局域网访问设置约束；本文不作为服务端部署说明。
 
 ## Naive
@@ -169,7 +169,7 @@ reality-opts:
   support-x25519mlkem768: false
 ```
 
-布尔值使用 YAML 的 `true` / `false`。如果原配置已显式选择 `false`，Solaris 会保留这个选择。
+布尔值使用 YAML 的 `true` / `false`。如果原配置已显式选择 `false`，OpenWeir 会保留这个选择。
 连接失败时先核对地址、SNI、公钥、short ID、密码或 UUID、系统时间及服务端策略，再判断是否需要旧握手兼容开关。
 
 ## Snell v4、v5、v6
@@ -261,7 +261,7 @@ Morph 只遮蔽 TLS/QUIC 之下的传输，不代替证书验证。只实现客�
 
 ## VLESS 反向代理
 
-反向代理让外部设备经你的公网 VLESS 服务端，访问这台电脑及其所在的内网。Solaris 作为内网端：
+反向代理让外部设备经你的公网 VLESS 服务端，访问这台电脑及其所在的内网。OpenWeir 作为内网端：
 `type: vless-reverse` 的虚拟入站通过指定的 VLESS 节点主动回连公网端，公网端再把发往内网的请求经这条通道送回来，
 本机按入站的 `rule` 决定这些请求能去哪里。它不在本机监听端口，也不需要 `listen`、`port`。
 
@@ -323,5 +323,5 @@ sub-rules:
 
 ## 相关文档
 
-- [Solaris 使用指南](usage.md)
+- [OpenWeir 使用指南](usage.md)
 - [开发者参数参考](development.md#内核参数参考)

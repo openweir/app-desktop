@@ -23,7 +23,7 @@ from urllib.parse import unquote, urlsplit
 
 import yaml
 
-from solaris.host.base import (
+from openweir.host.base import (
     EXPORT_SHARE,
     ComposedGroup,
     Composition,
@@ -44,7 +44,7 @@ from solaris.host.base import (
     TunnelConfig,
     ZeroTierSettings,
 )
-from solaris.models.plans import GROUP_TYPES
+from openweir.models.plans import GROUP_TYPES
 
 # The insert keys of an override (docs/ui.md §4): key -> (target list, at front).
 INSERT_KEYS = {

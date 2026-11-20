@@ -67,7 +67,7 @@ jobs:
           foreach ($arch in @('x64', 'arm64')) {
             $source = (Get-Item "build/migration/$arch/*.exe").FullName
             $build = if ($arch -eq 'x64') { 'build/windows' } else { 'build/windows-arm64' }
-            $payload = Join-Path $build 'Solaris'
+            $payload = Join-Path $build 'OpenWeir'
             7z x $source "-o$payload" -y
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
             foreach ($file in @('$PLUGINSDIR', 'uninstall.exe')) {
@@ -76,7 +76,7 @@ jobs:
             }
             uv run --frozen python scripts/build_windows.py --installer-only --arch $arch
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-            Copy-Item -LiteralPath (Get-Item "$build/Solaris-*-windows-$arch-setup.exe").FullName -Destination $source -Force
+            Copy-Item -LiteralPath (Get-Item "$build/OpenWeir-*-windows-$arch-setup.exe").FullName -Destination $source -Force
           }
       - name: Upgrade an emulated x64 installation to native ARM64
         shell: powershell

@@ -17,7 +17,7 @@ import (
 	C "github.com/metacubex/mihomo/constant"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/controlpb"
+	"github.com/openweir/app-desktop/src/core/internal/controlpb"
 )
 
 const geoMaxBytes = 256 << 20

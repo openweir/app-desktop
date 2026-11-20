@@ -5,7 +5,7 @@
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
 Add-Type -AssemblyName UIAutomationClientsideProviders
-if (-not ('SolarisAutomation' -as [type])) {
+if (-not ('OpenWeirAutomation' -as [type])) {
     $automationReferences = @(
         [System.Windows.Automation.AutomationElement].Assembly.Location,
         [System.Windows.Automation.ControlType].Assembly.Location,
@@ -14,7 +14,7 @@ if (-not ('SolarisAutomation' -as [type])) {
     Add-Type -TypeDefinition @'
 using System.Runtime.CompilerServices;
 using System.Windows.Automation;
-public static class SolarisAutomation {
+public static class OpenWeirAutomation {
     [MethodImpl(MethodImplOptions.NoInlining)]
     public static void Initialize() {
         ClientSettings.RegisterClientSideProviders(
@@ -23,5 +23,5 @@ public static class SolarisAutomation {
 }
 '@ -ReferencedAssemblies $automationReferences
 }
-try { [SolarisAutomation]::Initialize() }
+try { [OpenWeirAutomation]::Initialize() }
 catch { throw $_.Exception.ToString() }

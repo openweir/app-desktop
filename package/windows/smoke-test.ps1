@@ -2,12 +2,12 @@
 # (docs/architecture.md section 9): CI's windows-installer job and the release workflow run it.
 # No TUN and no connection: the service starts and listens on its pipe, the UI opens its window.
 #
-#     ./package/windows/smoke-test.ps1 -Installer build/windows/Solaris-<version>-windows-x64-setup.exe
+#     ./package/windows/smoke-test.ps1 -Installer build/windows/OpenWeir-<version>-windows-x64-setup.exe
 #
 # 1. A fresh install: files, service (LocalSystem, automatic, restarts on failure, listening),
-#    the uninstall entry, the solaris:, clash:, mihomo: and clashmeta: schemes, the Start
+#    the uninstall entry, the openweir:, clash:, mihomo: and clashmeta: schemes, the Start
 #    menu shortcut.
-# 2. Solaris.exe --quit with no UI running does nothing; the installed UI starts and opens its
+# 2. OpenWeir.exe --quit with no UI running does nothing; the installed UI starts and opens its
 #    window, and removes the user's own clash: registration that opens a program no longer
 #    there while it keeps a mihomo: one whose program exists (D45).
 # 3. The same installer again, over the running UI: the UI quits when asked (not ended), and
@@ -16,12 +16,12 @@
 #    shortcut or file left; the user data stays.
 # 5. Install again and uninstall with /PURGE: the user data goes too.
 #
-# With -Signed, as the release workflow runs it: the installer, the uninstaller, Solaris.exe and
-# solaris-service.exe carry Solaris's signature (package/windows/sign.ps1 -Check) and the other
-# programs one Windows trusts; the service runs as a signed release, which requires Solaris's
+# With -Signed, as the release workflow runs it: the installer, the uninstaller, OpenWeir.exe and
+# openweir-service.exe carry OpenWeir's signature (package/windows/sign.ps1 -Check) and the other
+# programs one Windows trusts; the service runs as a signed release, which requires OpenWeir's
 # signature of the UI (docs/architecture.md section 5.3), and has not turned the UI away.
 #
-# Each start of the UI writes its output to $env:RUNNER_TEMP\solaris-ui, with Qt's messages,
+# Each start of the UI writes its output to $env:RUNNER_TEMP\openweir-ui, with Qt's messages,
 # which a GUI program otherwise loses; a UI that exits while starting also leaves a copy of its
 # crash directory there, before step 5 purges it. CI uploads that directory when this fails.
 [CmdletBinding()]
@@ -32,33 +32,33 @@ if ($env:GITHUB_ACTIONS -ne 'true') {
 }
 
 $Installer = (Resolve-Path -LiteralPath $Installer).Path
-if ((Split-Path $Installer -Leaf) -notmatch '^Solaris-(\d+\.\d+\.\d+)-windows-(x64|arm64)-setup\.exe$') {
+if ((Split-Path $Installer -Leaf) -notmatch '^OpenWeir-(\d+\.\d+\.\d+)-windows-(x64|arm64)-setup\.exe$') {
     throw "Not an installer as docs/release.md names it: $Installer"
 }
 $Version = $Matches[1]
 $Architecture = $Matches[2]
 $Machine = if ($Architecture -eq 'arm64') { 0xAA64 } else { 0x8664 }
-$Root = Join-Path $env:SystemDrive 'Solaris CI Custom'
-$Client = Join-Path $Root 'Solaris.exe'
-$ServiceExecutable = Join-Path $Root 'solaris-service.exe'
+$Root = Join-Path $env:SystemDrive 'OpenWeir CI Custom'
+$Client = Join-Path $Root 'OpenWeir.exe'
+$ServiceExecutable = Join-Path $Root 'openweir-service.exe'
 $Uninstaller = Join-Path $Root 'uninstall.exe'
-$UninstallKey = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Solaris'
-$Shortcut = Join-Path $env:ProgramData 'Microsoft\Windows\Start Menu\Programs\Solaris.lnk'
-$ServiceName = 'SolarisService'
-$Pipe = 'ProtectedPrefix\Administrators\solaris'
+$UninstallKey = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\OpenWeir'
+$Shortcut = Join-Path $env:ProgramData 'Microsoft\Windows\Start Menu\Programs\OpenWeir.lnk'
+$ServiceName = 'OpenWeirService'
+$Pipe = 'ProtectedPrefix\Administrators\openweir'
 $LinkCommand = "`"$Client`" `"%1`""
-# One-click import (D6, D45): src/solaris/desktop/links.py SCHEMES.
-$Schemes = @('solaris', 'clash', 'mihomo', 'clashmeta')
-$ServiceData = Join-Path $env:ProgramData 'Solaris'
-$UserData = Join-Path $env:LOCALAPPDATA 'Solaris'
+# One-click import (D6, D45): src/openweir/desktop/links.py SCHEMES.
+$Schemes = @('openweir', 'clash', 'mihomo', 'clashmeta')
+$ServiceData = Join-Path $env:ProgramData 'OpenWeir'
+$UserData = Join-Path $env:LOCALAPPDATA 'OpenWeir'
 $DumpRoot = 'HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps'
-$UiLock = Join-Path $UserData 'ui.lock'  # src/solaris/desktop/instance.py
-# src/solaris/desktop/login.py's name for this user's task, and one of the same form that
+$UiLock = Join-Path $UserData 'ui.lock'  # src/openweir/desktop/instance.py
+# src/openweir/desktop/login.py's name for this user's task, and one of the same form that
 # starts something else.
-$Task = "Solaris ($($env:USERDOMAIN)_$($env:USERNAME))"
-$OtherTask = 'Solaris (OTHER_someone)'
-$ErrorLog = Join-Path $env:TEMP 'Solaris-setup-error.log'
-$UiOutput = Join-Path $env:RUNNER_TEMP 'solaris-ui'
+$Task = "OpenWeir ($($env:USERDOMAIN)_$($env:USERNAME))"
+$OtherTask = 'OpenWeir (OTHER_someone)'
+$ErrorLog = Join-Path $env:TEMP 'OpenWeir-setup-error.log'
+$UiOutput = Join-Path $env:RUNNER_TEMP 'openweir-ui'
 $UiStarts = 0
 
 # A check that fails is reported and the test goes on, so one run shows every problem; the
@@ -92,7 +92,7 @@ function Invoke-InteractiveSetup([string] $Path) {
     try {
         $rootElement = [System.Windows.Automation.AutomationElement]::RootElement
         $pidCondition = [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::ProcessIdProperty, $process.Id)
-        $classCondition = [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::ClassNameProperty, 'SolarisSetupWindow')
+        $classCondition = [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::ClassNameProperty, 'OpenWeirSetupWindow')
         $condition = [System.Windows.Automation.AndCondition]::new($pidCondition, $classCondition)
         $deadline = [DateTime]::UtcNow.AddSeconds(30)
         $window = $null
@@ -124,8 +124,8 @@ function Invoke-InteractiveSetup([string] $Path) {
         while (-not $process.HasExited -and $action.Current.Name -eq $initialName -and [DateTime]::UtcNow -lt $deadline) {
             Start-Sleep -Milliseconds 200
         }
-        $openChinese = '{0}{1} Solaris' -f [char]0x6253, [char]0x5F00
-        if ($process.HasExited -or $action.Current.Name -notin @('Open Solaris', $openChinese)) {
+        $openChinese = '{0}{1} OpenWeir' -f [char]0x6253, [char]0x5F00
+        if ($process.HasExited -or $action.Current.Name -notin @('Open OpenWeir', $openChinese)) {
             if (Test-Path $ErrorLog) { Get-Content -LiteralPath $ErrorLog | Write-Output }
             throw 'The custom installer did not reach its successful completion page'
         }
@@ -138,7 +138,7 @@ function Invoke-InteractiveSetup([string] $Path) {
     }
 }
 
-function Get-SolarisService {
+function Get-OpenWeirService {
     Get-CimInstance Win32_Service -Filter "Name='$ServiceName'"
 }
 
@@ -153,7 +153,7 @@ function Get-PEMachine([string] $Path) {
     } finally { $reader.Dispose() }
 }
 
-# Where shortcuts named Solaris*.lnk are, in every Start menu: tells a misplaced shortcut from
+# Where shortcuts named OpenWeir*.lnk are, in every Start menu: tells a misplaced shortcut from
 # a missing one.
 function Find-Shortcuts {
     $menus = @(
@@ -161,7 +161,7 @@ function Find-Shortcuts {
         (Join-Path $env:SystemDrive 'Users\*\AppData\Roaming\Microsoft\Windows\Start Menu'),
         (Join-Path $env:SystemRoot 'System32\config\systemprofile\AppData\Roaming\Microsoft\Windows\Start Menu')
     )
-    @(Get-ChildItem -Path $menus -Recurse -Filter 'Solaris*.lnk' -Force -ErrorAction SilentlyContinue |
+    @(Get-ChildItem -Path $menus -Recurse -Filter 'OpenWeir*.lnk' -Force -ErrorAction SilentlyContinue |
             ForEach-Object FullName)
 }
 
@@ -169,21 +169,21 @@ function Assert-Installed {
     foreach ($binary in @($Client, $ServiceExecutable, (Join-Path $Root 'libcronet.dll'))) {
         Expect ((Get-PEMachine $binary) -eq $Machine) "Wrong architecture in $binary; expected $Architecture"
     }
-    foreach ($image in @('Solaris.exe', 'solaris-service.exe')) {
+    foreach ($image in @('OpenWeir.exe', 'openweir-service.exe')) {
         $dump = Get-ItemProperty -LiteralPath (Join-Path $DumpRoot $image)
         Expect ($dump.DumpType -eq 1 -and $dump.DumpCount -eq 5) "Unexpected WER policy for $image"
-        Expect ($dump.SolarisInstallDirectory -eq $Root) "Unowned WER policy for $image"
+        Expect ($dump.OpenWeirInstallDirectory -eq $Root) "Unowned WER policy for $image"
     }
     foreach ($name in @(
-            'Solaris.exe', 'solaris-service.exe', 'libcronet.dll', 'uninstall.exe', 'LICENSE',
+            'OpenWeir.exe', 'openweir-service.exe', 'libcronet.dll', 'uninstall.exe', 'LICENSE',
             'geodata\GeoSite.dat', 'geodata\GeoIP.dat', 'geodata\geoip.metadb', 'geodata\ASN.mmdb',
-            'solaris\licenses\THIRD_PARTY_NOTICES.txt')) {
+            'openweir\licenses\THIRD_PARTY_NOTICES.txt')) {
         if (-not (Test-Path -LiteralPath (Join-Path $Root $name) -PathType Leaf)) { throw "$name is missing" }
     }
     $product = (Get-Item -LiteralPath $Client).VersionInfo.ProductVersion
-    Expect ($product -in @($Version, "$Version.0")) "Solaris.exe is version $product, not $Version"
+    Expect ($product -in @($Version, "$Version.0")) "OpenWeir.exe is version $product, not $Version"
 
-    $service = Get-SolarisService
+    $service = Get-OpenWeirService
     if (-not $service) { throw "$ServiceName is not installed" }
     $expected = "`"$ServiceExecutable`""
     Expect ($service.PathName -eq $expected) "$ServiceName runs $($service.PathName), not $expected"
@@ -220,7 +220,7 @@ function Assert-Installed {
         $target = (New-Object -ComObject WScript.Shell).CreateShortcut($Shortcut).TargetPath
         Expect ($target -eq $Client) "The Start menu shortcut opens '$target', not $Client"
     } else {
-        Expect $false "No shortcut at $Shortcut; Solaris shortcuts found: $((Find-Shortcuts) -join ', ')"
+        Expect $false "No shortcut at $Shortcut; OpenWeir shortcuts found: $((Find-Shortcuts) -join ', ')"
     }
     Write-Output "Installed $Version; $ServiceName running as process $($service.ProcessId)"
 }
@@ -275,7 +275,7 @@ function Assert-UIAccepted {
 }
 
 function Assert-Removed {
-    foreach ($image in @('Solaris.exe', 'solaris-service.exe')) {
+    foreach ($image in @('OpenWeir.exe', 'openweir-service.exe')) {
         Expect (-not (Test-Path -LiteralPath (Join-Path $DumpRoot $image))) "WER policy remains for $image"
     }
     Expect (-not (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue)) "$ServiceName is still there"
@@ -330,11 +330,11 @@ function Start-UI {
         $ui.Refresh()
     } while (-not $ui.HasExited -and $ui.MainWindowHandle -eq 0 -and [DateTime]::UtcNow -lt $deadline)
     if ($ui.HasExited) {
-        Expect $false "Solaris.exe exited with $($ui.ExitCode) while starting"
+        Expect $false "OpenWeir.exe exited with $($ui.ExitCode) while starting"
         Save-UICrash $output
     } else {
-        Expect ($ui.MainWindowHandle -ne 0) 'Solaris.exe opened no window in 60 seconds'
-        Write-Output "Solaris.exe ($($ui.Id)) is running; its window: '$($ui.MainWindowTitle)'"
+        Expect ($ui.MainWindowHandle -ne 0) 'OpenWeir.exe opened no window in 60 seconds'
+        Write-Output "OpenWeir.exe ($($ui.Id)) is running; its window: '$($ui.MainWindowTitle)'"
     }
 }
 
@@ -368,9 +368,9 @@ function Register-Task([string] $Name, [string] $Program) {
     Register-ScheduledTask -TaskName $Name -TaskPath '\' -Action $action -Trigger $trigger -Principal $principal | Out-Null
 }
 
-if ((Test-Path $Root) -or (Test-Path $UninstallKey) -or (Get-SolarisService) -or
+if ((Test-Path $Root) -or (Test-Path $UninstallKey) -or (Get-OpenWeirService) -or
     (Test-Path $ServiceData) -or (Test-Path $UserData)) {
-    throw 'Solaris is already on this machine; the test needs a fresh one.'
+    throw 'OpenWeir is already on this machine; the test needs a fresh one.'
 }
 New-Item -ItemType Directory -Force -Path $UiOutput | Out-Null
 # Qt writes its messages, the reason for a qFatal among them, to stderr only when told to.
@@ -386,12 +386,12 @@ try {
     $quit = Start-Process -FilePath $Client -ArgumentList '--quit' -PassThru
     $null = $quit.Handle
     if ($quit.WaitForExit(30000)) {
-        Expect ($quit.ExitCode -eq 0) "Solaris.exe --quit exited with $($quit.ExitCode) with no UI running"
+        Expect ($quit.ExitCode -eq 0) "OpenWeir.exe --quit exited with $($quit.ExitCode) with no UI running"
     } else {
         $quit.Kill()
-        Expect $false 'Solaris.exe --quit took more than 30 seconds with no UI running'
+        Expect $false 'OpenWeir.exe --quit took more than 30 seconds with no UI running'
     }
-    Expect (-not (Test-Path -LiteralPath $UserData)) "Solaris.exe --quit made $UserData"
+    Expect (-not (Test-Path -LiteralPath $UserData)) "OpenWeir.exe --quit made $UserData"
     $staleKey = 'HKCU:\Software\Classes\clash'
     $validKey = 'HKCU:\Software\Classes\mihomo'
     Set-UserScheme 'clash' "`"$env:SystemDrive\Removed Client\Removed Client.exe`" `"%1`""
@@ -409,17 +409,17 @@ try {
     if ($Signed) { Assert-UIAccepted }
 
     Write-Output '3. Upgrade over the running UI'
-    $before = (Get-SolarisService).ProcessId
+    $before = (Get-OpenWeirService).ProcessId
     Invoke-Setup $Installer '/S'
     Assert-QuitByItself 'the upgrade'
     Assert-Installed
-    Expect ((Get-SolarisService).ProcessId -ne $before) "$ServiceName was not restarted"
+    Expect ((Get-OpenWeirService).ProcessId -ne $before) "$ServiceName was not restarted"
 
     Write-Output '3b. A locked runtime file fails the upgrade; retry after release recovers'
     $lockedRuntime = [IO.File]::Open((Join-Path $Root 'libcronet.dll'), [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
     try {
         Invoke-Setup $Installer '/S' 1603
-        Expect ((Get-SolarisService).State -eq 'Stopped') 'A failed upgrade started the service with an incomplete runtime'
+        Expect ((Get-OpenWeirService).State -eq 'Stopped') 'A failed upgrade started the service with an incomplete runtime'
         Expect ((Test-Path -LiteralPath $ErrorLog) -and (Get-Item -LiteralPath $ErrorLog).Length -gt 0) 'The failed upgrade did not report its error'
     } finally { $lockedRuntime.Dispose() }
     Invoke-Setup $Installer '/S'
@@ -452,9 +452,9 @@ try {
         Expect (-not (Test-Path -LiteralPath $purged)) "/PURGE left $purged"
     }
     Write-Output '6. Default install location'
-    $Root = Join-Path $env:ProgramW6432 'Solaris'
-    $Client = Join-Path $Root 'Solaris.exe'
-    $ServiceExecutable = Join-Path $Root 'solaris-service.exe'
+    $Root = Join-Path $env:ProgramW6432 'OpenWeir'
+    $Client = Join-Path $Root 'OpenWeir.exe'
+    $ServiceExecutable = Join-Path $Root 'openweir-service.exe'
     $Uninstaller = Join-Path $Root 'uninstall.exe'
     $LinkCommand = "`"$Client`" `"%1`""
     Invoke-Setup $Installer '/S'

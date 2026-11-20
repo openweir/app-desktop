@@ -19,12 +19,12 @@ from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuick import QQuickItem, QQuickWindow
 from pytestqt.qtbot import QtBot
 
-from solaris.app import load_ui
-from solaris.desktop.titlebar import MAC, WINDOWS
-from solaris.host.base import HostError
-from solaris.models.store import ProfileStore
-from solaris.viewmodels.appearance import Appearance
-from solaris.viewmodels.composition import compose
+from openweir.app import load_ui
+from openweir.desktop.titlebar import MAC, WINDOWS
+from openweir.host.base import HostError
+from openweir.models.store import ProfileStore
+from openweir.viewmodels.appearance import Appearance
+from openweir.viewmodels.composition import compose
 from tests.support.i18n import ui_language
 from tests.support.releases import offline_updater
 from tests.support.simulated import SimulatedFetcher, SimulatedHost, seed_profiles
@@ -188,7 +188,7 @@ def test_a_dialog_left_open_keeps_its_page(qtbot: QtBot, loaded: Loaded) -> None
 def style(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> str:
     """The window's title bar in this style, whatever system the tests run on, as in
     test_titlebar.py. Request it before ``loaded``."""
-    monkeypatch.setattr("solaris.viewmodels.desktop.titlebar_style", lambda _: request.param)
+    monkeypatch.setattr("openweir.viewmodels.desktop.titlebar_style", lambda _: request.param)
     return request.param
 
 
@@ -260,12 +260,12 @@ def test_hidden_and_let_go_the_window_still_asks_and_opens_links(
 
     # An install link: the import form, filled in.
     hide()
-    view_models.open_link("solaris://install-config?url=https%3A%2F%2Fsub.example.com%2Fa")
+    view_models.open_link("openweir://install-config?url=https%3A%2F%2Fsub.example.com%2Fa")
     assert window.isVisible()
     assert view_models.shell.property("currentPage") == "profiles"
     assert loaded.item(lambda item: item.property("text") == LINK)
 
-    # The tray's 退出 Solaris, when the tunnel does not go down: the window asks.
+    # The tray's 退出 OpenWeir, when the tunnel does not go down: the window asks.
     async def unresponsive() -> None:
         raise HostError("core_unresponsive", "the core did not answer")
 
@@ -294,7 +294,7 @@ def test_a_window_brought_straight_back_keeps_its_pages(qtbot: QtBot, loaded: Lo
 
 @pytest.fixture
 def at_login(qtbot: QtBot, tmp_path: Path, appearance: Appearance) -> Iterator[Loaded]:
-    """The window as Solaris opens at login: hidden in the tray."""
+    """The window as OpenWeir opens at login: hidden in the tray."""
     store = ProfileStore(tmp_path)
     seed_profiles(store, time.time())
     with ui_language("zh"):

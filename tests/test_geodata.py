@@ -8,11 +8,11 @@ from pathlib import Path
 import httpx
 import pytest
 
-from solaris.host.base import GeoUpdateFile, GeoUpdatePlan, HostError
-from solaris.host.service import ServiceHost
-from solaris.host.transport import Streams
-from solaris.models.geodata import CHUNK_BYTES, GeoDownloader, GeoUpdates, due
-from solaris.protocol import control_pb2
+from openweir.host.base import GeoUpdateFile, GeoUpdatePlan, HostError
+from openweir.host.service import ServiceHost
+from openweir.host.transport import Streams
+from openweir.models.geodata import CHUNK_BYTES, GeoDownloader, GeoUpdates, due
+from openweir.protocol import control_pb2
 from tests.support.simulated import SimulatedHost
 from tests.test_control_client import info_response, serve
 
@@ -90,7 +90,7 @@ def test_bad_download_keeps_installed_cache(
 
 
 def test_oversize_stream_and_untrusted_name_are_rejected(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.setattr("solaris.models.geodata.MAX_BYTES", 5)
+    monkeypatch.setattr("openweir.models.geodata.MAX_BYTES", 5)
     downloader = GeoDownloader(tmp_path, transport=response(b"123456"))
     with pytest.raises(ValueError, match="too large"):
         asyncio.run(downloader.fetch(file(), 3600))

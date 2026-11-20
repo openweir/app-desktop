@@ -3,7 +3,7 @@ import struct
 
 import pytest
 
-from solaris.protocol.frame import (
+from openweir.protocol.frame import (
     HEADER_SIZE,
     KIND_REQUEST,
     KIND_RESPONSE,

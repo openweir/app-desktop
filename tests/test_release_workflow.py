@@ -11,8 +11,8 @@ from typing import Any
 
 import yaml
 
-from solaris import licenses
-from solaris.update.releases import CHECKSUMS_NAME, installer_name
+from openweir import licenses
+from openweir.update.releases import CHECKSUMS_NAME, installer_name
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github" / "workflows" / "release.yml"
@@ -83,8 +83,8 @@ def test_the_notes_say_where_the_source_is() -> None:
     notes = NOTES.read_text(encoding="utf-8")
     assert set(re.findall(r"\{\{\w*\}\}", notes)) == {"{{version}}"}
     assert "source.tar.gz" not in notes
-    assert "https://github.com/Ember-Moth/Solaris/tree/v{{version}}" in notes
-    assert "https://github.com/Ember-Moth/Solaris/blob/v{{version}}/src/core/go.mod" in notes
+    assert "https://github.com/openweir/app-desktop/tree/v{{version}}" in notes
+    assert "https://github.com/openweir/app-desktop/blob/v{{version}}/src/core/go.mod" in notes
     assert f"https://{MIHOMO}" in notes
     assert "`go.sum`" in notes
 
@@ -93,7 +93,7 @@ def test_the_notices_say_where_the_source_is() -> None:
     notices = licenses.NOTICES.read_text(encoding="utf-8")
     header = notices[: notices.index("\nPython\n------\n")]
     assert "source.tar.gz" not in header
-    assert "https://github.com/Ember-Moth/Solaris/tree/v<version>" in header
+    assert "https://github.com/openweir/app-desktop/tree/v<version>" in header
     assert f"https://{MIHOMO}" in header
     assert "src/core/go.sum" in header
 

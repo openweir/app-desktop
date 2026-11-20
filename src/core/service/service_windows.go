@@ -20,16 +20,16 @@ import (
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/mgr"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/admission"
-	"github.com/Ember-Moth/Solaris/src/core/internal/control"
-	"github.com/Ember-Moth/Solaris/src/core/internal/crashlog"
-	"github.com/Ember-Moth/Solaris/src/core/internal/engine"
-	"github.com/Ember-Moth/Solaris/src/core/internal/operation"
-	"github.com/Ember-Moth/Solaris/src/core/internal/owner"
-	"github.com/Ember-Moth/Solaris/src/core/internal/peer"
-	"github.com/Ember-Moth/Solaris/src/core/internal/power"
-	"github.com/Ember-Moth/Solaris/src/core/internal/product"
-	"github.com/Ember-Moth/Solaris/src/core/internal/server"
+	"github.com/openweir/app-desktop/src/core/internal/admission"
+	"github.com/openweir/app-desktop/src/core/internal/control"
+	"github.com/openweir/app-desktop/src/core/internal/crashlog"
+	"github.com/openweir/app-desktop/src/core/internal/engine"
+	"github.com/openweir/app-desktop/src/core/internal/operation"
+	"github.com/openweir/app-desktop/src/core/internal/owner"
+	"github.com/openweir/app-desktop/src/core/internal/peer"
+	"github.com/openweir/app-desktop/src/core/internal/power"
+	"github.com/openweir/app-desktop/src/core/internal/product"
+	"github.com/openweir/app-desktop/src/core/internal/server"
 )
 
 const (
@@ -76,7 +76,7 @@ func run() error {
 	})
 }
 
-// serviceRoot is %ProgramData%\Solaris, where only SYSTEM and Administrators get in
+// serviceRoot is %ProgramData%\OpenWeir, where only SYSTEM and Administrators get in
 // (docs/architecture.md §5.1).
 func serviceRoot() (string, error) {
 	programData, err := windows.KnownFolderPath(windows.FOLDERID_ProgramData, 0)
@@ -193,6 +193,9 @@ func serve(ctx context.Context, sessions <-chan sessionEvent, powerEvents *power
 	}
 	var signer peer.Signer
 	if product.SignedRelease == "true" {
+		if product.WindowsSigner == "" || product.WindowsSignerEKU == "" {
+			return errors.New("a signed release needs WindowsSigner and WindowsSignerEKU")
+		}
 		signer = peer.Signer{Name: product.WindowsSigner, EKU: product.WindowsSignerEKU}
 	}
 	// The service's own executable connects as the take-over helper (decision D5b).

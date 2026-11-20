@@ -9,9 +9,9 @@ import time
 
 import pytest
 
+from openweir.host.base import HostError, RunOptions, TunnelConfig
+from openweir.host.service import ServiceHost
 from scripts.dev import DevService
-from solaris.host.base import HostError, RunOptions, TunnelConfig
-from solaris.host.service import ServiceHost
 from tests.e2e.app import DIRECT_PROFILE, App, nodes_profile
 from tests.e2e.servers import free_port, listening_port
 from tests.e2e.unix import unix_opener

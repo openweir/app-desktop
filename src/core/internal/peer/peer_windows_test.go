@@ -16,7 +16,6 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/product"
 	"github.com/Microsoft/go-winio"
 	"golang.org/x/sys/windows"
 )
@@ -25,7 +24,7 @@ import (
 // verify made of it.
 func verifySelf(t *testing.T, verify Verifier) (Identity, error) {
 	t.Helper()
-	name := fmt.Sprintf(`\\.\pipe\solaris-peer-test-%d-%d`, os.Getpid(), time.Now().UnixNano())
+	name := fmt.Sprintf(`\\.\pipe\openweir-peer-test-%d-%d`, os.Getpid(), time.Now().UnixNano())
 	listener, err := winio.ListenPipe(name, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -89,7 +88,7 @@ func TestPipeClientVerifier(t *testing.T) {
 	}
 
 	// A copy at another path, or the same bytes in another file, is not the installed UI.
-	copied := filepath.Join(t.TempDir(), "Solaris.exe")
+	copied := filepath.Join(t.TempDir(), "OpenWeir.exe")
 	raw, err := os.ReadFile(executable)
 	if err != nil {
 		t.Fatal(err)
@@ -105,7 +104,7 @@ func TestPipeClientVerifier(t *testing.T) {
 	}
 	// This test binary carries no signature, so a signed release build refuses it.
 	if session != 0 {
-		release := Signer{Name: product.WindowsSigner, EKU: product.WindowsSignerEKU}
+		release := Signer{Name: testSigner, EKU: testSignerEKU}
 		if _, err := verifySelf(t, PipeClientVerifier(executable, "", release)); err == nil || !strings.Contains(err.Error(), "signature") {
 			t.Fatalf("an unsigned client: %v", err)
 		}
@@ -114,7 +113,7 @@ func TestPipeClientVerifier(t *testing.T) {
 
 // While a client is connected its executable cannot be changed, renamed or replaced.
 func TestVerifiedConnLocksTheExecutable(t *testing.T) {
-	executable := filepath.Join(t.TempDir(), "Solaris.exe")
+	executable := filepath.Join(t.TempDir(), "OpenWeir.exe")
 	if err := os.WriteFile(executable, []byte("MZ"), 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -167,9 +166,9 @@ func TestTrustedSigner(t *testing.T) {
 	if err := (Signer{Name: name, EKU: "1.3.6.1.5.5.7.3.3"}).check(name, certificate); err != nil {
 		t.Fatalf("Edge's certificate is not for code signing: %v", err)
 	}
-	// Only Solaris's certificate profile has Solaris's usage.
-	if err := (Signer{Name: name, EKU: product.WindowsSignerEKU}).check(name, certificate); err == nil {
-		t.Fatal("Edge's certificate has Solaris's extended key usage")
+	// Only OpenWeir's certificate profile has OpenWeir's usage.
+	if err := (Signer{Name: name, EKU: testSignerEKU}).check(name, certificate); err == nil {
+		t.Fatal("Edge's certificate has OpenWeir's extended key usage")
 	}
 }
 
@@ -240,7 +239,7 @@ func TestPipeClientVerifierHelper(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ui := filepath.Join(t.TempDir(), "Solaris.exe")
+	ui := filepath.Join(t.TempDir(), "OpenWeir.exe")
 	if err := os.WriteFile(ui, []byte("MZ"), 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -272,7 +271,7 @@ func TestPipeClientVerifierHelper(t *testing.T) {
 	}
 }
 
-const childPipeEnv = "SOLARIS_PEER_TEST_PIPE"
+const childPipeEnv = "OPENWEIR_PEER_TEST_PIPE"
 
 // TestChildDialsThePipe is the client verifyChild starts: it holds the pipe open until the
 // test is done with it.
@@ -296,7 +295,7 @@ func TestChildDialsThePipe(t *testing.T) {
 // it.
 func verifyChild(t *testing.T, verify Verifier, token windows.Token) (Identity, error) {
 	t.Helper()
-	name := fmt.Sprintf(`\\.\pipe\solaris-peer-test-%d-%d`, os.Getpid(), time.Now().UnixNano())
+	name := fmt.Sprintf(`\\.\pipe\openweir-peer-test-%d-%d`, os.Getpid(), time.Now().UnixNano())
 	// Everyone may connect: the filtered token gets nothing from Administrators.
 	listener, err := winio.ListenPipe(name, &winio.PipeConfig{SecurityDescriptor: "D:P(A;;GA;;;WD)"})
 	if err != nil {

@@ -13,7 +13,7 @@ import (
 	"github.com/dlclark/regexp2"
 	RC "github.com/metacubex/mihomo/rules/common"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/controlpb"
+	"github.com/openweir/app-desktop/src/core/internal/controlpb"
 )
 
 // Reasons a converted rule is left out (SkippedRule.reason).

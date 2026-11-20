@@ -7,10 +7,10 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/controlpb"
-	"github.com/Ember-Moth/Solaris/src/core/internal/engine"
-	"github.com/Ember-Moth/Solaris/src/core/internal/peer"
-	"github.com/Ember-Moth/Solaris/src/core/internal/porttest"
+	"github.com/openweir/app-desktop/src/core/internal/controlpb"
+	"github.com/openweir/app-desktop/src/core/internal/engine"
+	"github.com/openweir/app-desktop/src/core/internal/peer"
+	"github.com/openweir/app-desktop/src/core/internal/porttest"
 )
 
 // fakeHost owns the service for owner and records what the dispatcher tells it.

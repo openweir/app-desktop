@@ -8,7 +8,7 @@ Inputs: the installed Python packages, the Go modules the Windows service and th
 extension link (``go list``, which needs the module cache), ``package/licenses/`` (Qt's
 third-party code, read once from Qt's documentation; the libraries CPython's build bundles;
 Wintun's license; the LGPL text) and the bundled fonts. Outputs, committed like Theme.qml:
-``src/solaris/licenses/third_party.json`` for the settings page and
+``src/openweir/licenses/third_party.json`` for the settings page and
 ``THIRD_PARTY_NOTICES.txt`` with every text.
 """
 
@@ -41,10 +41,10 @@ QT_INPUT = INPUTS / "qt.json"
 CPYTHON_INPUT = INPUTS / "cpython.json"
 WINTUN_LICENSE = INPUTS / "wintun.txt"
 LGPL = INPUTS / "LGPL-3.0-only.txt"
-OUTPUT = ROOT / "src" / "solaris" / "licenses"
+OUTPUT = ROOT / "src" / "openweir" / "licenses"
 MANIFEST = OUTPUT / "third_party.json"
 NOTICES = OUTPUT / "THIRD_PARTY_NOTICES.txt"
-FONTS = ROOT / "src" / "solaris" / "ui" / "fonts"
+FONTS = ROOT / "src" / "openweir" / "ui" / "fonts"
 GOPROXY = "https://goproxy.cn,direct"
 
 # Go builds that ship (docs/architecture.md §3.4): the service and the extension's library.
@@ -253,7 +253,7 @@ def _python_url(dist: Distribution) -> str:
 
 def python_entries() -> list[Entry]:
     entries = []
-    for dist in _runtime_closure("solaris"):
+    for dist in _runtime_closure("openweir"):
         metadata = dist.metadata
         texts = _python_texts(dist)
         license_ = metadata.get("License-Expression") or ""
@@ -603,18 +603,18 @@ def font_entries() -> list[Entry]:
 # -- output ----------------------------------------------------------------------------------
 
 HEADER = """\
-Solaris third-party notices
+OpenWeir third-party notices
 ===========================
 
-Solaris is free software: you can redistribute it and/or modify it under the terms of the
+OpenWeir is free software: you can redistribute it and/or modify it under the terms of the
 GNU General Public License version 3 (GPL-3.0-only). Its full text is in the LICENSE file
 that comes with the program.
 
-Solaris includes the third-party components listed below, each under its own license; the
+OpenWeir includes the third-party components listed below, each under its own license; the
 license texts follow the list. Texts that several components share are given once.
 
 Corresponding source code:
-- Solaris: https://github.com/Ember-Moth/Solaris/tree/v<version>, the repository's tag for
+- OpenWeir: https://github.com/openweir/app-desktop/tree/v<version>, the repository's tag for
   this version (Settings, About).
 - mihomo: the commit of https://github.com/openweir/mihomo that the replace directive in
   that tag's src/core/go.mod pins.

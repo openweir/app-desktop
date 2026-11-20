@@ -38,10 +38,10 @@ import (
 	"github.com/metacubex/mihomo/listener"
 	"github.com/metacubex/mihomo/transport/socks5"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/admission"
-	"github.com/Ember-Moth/Solaris/src/core/internal/compose"
-	"github.com/Ember-Moth/Solaris/src/core/internal/controlpb"
-	"github.com/Ember-Moth/Solaris/src/core/internal/porttest"
+	"github.com/openweir/app-desktop/src/core/internal/admission"
+	"github.com/openweir/app-desktop/src/core/internal/compose"
+	"github.com/openweir/app-desktop/src/core/internal/controlpb"
+	"github.com/openweir/app-desktop/src/core/internal/porttest"
 )
 
 // echoHost is the name the UDP exchanges use for the echo server besides its address; the

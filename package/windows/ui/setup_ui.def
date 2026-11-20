@@ -1,4 +1,4 @@
-LIBRARY SolarisSetupUI
+LIBRARY OpenWeirSetupUI
 EXPORTS
     Begin
     Status

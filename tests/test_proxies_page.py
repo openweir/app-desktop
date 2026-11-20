@@ -7,7 +7,7 @@ from PySide6.QtCore import QPointF, Qt
 from PySide6.QtQuick import QQuickItem
 from pytestqt.qtbot import QtBot
 
-from solaris.host.base import Proxy, ProxyGroup
+from openweir.host.base import Proxy, ProxyGroup
 from tests.support.window import Loaded, find, find_all, kind
 
 GROUPS = 40

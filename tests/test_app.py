@@ -12,15 +12,15 @@ from PySide6.QtQuick import QQuickItem
 from PySide6.QtTest import QTest
 from pytestqt.qtbot import QtBot
 
-from solaris.app import MAIN_QML, open_store, switch_language
-from solaris.desktop.dock import ACCESSORY, REGULAR
-from solaris.desktop.instance import LOCK_NAME
-from solaris.host.base import TAKEOVER_NONE, TAKEOVER_SETTINGS, TAKEOVER_TUN, HostError, Rule
-from solaris.i18n import Translations
-from solaris.models.settings import DatabaseSettingsStore
-from solaris.models.store import ProfileStore
-from solaris.viewmodels import settings as settings_view_model
-from solaris.viewmodels.composition import ViewModels
+from openweir.app import MAIN_QML, open_store, switch_language
+from openweir.desktop.dock import ACCESSORY, REGULAR
+from openweir.desktop.instance import LOCK_NAME
+from openweir.host.base import TAKEOVER_NONE, TAKEOVER_SETTINGS, TAKEOVER_TUN, HostError, Rule
+from openweir.i18n import Translations
+from openweir.models.settings import DatabaseSettingsStore
+from openweir.models.store import ProfileStore
+from openweir.viewmodels import settings as settings_view_model
+from openweir.viewmodels.composition import ViewModels
 from tests.support.appearance import SystemColorScheme
 from tests.support.dock import ACTIVATE, RecordingApplication
 from tests.support.simulated import CORE_VERSION, SimulatedHost
@@ -34,9 +34,9 @@ ROOT = Path(__file__).resolve().parents[1]
 RUNNING_UI = """
 import sys
 from pathlib import Path
-from solaris import app
-from solaris.models import credentials
-from solaris.models.store import ProfileStore
+from openweir import app
+from openweir.models import credentials
+from openweir.models.store import ProfileStore
 from tests.support.credentials import MemoryKeyring
 from tests.support.releases import offline_updater
 from tests.support.simulated import SimulatedFetcher, SimulatedHost
@@ -67,11 +67,11 @@ store = ProfileStore(directory)
 sys.exit(app.main(Host(), store, SimulatedFetcher(), updater=offline_updater(directory)))
 """
 
-# ``Solaris --quit``, with the data directory in the test's.
+# ``OpenWeir --quit``, with the data directory in the test's.
 QUIT = """
 import sys
 from pathlib import Path
-from solaris import app
+from openweir import app
 directory = Path(sys.argv[1])
 app.default_data_dir = lambda: directory
 sys.argv[1:] = ["--quit"]
@@ -83,7 +83,7 @@ HIDING_WINDOW = """
 import sys
 from PySide6.QtCore import QTimer
 from PySide6.QtQml import QQmlApplicationEngine
-from solaris.app import Application
+from openweir.app import Application
 app = Application(sys.argv)
 app.setQuitOnLastWindowClosed(False)
 engine = QQmlApplicationEngine()
@@ -101,7 +101,7 @@ sys.exit(app.exec())
 QUIT_EVENT = """
 import sys
 from PySide6.QtCore import QTimer
-from solaris import app
+from openweir import app
 ending = sys.argv[1] == "system"
 app.session_ending = lambda: ending
 application = app.Application(sys.argv)
@@ -566,7 +566,7 @@ def test_a_failed_disconnect_asks_before_quitting(
         qtbot.waitUntil(lambda: loaded.focused_text() == ("Retry" if english else "重试"))
         assert loaded.overlay_items(lambda item: item.property("text") == title)
 
-    # Esc keeps Solaris running, the tunnel as it was.
+    # Esc keeps OpenWeir running, the tunnel as it was.
     ask()
     with qtbot.assertNotEmitted(desktop.quitRequested, wait=300):
         loaded.key(qtbot, Qt.Key.Key_Escape)
@@ -597,10 +597,10 @@ def in_the_menu_bar(loaded: Loaded) -> RecordingApplication:
     return application
 
 
-def test_every_way_back_to_the_window_puts_solaris_in_the_dock(
+def test_every_way_back_to_the_window_puts_openweir_in_the_dock(
     qtbot: QtBot, loaded: Loaded
 ) -> None:
-    """Hidden in the menu bar, Solaris is out of the Dock; whatever shows the window brings it
+    """Hidden in the menu bar, OpenWeir is out of the Dock; whatever shows the window brings it
     back and activates it."""
     view_models, window = loaded.view_models, loaded.window
     desktop, overview = view_models.desktop, view_models.overview
@@ -615,8 +615,8 @@ def test_every_way_back_to_the_window_puts_solaris_in_the_dock(
 
     for show in (
         desktop.showWindow,  # the menu bar's 打开主窗口, or a second launch
-        desktop.reopened.emit,  # Solaris opened again, as from the Finder
-        lambda: view_models.open_link("solaris://install-config?url=https%3A%2F%2Fa.example"),
+        desktop.reopened.emit,  # OpenWeir opened again, as from the Finder
+        lambda: view_models.open_link("openweir://install-config?url=https%3A%2F%2Fa.example"),
         lambda: view_models.open_link("clash://install-config?url=https%3A%2F%2Fa.example"),
         overview.extensionSetupRequested.emit,  # the system extension's approval guide
     ):
@@ -635,10 +635,10 @@ def test_every_way_back_to_the_window_puts_solaris_in_the_dock(
     assert loaded.warnings == []
 
 
-def test_a_failed_disconnect_brings_solaris_back_to_ask(
+def test_a_failed_disconnect_brings_openweir_back_to_ask(
     qtbot: QtBot, loaded: Loaded, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Closing the window to quit takes the Dock icon with it while Solaris disconnects; the
+    """Closing the window to quit takes the Dock icon with it while OpenWeir disconnects; the
     question when that fails brings both back."""
     desktop, overview = loaded.view_models.desktop, loaded.view_models.overview
     host = simulated(loaded)
@@ -688,7 +688,7 @@ def test_quit_command_closes_the_running_ui(tmp_path: Path) -> None:
     # quitting by the user (D41).
     assert said == ["closed"]
     # It closed the database, then let go of the lock: no write-ahead log, no lock file.
-    assert not (tmp_path / "solaris.db-wal").exists()
+    assert not (tmp_path / "openweir.db-wal").exists()
     assert not (tmp_path / LOCK_NAME).exists()
     # With no UI running, the command has nothing to wait for.
     assert subprocess.run(quit_command, cwd=ROOT, timeout=30).returncode == 0

@@ -15,7 +15,7 @@ import (
 func TestNaiveRuntimePinnedToInstallDirectory(t *testing.T) {
 	// The loader remembers its first result process-wide. Keep the failure probe
 	// isolated from other tests, just as a service start has its own loader state.
-	const probe = "SOLARIS_TEST_NAIVE_LOADER"
+	const probe = "OPENWEIR_TEST_NAIVE_LOADER"
 	if os.Getenv(probe) != "1" {
 		command := exec.Command(os.Args[0], "-test.run=^TestNaiveRuntimePinnedToInstallDirectory$")
 		command.Env = append(os.Environ(), probe+"=1")

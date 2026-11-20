@@ -20,7 +20,7 @@ htmlcov/
 *.qmlc
 *.jsc
 *.qm
-!src/solaris/translations/*.qm
+!src/openweir/translations/*.qm
 .qmlls.ini
 deployment/
 
@@ -33,7 +33,7 @@ DerivedData/
 *.xcuserstate
 xcuserdata/
 # Generated from apple/project.yml by scripts/build_apple.py
-apple/Solaris.xcodeproj/
+apple/OpenWeir.xcodeproj/
 *.provisionprofile
 *.mobileprovision
 *.p12

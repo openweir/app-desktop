@@ -4,10 +4,10 @@ import pytest
 from PySide6.QtCore import QCoreApplication, Qt
 from pytestqt.qtbot import QtBot
 
-from solaris.models.settings import DatabaseSettingsStore
-from solaris.models.store import ProfileStore
-from solaris.viewmodels.appearance import APPEARANCE_ENV, Appearance, resolve_mode
-from solaris.viewmodels.composition import compose
+from openweir.models.settings import DatabaseSettingsStore
+from openweir.models.store import ProfileStore
+from openweir.viewmodels.appearance import APPEARANCE_ENV, Appearance, resolve_mode
+from openweir.viewmodels.composition import compose
 from tests.support.appearance import SystemColorScheme
 from tests.support.simulated import SimulatedFetcher, SimulatedHost
 

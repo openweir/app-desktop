@@ -20,22 +20,22 @@ import pytest
 from PySide6.QtCore import QObject
 from pytestqt.qtbot import QtBot
 
-from solaris import __version__, diagnostics
-from solaris.host.base import HostError, HostInfo, HostStatus, LogEntry
-from solaris.models.routing import Plan, PlanRule, RoutingStore
-from solaris.models.settings import Settings
-from solaris.models.store import ProfileStore
-from solaris.update.releases import ReleaseSource, UpdateError
-from solaris.update.updater import Check, Downloaded, Updater
-from solaris.viewmodels import about as about_module
-from solaris.viewmodels.about import AboutViewModel
-from solaris.viewmodels.composition import ViewModels, compose
+from openweir import __version__, diagnostics
+from openweir.host.base import HostError, HostInfo, HostStatus, LogEntry
+from openweir.models.routing import Plan, PlanRule, RoutingStore
+from openweir.models.settings import Settings
+from openweir.models.store import ProfileStore
+from openweir.update.releases import ReleaseSource, UpdateError
+from openweir.update.updater import Check, Downloaded, Updater
+from openweir.viewmodels import about as about_module
+from openweir.viewmodels.about import AboutViewModel
+from openweir.viewmodels.composition import ViewModels, compose
 from tests.support.releases import FakeGitHub, FakeVerifier, fake_github, offline_updater
 from tests.support.simulated import CORE_VERSION, SimulatedFetcher, SimulatedHost, seed_profiles
 
 NOW = datetime(2026, 10, 30, 9).timestamp()
-DMG = "Solaris-1.1.0-macos-universal.dmg"
-EXE = "Solaris-1.1.0-windows-x64-setup.exe"
+DMG = "OpenWeir-1.1.0-macos-universal.dmg"
+EXE = "OpenWeir-1.1.0-windows-x64-setup.exe"
 SECRET_OVERRIDE = "prepend-rules:\n  - DOMAIN,override-secret.example.net,DIRECT\n"
 SECRET_RULE = "plan-secret.example.net"
 
@@ -170,7 +170,7 @@ def test_update_from_check_to_install(
     ):
         about.runUpdateAction()
     assert opened.paths == []  # nothing opens before the user confirms
-    assert prop(about, "installTitle") == "打开 Solaris 1.1.0 的安装包？"
+    assert prop(about, "installTitle") == "打开 OpenWeir 1.1.0 的安装包？"
     assert hint in prop(about, "installMessage")
     assert "退出" in prop(about, "installMessage")
     with qtbot.waitSignal(built.desktop.quitRequested):
@@ -253,7 +253,10 @@ def test_check_failures(
 @pytest.mark.parametrize(
     ("error", "status"),
     [
-        (UpdateError("signer_mismatch", "TeamIdentifier=X"), "安装包不是由 Solaris 的开发者签名的"),
+        (
+            UpdateError("signer_mismatch", "TeamIdentifier=X"),
+            "安装包不是由 OpenWeir 的开发者签名的",
+        ),
         (
             UpdateError("signature_invalid", "code object is not signed at all"),
             "安装包的签名无效：code object is not signed at all",
@@ -360,7 +363,7 @@ def test_cancel_a_download(
 def test_start_clears_old_downloads(qtbot: QtBot, built: ViewModels, tmp_path: Path) -> None:
     update = offline_updater(tmp_path / "data")
     update.directory.mkdir(parents=True)
-    (update.directory / "Solaris-1.0.0-macos-universal.dmg").write_bytes(b"old")
+    (update.directory / "OpenWeir-1.0.0-macos-universal.dmg").write_bytes(b"old")
     built.settings_store.update(update_check=False)
     about = about_for(built, update)
     about.start()
@@ -450,7 +453,7 @@ def read_archive(path: Path) -> dict[str, str]:
 def test_crash_summary_and_raw_export_are_separate(
     qtbot: QtBot, built: ViewModels, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from solaris import crashes
+    from openweir import crashes
 
     directory = tmp_path / "crashes"
     directory.mkdir()
@@ -476,7 +479,7 @@ def test_crash_summary_and_raw_export_are_separate(
 def test_crash_notices_give_way_to_the_report_count(
     qtbot: QtBot, built: ViewModels, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from solaris import crashes
+    from openweir import crashes
 
     directory = tmp_path / "crashes"
     directory.mkdir()
@@ -529,7 +532,7 @@ def test_export_diagnostics(qtbot: QtBot, tmp_path: Path) -> None:
         LogEntry("warning", "dial failed", 2_000),
     ]
     about = about_for(built, offline_updater(tmp_path), logs=logs)
-    assert prop(about, "diagnosticsName") == "solaris-diagnostics-20261030-090000.zip"
+    assert prop(about, "diagnosticsName") == "openweir-diagnostics-20261030-090000.zip"
     target = tmp_path / "out" / "diag.zip"
     target.parent.mkdir()
     about.exportDiagnostics(target.as_uri())

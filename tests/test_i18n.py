@@ -10,14 +10,14 @@ import pytest
 from PySide6.QtCore import QCoreApplication, QLocale, QObject
 from pytestqt.qtbot import QtBot
 
+from openweir.host.base import HostError
+from openweir.i18n import LANG_ENV, resolve_language, system_ui_languages, ui_locale
+from openweir.models import format as fmt
+from openweir.models.profiles import ProfileError
+from openweir.models.store import ProfileStore
+from openweir.viewmodels.composition import ViewModels, compose
+from openweir.viewmodels.feedback import failure_text
 from scripts.gen_i18n import stale_binaries, stale_catalogs, unfinished_messages
-from solaris.host.base import HostError
-from solaris.i18n import LANG_ENV, resolve_language, system_ui_languages, ui_locale
-from solaris.models import format as fmt
-from solaris.models.profiles import ProfileError
-from solaris.models.store import ProfileStore
-from solaris.viewmodels.composition import ViewModels, compose
-from solaris.viewmodels.feedback import failure_text
 from tests.support.simulated import SimulatedFetcher, SimulatedHost, seed_profiles
 
 NOW = datetime(2026, 10, 29, 12).timestamp()
@@ -62,7 +62,7 @@ def test_language_choice(
 
 
 LANGUAGE_PROBE = """
-from solaris.i18n import resolve_language, ui_locale
+from openweir.i18n import resolve_language, ui_locale
 language = resolve_language("", {})
 print(language, ui_locale(language).name())
 """

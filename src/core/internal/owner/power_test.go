@@ -12,11 +12,11 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/control"
-	"github.com/Ember-Moth/Solaris/src/core/internal/controlpb"
-	"github.com/Ember-Moth/Solaris/src/core/internal/operation"
-	"github.com/Ember-Moth/Solaris/src/core/internal/power"
-	"github.com/Ember-Moth/Solaris/src/core/internal/sysproxy"
+	"github.com/openweir/app-desktop/src/core/internal/control"
+	"github.com/openweir/app-desktop/src/core/internal/controlpb"
+	"github.com/openweir/app-desktop/src/core/internal/operation"
+	"github.com/openweir/app-desktop/src/core/internal/power"
+	"github.com/openweir/app-desktop/src/core/internal/sysproxy"
 )
 
 type powerMachine struct {

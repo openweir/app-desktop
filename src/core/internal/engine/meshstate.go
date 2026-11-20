@@ -16,7 +16,7 @@ import (
 	C "github.com/metacubex/mihomo/constant"
 	ZT "github.com/metacubex/zerotier-go"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/controlpb"
+	"github.com/openweir/app-desktop/src/core/internal/controlpb"
 )
 
 // How the mesh outbounds stand (GetMeshStatus, LoginMesh; docs/mesh.md §10.5). mihomo

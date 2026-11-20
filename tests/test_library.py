@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 
-from solaris.host.base import (
+from openweir.host.base import (
     TAKEOVER_NONE,
     TAKEOVER_SETTINGS,
     TAKEOVER_TUN,
@@ -16,10 +16,10 @@ from solaris.host.base import (
     RunOptions,
     TunnelConfig,
 )
-from solaris.models.library import RETRY_AFTER_S, ProfileLibrary
-from solaris.models.profiles import KIND_FILE, ProfileError, Usage
-from solaris.models.settings import Settings
-from solaris.models.store import ProfileStore
+from openweir.models.library import RETRY_AFTER_S, ProfileLibrary
+from openweir.models.profiles import KIND_FILE, ProfileError, Usage
+from openweir.models.settings import Settings
+from openweir.models.store import ProfileStore
 from tests.support.simulated import (
     NODES,
     SAMPLE_CONFIG,
@@ -194,7 +194,7 @@ def test_invalid_update_interval_neither_downloads_nor_changes_metadata(
 
 
 def test_custom_update_interval_survives_backup(tmp_path: Path) -> None:
-    from solaris.models.backup import REPLACE, Backups
+    from openweir.models.backup import REPLACE, Backups
 
     scene = Scene(tmp_path / "source", seeded=False)
     imported = run(
@@ -288,7 +288,7 @@ def test_edited_address_rejects_old_inflight_results_even_after_changing_back(
 
 
 def test_pasted_nodes_join_the_pool_and_survive_backup(tmp_path: Path) -> None:
-    from solaris.models.backup import REPLACE, Backups
+    from openweir.models.backup import REPLACE, Backups
 
     scene = Scene(tmp_path / "original", seeded=False)
     text = NODE_LINK + "\n" + "trojan://secret@other.example:443#Singapore"
@@ -357,7 +357,7 @@ def test_partial_node_import_is_refused_when_an_offline_core_becomes_available(
 
 
 def test_restored_unvalidated_node_batch_cannot_silently_lose_bad_links(tmp_path: Path) -> None:
-    from solaris.models.backup import REPLACE, Backups
+    from openweir.models.backup import REPLACE, Backups
 
     source = Scene(tmp_path / "source", seeded=False)
     source.host.core_needs_tunnel = True

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/controlpb"
+	"github.com/openweir/app-desktop/src/core/internal/controlpb"
 )
 
 // vpnGateServer is a server as ListVpnGate hands it out; nothing dials it here.

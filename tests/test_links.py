@@ -15,8 +15,8 @@ from PySide6.QtCore import QCoreApplication, QUrl
 from PySide6.QtGui import QFileOpenEvent
 from pytestqt.qtbot import QtBot
 
-from solaris.desktop.instance import ACTIVATE, SingleInstance, message
-from solaris.desktop.links import (
+from openweir.desktop.instance import ACTIVATE, SingleInstance, message
+from openweir.desktop.links import (
     SCHEMES,
     InstallLink,
     LinkReceiver,
@@ -24,8 +24,8 @@ from solaris.desktop.links import (
     is_link,
     parse,
 )
-from solaris.models.store import ProfileStore
-from solaris.viewmodels.composition import ViewModels, compose
+from openweir.models.store import ProfileStore
+from openweir.viewmodels.composition import ViewModels, compose
 from tests.support.releases import offline_updater
 from tests.support.simulated import SimulatedFetcher, SimulatedHost, seed_profiles
 from tests.support.window import Loaded, find, kind
@@ -37,7 +37,7 @@ ENCODED = quote(SUBSCRIPTION, safe="")
 @pytest.mark.parametrize(
     ("link", "parsed"),
     [
-        (f"solaris://install-config?url={ENCODED}&name=%E6%9C%BA%E5%9C%BA", ("机场",)),
+        (f"openweir://install-config?url={ENCODED}&name=%E6%9C%BA%E5%9C%BA", ("机场",)),
         (f"clash://install-config?url={ENCODED}", ("",)),
         (f"CLASH://Install-Config/?url={ENCODED}&name=Hi", ("Hi",)),
         # Clash Party's, and Clash Meta for Android's, FlClash's and Remnawave's (D45).
@@ -45,9 +45,9 @@ ENCODED = quote(SUBSCRIPTION, safe="")
         (f"clashmeta://install-config?url={ENCODED}&name=%E6%9C%BA%E5%9C%BA", ("机场",)),
         (f"MiHoMo://INSTALL-CONFIG/?url={ENCODED}", ("",)),
         (f"ClashMeta://install-config/?name=Meta&url={ENCODED}", ("Meta",)),
-        (f"solaris://install-config?name=+%20Spaced%20+&url={ENCODED}", ("Spaced",)),
-        (f"solaris://install-config?url={ENCODED}&name=a%0Ab%09c", ("abc",)),
-        (f"solaris://install-config?url={ENCODED}&name={'x' * 150}", ("x" * 100,)),
+        (f"openweir://install-config?name=+%20Spaced%20+&url={ENCODED}", ("Spaced",)),
+        (f"openweir://install-config?url={ENCODED}&name=a%0Ab%09c", ("abc",)),
+        (f"openweir://install-config?url={ENCODED}&name={'x' * 150}", ("x" * 100,)),
     ],
 )
 def test_parse(link: str, parsed: tuple[str]) -> None:
@@ -58,24 +58,24 @@ def test_parse(link: str, parsed: tuple[str]) -> None:
     "link",
     [
         f"https://install-config?url={ENCODED}",  # another scheme
-        f"solaris://import?url={ENCODED}",  # another action
-        f"solaris://install-config/more?url={ENCODED}",
-        "solaris://install-config?name=only",  # no url
-        f"solaris://install-config?url={ENCODED}&url={ENCODED}",  # two
-        "solaris://install-config?url=file%3A%2F%2F%2Fetc%2Fpasswd",
-        "solaris://install-config?url=javascript%3Aalert(1)",
+        f"openweir://import?url={ENCODED}",  # another action
+        f"openweir://install-config/more?url={ENCODED}",
+        "openweir://install-config?name=only",  # no url
+        f"openweir://install-config?url={ENCODED}&url={ENCODED}",  # two
+        "openweir://install-config?url=file%3A%2F%2F%2Fetc%2Fpasswd",
+        "openweir://install-config?url=javascript%3Aalert(1)",
         "clash://install-config?url=ftp%3A%2F%2Fexample.com%2Fsub",
         "mihomo://install-config?name=only",
         "clashmeta://install-config",
         "clashmeta://install-config/",
         f"mihomo://install-config/more?url={ENCODED}",
         f"clashmeta://import?url={ENCODED}",
-        f"meta://install-config?url={ENCODED}",  # schemes Solaris does not take
+        f"meta://install-config?url={ENCODED}",  # schemes OpenWeir does not take
         f"clash-meta://install-config?url={ENCODED}",
         f"clashmetax://install-config?url={ENCODED}",
         "clashmeta:",
-        f"solaris://install-config?url={ENCODED}&name={'x' * 9000}",  # too long
-        "solaris:",
+        f"openweir://install-config?url={ENCODED}&name={'x' * 9000}",  # too long
+        "openweir:",
         "",
     ],
 )
@@ -91,7 +91,7 @@ def test_unencoded_ampersands_cut_the_link() -> None:
 
 
 def test_every_scheme_in_any_case_is_a_link() -> None:
-    assert SCHEMES == ("solaris", "clash", "mihomo", "clashmeta")
+    assert SCHEMES == ("openweir", "clash", "mihomo", "clashmeta")
     for scheme in SCHEMES:
         for spelling in (scheme, scheme.upper(), scheme.capitalize()):
             link = f"{spelling}://install-config?url={ENCODED}"
@@ -101,15 +101,15 @@ def test_every_scheme_in_any_case_is_a_link() -> None:
 
 
 def test_link_from_the_command_line() -> None:
-    link = f"solaris://install-config?url={ENCODED}"
+    link = f"openweir://install-config?url={ENCODED}"
     assert from_arguments(["--background", link, "clash://other"]) == link
     assert from_arguments(["--background"]) is None
-    assert from_arguments(["solaris" + "x" * 9000 + ":"]) is None
+    assert from_arguments(["openweir" + "x" * 9000 + ":"]) is None
 
 
 @pytest.mark.parametrize("scheme", ["mihomo", "clashmeta", "MIHOMO", "ClashMeta"])
 def test_the_command_line_takes_the_other_clients_schemes(scheme: str) -> None:
-    # As Windows starts Solaris for a link: the registered command's "%1".
+    # As Windows starts OpenWeir for a link: the registered command's "%1".
     link = f"{scheme}://install-config?url={ENCODED}&name=Mine"
     assert from_arguments(["--background", link]) == link
     assert from_arguments([f"{scheme}x://install-config?url={ENCODED}"]) is None
@@ -117,8 +117,8 @@ def test_the_command_line_takes_the_other_clients_schemes(scheme: str) -> None:
 
 def test_the_message_a_later_ui_sends() -> None:
     assert message(None) == ACTIVATE
-    assert message("solaris://install-config?url=x") == b"open solaris://install-config?url=x\n"
-    assert message("solaris://a\r\nactivate") == b"open solaris://aactivate\n"
+    assert message("openweir://install-config?url=x") == b"open openweir://install-config?url=x\n"
+    assert message("openweir://a\r\nactivate") == b"open openweir://aactivate\n"
 
 
 # A second UI started with a link, in a process of its own: see test_desktop.py.
@@ -126,7 +126,7 @@ SECOND_UI = """
 import sys
 from pathlib import Path
 from PySide6.QtCore import QCoreApplication
-from solaris.desktop.instance import SingleInstance
+from openweir.desktop.instance import SingleInstance
 app = QCoreApplication(sys.argv)
 sys.exit(1 if SingleInstance(Path(sys.argv[1])).claim(sys.argv[2]) else 0)
 """
@@ -135,7 +135,7 @@ sys.exit(1 if SingleInstance(Path(sys.argv[1])).claim(sys.argv[2]) else 0)
 def test_a_second_ui_hands_over_its_link(qtbot: QtBot, tmp_path: Path) -> None:
     first = SingleInstance(tmp_path)
     assert first.claim()
-    link = f"solaris://install-config?url={ENCODED}&name=%E6%9C%BA%E5%9C%BA"
+    link = f"openweir://install-config?url={ENCODED}&name=%E6%9C%BA%E5%9C%BA"
     second = subprocess.Popen([sys.executable, "-c", SECOND_UI, str(tmp_path), link])
     try:
         with qtbot.waitSignal(first.received, timeout=8000) as received:
@@ -154,7 +154,7 @@ def test_the_system_opens_a_link(qtbot: QtBot) -> None:
     receiver = LinkReceiver(app)
     seen: list[str] = []
     receiver.received.connect(seen.append)
-    link = f"solaris://install-config?url={ENCODED}"
+    link = f"openweir://install-config?url={ENCODED}"
     # Before the UI is ready the link waits, as on a launch that a link started.
     QCoreApplication.sendEvent(app, QFileOpenEvent(QUrl(link)))
     QCoreApplication.sendEvent(app, QFileOpenEvent(QUrl.fromLocalFile("/tmp/a.yaml")))
@@ -214,7 +214,7 @@ def test_a_link_fills_in_the_import_form(qtbot: QtBot, built: ViewModels, scheme
 
 
 def test_an_unknown_link_says_so(qtbot: QtBot, built: ViewModels) -> None:
-    built.open_link("solaris://something-else")
+    built.open_link("openweir://something-else")
     assert built.shell.currentPage == "profiles"
     assert built.profiles.property("summary") == "无法识别的导入链接"
     assert built.profiles.property("hasError")

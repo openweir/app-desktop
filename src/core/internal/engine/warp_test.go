@@ -11,10 +11,10 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/admission"
-	"github.com/Ember-Moth/Solaris/src/core/internal/controlpb"
-	"github.com/Ember-Moth/Solaris/src/core/internal/porttest"
-	"github.com/Ember-Moth/Solaris/src/core/internal/warp"
+	"github.com/openweir/app-desktop/src/core/internal/admission"
+	"github.com/openweir/app-desktop/src/core/internal/controlpb"
+	"github.com/openweir/app-desktop/src/core/internal/porttest"
+	"github.com/openweir/app-desktop/src/core/internal/warp"
 )
 
 // fakeWarpAPI answers registration on loopback with a fixed device and counts the calls.

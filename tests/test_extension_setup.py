@@ -8,8 +8,8 @@ import pytest
 from PySide6.QtCore import QMetaObject, QObject, Qt
 from pytestqt.qtbot import QtBot
 
-from solaris.host.base import HostError, TunnelConfig
-from solaris.viewmodels import overview as overview_module
+from openweir.host.base import HostError, TunnelConfig
+from openweir.viewmodels import overview as overview_module
 from tests.support.simulated import SimulatedHost
 from tests.support.window import Loaded, find_all, pages
 

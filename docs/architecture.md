@@ -1,9 +1,9 @@
 # 架构
 
-本文面向开发者，记录 Solaris 的架构。用户操作见 [使用指南](usage.md)。Solaris 是 mihomo 的桌面客户端（仓库 `Ember-Moth/Solaris`）。产品名、应用名都是
-Solaris（决策 D1）；
-代码里的产品标识集中在 `src/core/internal/product/product.go` 与 `src/solaris/product.py`，协议见
-`proto/solaris/protocol/control.proto`。
+本文面向开发者，记录 OpenWeir 的架构。用户操作见 [使用指南](usage.md)。OpenWeir 是 mihomo 的桌面客户端（仓库 `openweir/app-desktop`）。产品名、应用名都是
+OpenWeir（决策 D1）；
+代码里的产品标识集中在 `src/core/internal/product/product.go` 与 `src/openweir/product.py`，协议见
+`proto/openweir/protocol/control.proto`。
 
 本文只讲系统层面的结构；界面各部分的设计见 [ui.md](ui.md)，存储与备份、分流、链式出口、组网出站和发布更新分别见
 [storage.md](storage.md)、[routing.md](routing.md)、[exits.md](exits.md)、[mesh.md](mesh.md)、
@@ -19,7 +19,7 @@ Solaris（决策 D1）；
 - **UI 始终以普通用户权限运行。** Windows 在安装器处请求 UAC；管理员接管其他用户的隧道时，界面经 UAC 启动的是服务
   自己的接管辅助进程，界面本身不提权（5.4 节）。macOS 只在首次激活系统扩展时需要用户批准。
 - **隧道不依赖界面进程。** Windows 服务按属主持久化配置，并在开机后恢复；macOS 的 NE 本身就独立于 App 运行。关闭窗口
-  留在托盘、界面崩溃或被结束时隧道照常运行；用户退出 Solaris 时先断开隧道再退出（D41，ui.md 第 8 节）。
+  留在托盘、界面崩溃或被结束时隧道照常运行；用户退出 OpenWeir 时先断开隧道再退出（D41，ui.md 第 8 节）。
 - **控制面是自定义的方法调用协议，不使用 HTTP。** Windows 上走命名管道；macOS 上走 Network Extension
   自带的 IPC（provider message），不监听任何 socket。两端都不开放 TCP 端口，mihomo 自带的 HTTP
   控制器（Clash API）在任何情况下都不启动。
@@ -52,9 +52,9 @@ secret 注入。而且接口面由 mihomo 决定：上游升级时新增的接�
                  |                                        |
    Windows       | named pipe, framed             macOS   | ctypes -> Swift manager dylib
                  v                                        |   activate sysext, start/stop tunnel,
-   solaris-service.exe  (LocalSystem, Go)               |   sendProviderMessage(Request)
-     \\.\pipe\ProtectedPrefix\Administrators\solaris    v
-     peer check, host + core methods             dev.tschen.solaris.tunnel.systemextension  (Swift)
+   openweir-service.exe  (LocalSystem, Go)               |   sendProviderMessage(Request)
+     \\.\pipe\ProtectedPrefix\Administrators\openweir    v
+     peer check, host + core methods             org.openweir.app.tunnel.systemextension  (Swift)
      engine (mihomo), owned-TUN mode               handleAppMessage -> Go dispatcher
      no mihomo HTTP controller                     engine (mihomo), fd mode
                                                    no socket, no HTTP controller
@@ -132,8 +132,8 @@ secret 注入。而且接口面由 mihomo 决定：上游升级时新增的接�
 ### 3.2 engine 的职责
 
 - **初始化**（`engine.New`）：为属主设置 mihomo 的 home 目录（`C.SetHomeDir`），开启 `route.SetEmbedMode(true)`，
-  然后自检路径沙箱。开发服务的 home 默认在用户配置目录下的 `Solaris/dev-core`（`-home` 可改）；
-  Windows 服务的 home 是属主的 `%ProgramData%\Solaris\users\<SID>`（5.1 节）。
+  然后自检路径沙箱。开发服务的 home 默认在用户配置目录下的 `OpenWeir/dev-core`（`-home` 可改）；
+  Windows 服务的 home 是属主的 `%ProgramData%\OpenWeir\users\<SID>`（5.1 节）。
   mihomo 在进程内只打开一次 `cache.db`，所以 home 在进程生命周期内不能更换，更换属主需要新的服务进程（5.4 节）。
 - **配置准入**：用户 YAML 解析为映射（锚点和合并键在这一步展开，补丁无法被别名绕过），或者由节点池和方案
   拼装出映射 → 依次应用覆写 → 按 TUN 模式打补丁 → 最后一步强制安全项 → 重新编码后交给
@@ -240,7 +240,7 @@ mihomo 提供的可选标签有 `with_gvisor`、`with_low_memory`、`no_tailscal
   最终体积包含下文静态链接的 Cronet 原生库。
 - TUN 自动化在 Linux 网络命名空间中运行（第 11 节）；平台验收按 [维护清单](maintenance.md) 执行。
 
-Solaris 保留 `github.com/metacubex/mihomo` 导入路径，通过 go.mod replace 锁定
+OpenWeir 保留 `github.com/metacubex/mihomo` 导入路径，通过 go.mod replace 锁定
 [openweir/mihomo](https://github.com/openweir/mihomo) 的明确版本（D38）。内核和原生依赖版本以
 [`src/core/go.mod`](../src/core/go.mod) 与 go.sum 为准，状态和许可证清单使用实际替换版本。
 用户侧参数及示例见 [mihomo 配置指南](mihomo-fork.md)。
@@ -265,7 +265,7 @@ protobuf，编译和测试都正常。
 
 两个平台共用同一组 Protobuf 消息和同一个 Go 分发器，区别只在传输层和"启停"这类宿主方法。
 协议只有请求和响应两种消息，没有服务端主动推送，因为 macOS 的 provider message 只支持一问一答。
-schema 放在 `proto/solaris/protocol/control.proto`，Go 与 Python 的绑定由它生成。
+schema 放在 `proto/openweir/protocol/control.proto`，Go 与 Python 的绑定由它生成。
 Swift 侧（管理库和扩展）只转发字节，不解析消息。
 
 ### 4.1 消息
@@ -488,15 +488,15 @@ Windows 上 UI 断线后按退避间隔重连，并重新建立订阅。
 ### 5.1 安装布局
 
 ```text
-C:\Program Files\Solaris\            默认位置；可自定义，安装目录管理员所有、普通用户只读运行
-├── Solaris.exe                      Nuitka standalone UI
-├── solaris-service.exe              Go 服务；wintun.dll（0.14.1）由 sing-tun 嵌在里面，从内存加载
+C:\Program Files\OpenWeir\            默认位置；可自定义，安装目录管理员所有、普通用户只读运行
+├── OpenWeir.exe                      Nuitka standalone UI
+├── openweir-service.exe              Go 服务；wintun.dll（0.14.1）由 sing-tun 嵌在里面，从内存加载
 ├── geodata\                         附带 GeoSite.dat、GeoIP.dat、geoip.metadb、ASN.mmdb（D18），服务补齐 home 缺少的文件
-├── LICENSE、solaris\licenses\        许可证与第三方声明（release.md 第 5 节）
+├── LICENSE、openweir\licenses\        许可证与第三方声明（release.md 第 5 节）
 ├── uninstall.exe
 └── …                                  Python / Qt 运行依赖
 
-C:\ProgramData\Solaris\              仅 SYSTEM 与 Administrators 可访问
+C:\ProgramData\OpenWeir\              仅 SYSTEM 与 Administrators 可访问
 ├── service.log                        服务日志；启动时超过 1 MiB 就移到 service.log.1
 ├── owner.json                         属主的 SID、会话编号和连接所属的 Windows 登录时间
 └── users\<SID>\                       该用户的 mihomo home 目录（IsSafePath 根）：只有 SYSTEM 能写，属主能读
@@ -522,13 +522,13 @@ UI 必须使用 Nuitka standalone 模式。onefile 模式会解压到 `%TEMP%` �
 
 ### 5.2 服务
 
-- 服务名 `SolarisService`，以 LocalSystem 身份运行，自动启动。
+- 服务名 `OpenWeirService`，以 LocalSystem 身份运行，自动启动。
 - SCM 故障恢复：依次在 5 s、15 s、60 s 后重启。
 - 接受的控制事件：Stop、Shutdown、SessionChange（SessionLogon、SessionLogoff）、PowerEvent。
   另外经 `PowerRegisterSuspendResumeNotification` 接收现代待机通知；回调只发布事件，不等待内核。
 - **一个进程只服务一个属主**：启动时读 `owner.json`，在属主的 home 里打开 engine；没有属主时不打开 engine，只回答
   `GetInfo` 和 `Claim`。认领换了属主时（包括第一次认领），服务写好新的 `owner.json`，回复 `service_restarting`，
-  启动一个 `solaris-service.exe -restart` 辅助进程，然后退出；辅助进程等服务停下后再启动它，新进程打开新属主的
+  启动一个 `openweir-service.exe -restart` 辅助进程，然后退出；辅助进程等服务停下后再启动它，新进程打开新属主的
   home。界面重连后再次认领（5.4 节）。
 - **持久化**：`Start`、`Reload` 生效后写 `profile.json` 并置 `was_running`；`Stop` 清除 `was_running`；
   `SetSystemProxy` 改写 `profile.json` 里的系统代理开关。写入失败只记日志，已经生效的请求照常成功。节点选择由
@@ -546,7 +546,7 @@ UI 必须使用 Nuitka standalone 模式。onefile 模式会解压到 `%TEMP%` �
 - 合并 SCM 和原生回调的重复通知，记录每次睡眠的序号与最新状态；即使睡眠、唤醒发生在消费队列之前，也会执行一次恢复。
   自动唤醒和随后用户活动的通知属于同一轮；没有前置睡眠通知的关键唤醒也可以触发重置。
 - 睡眠时停止内核并还原系统代理，保留 `was_running`、配置和节点选择；唤醒先清理旧连接与 TUN，再恢复最近成功的配置。
-  只恢复仍登录着的原属主，且其连接意图仍为开启。空闲用户、主动断开（包括退出 Solaris，D41）、注销、换属主或服务关闭
+  只恢复仍登录着的原属主，且其连接意图仍为开启。空闲用户、主动断开（包括退出 OpenWeir，D41）、注销、换属主或服务关闭
   都会取消恢复。
 - 重试间隔依次为 0、1、2、5、10 秒，整轮最多一分钟。先检查本机接口是否启用且有可用地址，不发公网探测请求；
   真正的配置/内核错误仍由启动返回。无效配置或内核卡死不继续重试。睡眠/注销等临时停止与用户断开分别处理。
@@ -559,7 +559,7 @@ UI 必须使用 Nuitka standalone 模式。onefile 模式会解压到 `%TEMP%` �
 
 ### 5.3 管道与客户端校验
 
-管道名为 `\\.\pipe\ProtectedPrefix\Administrators\solaris`，SDDL 为
+管道名为 `\\.\pipe\ProtectedPrefix\Administrators\openweir`，SDDL 为
 `D:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;GRGW;;;IU)`。这是服务唯一的对外入口。
 
 `ProtectedPrefix\Administrators` 前缀下只有管理员和 SYSTEM 能创建管道，因此客户端不必再核对服务端
@@ -569,15 +569,15 @@ PID 来防止管道名被抢注。
 
 1. 用 `GetNamedPipeClientProcessId` 取得客户端进程，并在整个连接期间持有其进程句柄，这期间进程 ID 不会给别的
    进程用；
-2. 以只允许共享读的方式打开客户端的映像文件，比较它与服务旁边的 `Solaris.exe` 的卷序列号和文件 ID；映像的句柄
-   同样持有到连接结束，这期间文件不能被改写、改名或删除。服务自己的 `solaris-service.exe` 也按文件 ID 接受，它是
+2. 以只允许共享读的方式打开客户端的映像文件，比较它与服务旁边的 `OpenWeir.exe` 的卷序列号和文件 ID；映像的句柄
+   同样持有到连接结束，这期间文件不能被改写、改名或删除。服务自己的 `openweir-service.exe` 也按文件 ID 接受，它是
    管理员接管用的辅助进程（5.4 节），要求第 3 项读到管理员权限；
 3. 客户端必须在用户会话里（会话 ID 不为 0）；读取它 token 的用户 SID、会话 ID，以及 Administrators 组是否启用
    （管理员权限），作为属主判断的身份；
 4. 发布构建（`scripts/build_windows.py --sign`，链接时设 `product.SignedRelease=true`）还要求客户端的 Authenticode
-   签名为 Windows 信任，签名证书主题的显示名是 `product.WindowsSigner`（`Herta Network LLC`），并且证书带
+   签名为 Windows 信任，签名证书主题的显示名是 `product.WindowsSigner`（`OpenWeir`），并且证书带
    `product.WindowsSignerEKU` 这个扩展密钥用法（EKU）。Artifact Signing 的证书有效期只有几天、每天换新，中间 CA 也会变
-   （D42），所以不固定证书或 CA；组织名别的同名机构也可能通过验证，而这个 EKU 是 Artifact Signing 只发给 Solaris 这个
+   （D42），所以不固定证书或 CA；组织名别的同名机构也可能通过验证，而这个 EKU 是 Artifact Signing 只发给 OpenWeir 这个
    证书配置文件的。不检查吊销：那可能要联网，而且每条连接都要做。被拒的连接在 `service.log` 里记一行
    `rejected control client`，原因是 `pipe client signature: …` 或 `pipe client is signed by …`；
 5. 最后确认客户端进程仍在运行。
@@ -586,8 +586,8 @@ PID 来防止管道名被抢注。
 
 **未签名的构建**：CI、测试 VM 和本地的构建不加 `--sign`，链接服务时只注入版本，`SignedRelease` 保持默认的 `"false"`，
 服务把零值的 `peer.Signer` 交给 `peer.PipeClientVerifier`，只跳过第 4 项；1.0.0 也是这样（D29）。第 1、2、3、5 项
-照常：客户端必须就是服务旁边那个 `Solaris.exe` 文件本身（卷序列号和文件 ID 相同，连接期间锁住），复制到别处的同一个
-程序、同名的其他程序都会被断开。安装目录（默认 `C:\Program Files\Solaris`）只有管理员能写，所以能换掉这个文件的人本来就
+照常：客户端必须就是服务旁边那个 `OpenWeir.exe` 文件本身（卷序列号和文件 ID 相同，连接期间锁住），复制到别处的同一个
+程序、同名的其他程序都会被断开。安装目录（默认 `C:\Program Files\OpenWeir`）只有管理员能写，所以能换掉这个文件的人本来就
 能换掉服务。`peer_windows_test.go` 用零值的签名者测这几项（复制出的程序被拒、界面没装时被拒、会话 0 被拒），以及服务的
 可执行文件只在有管理员权限时通过（以 UAC 那样过滤过的 token 起的子进程被拒）；用发布的签名者测未签名的测试程序被拒，
 用 Edge 的微软签名测显示名和 EKU 的读取，以及同名不同 EKU 被拒（`signer_test.go` 用生成的证书在所有平台上测后者）。
@@ -618,7 +618,7 @@ CI 的 `smoke-test.ps1` 用 PowerShell 连一次装好的服务的管道，只�
 - **管理员接管**（决策 D5b）：另一个用户的隧道在运行时，管理员经 UAC 确认后可以接管。那个用户的隧道停止，管理员
   成为属主；不是管理员的用户仍要等对方断开或注销。
   - 界面：管理员（token 的提权类型是"受限"或"完全"，或者 UAC 关着时是 Administrators 的成员）在概览页点"接管"、
-    确认后（ui.md 第 8 节），界面以 `ShellExecuteEx` 的 `runas` 启动服务旁边的 `solaris-service.exe -take-over`，
+    确认后（ui.md 第 8 节），界面以 `ShellExecuteEx` 的 `runas` 启动服务旁边的 `openweir-service.exe -take-over`，
     UAC 弹出同意提示。这个辅助进程连上管道，发带 `take_over` 的 `Claim`，得到 `service_restarting`（或 Empty，
     已经是它的）就以 0 退出。界面随后照常认领，等过服务重启。用户在 UAC 提示里选"否"时什么都不变。
   - 服务（`owner.Service.TakeOver`）：调用者 token 的 Administrators 组没有启用时，与 `Claim` 一样得到
@@ -652,12 +652,12 @@ CI 的 `smoke-test.ps1` 用 PowerShell 连一次装好的服务的管道，只�
 ### 6.1 包结构
 
 ```text
-Solaris.app/Contents/
-├── Info.plist                                      dev.tschen.solaris；URL scheme solaris、clash（D6）
-├── MacOS/SolarisUI                                 Nuitka standalone UI；旁边是它的库和 solaris/ 数据目录
-├── Frameworks/SolarisManager.dylib                 Swift，C ABI，供 ctypes 调用
-└── Library/SystemExtensions/dev.tschen.solaris.tunnel.systemextension
-    ├── MacOS/dev.tschen.solaris.tunnel             NEPacketTunnelProvider + 本仓库 Go 模块编出的 xcframework（静态链接）
+OpenWeir.app/Contents/
+├── Info.plist                                      org.openweir.app；URL scheme openweir、clash（D6）
+├── MacOS/OpenWeirUI                                 Nuitka standalone UI；旁边是它的库和 openweir/ 数据目录
+├── Frameworks/OpenWeirManager.dylib                 Swift，C ABI，供 ctypes 调用
+└── Library/SystemExtensions/org.openweir.app.tunnel.systemextension
+    ├── MacOS/org.openweir.app.tunnel             NEPacketTunnelProvider + 本仓库 Go 模块编出的 xcframework（静态链接）
     └── Resources/GeoSite.dat、GeoIP.dat、geoip.metadb、ASN.mmdb  附带的 GEO 数据（routing.md 8.4 节）
 ```
 
@@ -666,32 +666,32 @@ Solaris.app/Contents/
   最低系统版本是 macOS 15.0；主应用以 macOS 26.0 为底线，并取 bundle 中更高的库版本要求（见 apple/README.md）。
   CI 和发布环境均为 macOS 26（决策 D28）。
 - 需要 Developer ID 签名、公证，以及 `packet-tunnel-provider-systemextension` entitlement。可执行文件叫
-  `SolarisUI`，因为卷不区分大小写，`MacOS/solaris/` 是 Python 包的数据目录。
+  `OpenWeirUI`，因为卷不区分大小写，`MacOS/openweir/` 是 Python 包的数据目录。
 - 管理库用 `OSSystemExtensionRequest` 激活扩展（用户需在系统设置中批准；包内的扩展总是替换其他构建激活的
   扩展）、配置 `NETunnelProviderManager`、启停隧道、查询状态、收发 provider message。配置和启动时按设置写
   `includeAllNetworks`（D19，默认关闭；`MacExtensionHost` 取自界面的 `RunOptions.include_all_networks`，这是
   Python 侧的字段，不进协议）；打开它时同时设 `excludeLocalNetworks`，局域网流量（打印机、AirDrop、Bonjour）照旧
   不进隧道。隧道连着时不改这两项：扩展只在 attach 时读一次，所以改动下次连接时生效。C 接口是
-  `apple/Manager/SolarisManager.h`：调用阻塞到完成或超时，要在后台线程调用；本库交出的字符串和缓冲区由
-  调用方用 `solaris_manager_free` 释放。
+  `apple/Manager/OpenWeirManager.h`：调用阻塞到完成或超时，要在后台线程调用；本库交出的字符串和缓冲区由
+  调用方用 `openweir_manager_free` 释放。
 - hypervpn-desktop 的 `src/packet-engine/native/macos/SystemNetworkExtension/` 和它的 NE 管理库可以作为参考。
 
 ### 6.2 扩展内的运行流程
 
-1. 从 Go 读出隧道的网络（`solaris_tunnel_network`，即 `admission.FDNetwork`），用 `setTunnelNetworkSettings`
+1. 从 Go 读出隧道的网络（`openweir_tunnel_network`，即 `admission.FDNetwork`），用 `setTunnelNetworkSettings`
    设置：地址 198.18.0.1/30 和 fdfe:dcba:9876::1/126，MTU 9000，IPv4 和 IPv6 的默认路由都进隧道；DNS 服务器
    198.18.0.2，查询进入隧道后由 mihomo 劫持应答（3.1 节）。地址只在 Go 里定义这一处，扩展的网络设置和准入流水线
    的 fd 补丁都从这里取，Go 的测试核对补丁解析出的 TUN 与它一致；
 2. 网络设置完成后 NE 才打开 utun。扩展在 0 到 1024 号描述符里找
    `getsockopt(SYSPROTO_CONTROL, UTUN_OPT_IFNAME)` 返回 utun 名字的那个（与 hypervpn 的
    `AppleRawTunFileDescriptor.locate` 相同），连同 `protocolConfiguration` 的 `includeAllNetworks`
-   用 `solaris_attach_tun` 交给 Go，同时交出扩展的资源目录：Go 先把 home（扩展容器的
-   `Application Support/Solaris/core`）里缺少的 GEO 数据从资源目录复制过去，再以 fd 模式打开 engine 和分发器，
+   用 `openweir_attach_tun` 交给 Go，同时交出扩展的资源目录：Go 先把 home（扩展容器的
+   `Application Support/OpenWeir/core`）里缺少的 GEO 数据从资源目录复制过去，再以 fd 模式打开 engine 和分发器，
    mihomo 此时还不运行；
 3. 配置和 Windows 一样由界面经控制协议的 `Start` / `Reload` 传入（决策 D7），不经
    `startVPNTunnel(options:)`；mihomo 在描述符的副本上运行 TUN（3.1 节）。不监听任何 socket，mihomo 的 HTTP
    控制器也不启动；
-4. 停止时，`stopTunnel` 先调 `solaris_detach_tun`：取消在途的消息并等它们结束，停止内核，关闭 Go 的副本；
+4. 停止时，`stopTunnel` 先调 `openweir_detach_tun`：取消在途的消息并等它们结束，停止内核，关闭 Go 的副本；
    然后才调用 completion handler，NE 随后拆掉 utun、关闭它自己的描述符。描述符始终归 NE，Go 从不关闭它。
    attach 和 detach 在同一个串行队列上按序执行；还在等网络设置时就被停止的启动，不再 attach。
 
@@ -705,9 +705,9 @@ Solaris.app/Contents/
 
 macOS 不监听任何 socket，控制消息全部走 Network Extension 自带的 IPC：
 
-1. UI 通过 ctypes 调用管理库的发送函数 `solaris_manager_send`，传入编码好的 Request 和超时；
+1. UI 通过 ctypes 调用管理库的发送函数 `openweir_manager_send`，传入编码好的 Request 和超时；
 2. 管理库调用 `NETunnelProviderSession.sendProviderMessage` 发给扩展，超时则返回错误；
-3. 扩展在 `handleAppMessage` 里把消息交给 Go 分发器（xcframework 导出的 `solaris_handle_message`）。
+3. 扩展在 `handleAppMessage` 里把消息交给 Go 分发器（xcframework 导出的 `openweir_handle_message`）。
    分发在并发队列上执行，不阻塞 provider 的其他回调；改变状态的方法由分发器的操作锁串行；
 4. 分发器返回编码好的 Response，经 completion handler 回到管理库，再交回 Python。
 
@@ -723,7 +723,7 @@ macOS 不监听任何 socket，控制消息全部走 Network Extension 自带的
   provider message；没有 attach 的隧道时，消息得到 `not_running`。`MacExtensionHost` 发出的 `RunOptions` 总是开着
   TUN、关着系统代理，不论设置怎么写（ui.md 第 8 节"接管方式"）。
 - **消息大小**：配置用一条 provider message 发送，不分片（决策 D8）。单条消息的系统上限未知，要在测试 Mac 上
-  用大配置核实；真带不动时，大配置可以改经主应用和扩展共有的 App Group `group.dev.tschen.solaris` 传递。
+  用大配置核实；真带不动时，大配置可以改经主应用和扩展共有的 App Group `group.org.openweir.app` 传递。
 - 做法与 hypervpn 一致，见它的 `NetworkExtensionManager.swift`（`providerExchange`）和
   `PacketTunnelProvider.swift`（`handleAppMessage`）。
 
@@ -733,8 +733,8 @@ macOS 不监听任何 socket，控制消息全部走 Network Extension 自带的
   通过排队信号回到 Qt 线程。
 - 控制客户端只依赖 protobuf：Windows 上是命名管道的一条长连接，macOS 上通过 ctypes 调用管理库。
 - 宿主抽象 `TunnelHost` 有 `ServiceHost`（Windows 服务；开发模式下走本地 socket）和 `MacExtensionHost`（macOS
-  打包的 app，经管理库发 provider message，`src/solaris/host/extension.py`）两个实现；测试和预览用模拟宿主。
-- Tor 出口未实现。设计是把 arti 做成 pyo3 扩展模块 `solaris_tor`，运行在界面进程里，不进服务和系统扩展
+  打包的 app，经管理库发 provider message，`src/openweir/host/extension.py`）两个实现；测试和预览用模拟宿主。
+- Tor 出口未实现。设计是把 arti 做成 pyo3 扩展模块 `openweir_tor`，运行在界面进程里，不进服务和系统扩展
   （D23，[exits.md](exits.md) 第 4 节）。
 
 界面各部分的设计见 [ui.md](ui.md)。
@@ -743,7 +743,7 @@ macOS 不监听任何 socket，控制消息全部走 Network Extension 自带的
 
 | 威胁 | 措施 |
 | --- | --- |
-| 其他本地进程冒充 UI | Windows：连接建立时比较映像与安装的 `Solaris.exe` 的文件 ID 并锁住映像，要求用户会话，读取 SID 与会话，签名的发布构建再校验签名者（5.3 节）；macOS：只有本应用能取得 NE session |
+| 其他本地进程冒充 UI | Windows：连接建立时比较映像与安装的 `OpenWeir.exe` 的文件 ID 并锁住映像，要求用户会话，读取 SID 与会话，签名的发布构建再校验签名者（5.3 节）；macOS：只有本应用能取得 NE session |
 | 抢注服务管道名 | 使用 `ProtectedPrefix\Administrators` 前缀 |
 | 配置让 SYSTEM 读写任意文件 | 每个 SID 独立的 mihomo home 目录 + `IsSafePath`（不带 `cmfa`，不设 `SKIP_SAFE_PATH_CHECK` / `SAFE_PATHS`），并修正 `ResolveAsRoot` |
 | 用户借链接让 SYSTEM 写到别处 | home 只有 SYSTEM 能写，属主不能在里面放链接；服务不用链接或别人建的目录（5.1 节） |
@@ -770,40 +770,40 @@ macOS 不监听任何 socket，控制消息全部走 Network Extension 自带的
   `packaging/windows/`。
   - 自定义界面（D39）：`package/windows/ui/setup_ui.cpp` 是独立的 Win32 UI 线程，配色、字号及窗口尺寸从
     DESIGN.md 生成，支持中英文、系统浅深色、高对比度和 DPI 变化，外观见 DESIGN.md「Windows 安装器」。NSIS 的默认页面
-    隐藏；普通运行先由 UI 收集安装/卸载选择，再在静默引擎中执行原有事务。事务用 `SolarisSetupUI::Step <序号>`
+    隐藏；普通运行先由 UI 收集安装/卸载选择，再在静默引擎中执行原有事务。事务用 `OpenWeirSetupUI::Step <序号>`
     报告做到第几步（界面的步骤清单），用 `Status` / `Log` 往详细信息里写一行，用 `Finish` 报告结果和错误信息；
     步骤文字和错误文字放在 `package/windows/messages.nsh`，界面预览共用。更新时 `Begin` 还带上卸载信息里的
     `DisplayVersion`，界面显示「旧版本 → 新版本」。控件只返回选择，不执行安装命令。`/S` 不创建界面；操作进行中
-    不能关闭，完成或失败后可查看详细信息并关闭，安装、更新完成还可打开 Solaris。
-  - 安装：默认 `C:\Program Files\Solaris`，首次安装可输入路径或浏览选择，静默安装支持最后一个参数 `/D=<完整路径>`（不加引号）。
+    不能关闭，完成或失败后可查看详细信息并关闭，安装、更新完成还可打开 OpenWeir。
+  - 安装：默认 `C:\Program Files\OpenWeir`，首次安装可输入路径或浏览选择，静默安装支持最后一个参数 `/D=<完整路径>`（不加引号）。
     交互安装与升级需主动勾选 GPLv3 同意项，可在同一窗口阅读仓库 LICENSE 全文；静默执行不显示确认页。
     写文件及执行已有程序前，`prepare-directory` 检查本地固定 NTFS/ReFS 卷、路径各级的所有者和 ACL、目录链接及已有内容。
     只新建缺失目录，并在创建时设置受保护的 ACL（SYSTEM / Administrators 完全控制，Users 读取执行），不修改现有父目录权限。
     路径只接受 `\` 分隔、与 Windows 规范化结果一致的写法（静默安装的 `/D=` 不经界面，含 `/` 时直接拒绝），逐级检查；
     安装目录及其中的文件夹上只对子项生效（inherit-only）的授权也计入，因为装进去的文件会继承（CREATOR OWNER 除外）。
-    普通用户可修改/替换的目录、链接和不属于 Solaris 的非空目标会被拒绝；应用目录的标记支持失败后的重试。然后复制
-    文件；用 `sc.exe` 注册 `SolarisService`（LocalSystem、自动启动，5.2 节的故障恢复，`failureflag 1` 让服务带错误
-    退出时也重启）并启动；在 HKLM 下注册 `solaris:`、`clash:`、`mihomo:`、`clashmeta:`（D6、D45），命令是
-    `"<安装目录>\Solaris.exe" "%1"`；所有用户的开始菜单快捷方式；"应用"里的卸载信息。安装器以管理员身份运行，可能
+    普通用户可修改/替换的目录、链接和不属于 OpenWeir 的非空目标会被拒绝；应用目录的标记支持失败后的重试。然后复制
+    文件；用 `sc.exe` 注册 `OpenWeirService`（LocalSystem、自动启动，5.2 节的故障恢复，`failureflag 1` 让服务带错误
+    退出时也重启）并启动；在 HKLM 下注册 `openweir:`、`clash:`、`mihomo:`、`clashmeta:`（D6、D45），命令是
+    `"<安装目录>\OpenWeir.exe" "%1"`；所有用户的开始菜单快捷方式；"应用"里的卸载信息。安装器以管理员身份运行，可能
     不是使用者本人，所以 scheme 写在 HKLM 而不是 HKCU；用户自己的 HKCU 里如有其他客户端注册的同名 scheme，对这个用户
-    仍是它优先，其中指向已不存在的程序的，由界面启动时删除（release.md 第 6 节）。完成页的"打开 Solaris"经 Explorer
+    仍是它优先，其中指向已不存在的程序的，由界面启动时删除（release.md 第 6 节）。完成页的"打开 OpenWeir"经 Explorer
     以登录用户的身份打开界面，不继承安装器的管理员权限。
   - 升级：注册表里已有安装时，先关闭正在运行的界面（见下面的"关闭界面"；隧道在服务里，不受影响），停止服务并等它
     的进程退出，再以 `/UPGRADE` 静默运行旧版本的卸载器。它只按自己的清单删除装过的文件，服务、计划任务和注册
     都留着；删除前清除这些文件的只读属性，遇到占用有限重试，仍失败则报告文件路径和非零退出码，停止本次升级。
     然后复制新文件，核对全部 EXE/DLL/PYD 的架构（NSIS 卸载器除外），再把服务指向新文件并启动，
     服务按 `was_running` 恢复隧道（5.2 节）。升级始终沿用注册表记录的位置，包括自定义目录；如需迁移位置，先卸载再安装。
-  - 卸载：关闭界面；停止并删除服务；删除每个用户指向本安装的"登录时打开"计划任务（`Solaris (<域>_<用户>)`，
-    `src/solaris/desktop/login.py`）、开始菜单快捷方式和卸载信息；四个 scheme 只在仍指向本安装时删除；按清单逐个
+  - 卸载：关闭界面；停止并删除服务；删除每个用户指向本安装的"登录时打开"计划任务（`OpenWeir (<域>_<用户>)`，
+    `src/openweir/desktop/login.py`）、开始菜单快捷方式和卸载信息；四个 scheme 只在仍指向本安装时删除；按清单逐个
     删除装过的文件并确认删除成功，安装目录只在空了时删除，不递归删除未知文件，也不修改未知文件的属性。
-  - 关闭界面：`setup.ps1` 以安装目录里的 `Solaris.exe --quit` 请界面退出（ui.md 第 8 节；不断开隧道，D41），最多等 15 秒；之后
-    再给各会话里从安装目录运行的 `Solaris.exe` 共 5 秒，仍在运行的直接结束。`--quit` 以运行安装器的用户身份
+  - 关闭界面：`setup.ps1` 以安装目录里的 `OpenWeir.exe --quit` 请界面退出（ui.md 第 8 节；不断开隧道，D41），最多等 15 秒；之后
+    再给各会话里从安装目录运行的 `OpenWeir.exe` 共 5 秒，仍在运行的直接结束。`--quit` 以运行安装器的用户身份
     执行，只请得到这个用户的界面；其他用户的界面（快速切换用户，或以另一个管理员账户提权安装时）等完这 5 秒后被
     结束。
   - 用户数据：卸载确认界面的数据清除选项默认不勾选，勾选（静默卸载时加 `/PURGE`）才删除
-    `C:\ProgramData\Solaris`（服务一侧，所有用户的配置、覆写与缓存）和运行卸载器的用户的 `%LOCALAPPDATA%\Solaris`。
+    `C:\ProgramData\OpenWeir`（服务一侧，所有用户的配置、覆写与缓存）和运行卸载器的用户的 `%LOCALAPPDATA%\OpenWeir`。
     其他用户的界面数据和系统凭据库里的 WARP 账户卸载器够不着，留着。
-  - 失败时显示独立的失败状态和操作详情，静默运行时原因写进 `%TEMP%\Solaris-setup-error.log`；退出码沿用 Windows Installer 的：
+  - 失败时显示独立的失败状态和操作详情，静默运行时原因写进 `%TEMP%\OpenWeir-setup-error.log`；退出码沿用 Windows Installer 的：
     1603 一般失败、1633 不是 64 位的 Windows 10 及以上、1638 已装在别的目录。
   - 签名（D42，第 10 节）：发布构建的安装器和卸载器都由 Artifact Signing 签名，卸载器经 makensis 的 `!uninstfinalize`
     在放进安装器之前签名；安装目录里的程序在编译安装包之前签好。
@@ -813,11 +813,11 @@ macOS 不监听任何 socket，控制消息全部走 Network Extension 自带的
     首次安装通过 UI Automation 操作真实安装窗口，之后打开界面、静默升级、静默卸载（保留数据）、再安装、以 `/PURGE` 卸载，核对文件、服务的
     路径、启动方式、账户、恢复策略与管道监听、注册表、快捷方式、计划任务，升级和卸载时界面自己退出（退出码 0，
     没有留下 `ui.lock`），以及卸载后什么都没留下。不建 TUN，不连接。界面每次启动的输出（设了 `QT_FORCE_STDERR_LOGGING`，
-    Qt 的消息也在里面）写到 `%RUNNER_TEMP%\solaris-ui`；界面启动即退出时，脚本当场把它的崩溃目录复制过去，再把日志
+    Qt 的消息也在里面）写到 `%RUNNER_TEMP%\openweir-ui`；界面启动即退出时，脚本当场把它的崩溃目录复制过去，再把日志
     打印出来，因为后面的 `/PURGE` 会删掉用户数据。测试失败时工作流把这个目录作为 artifact 上传。真机上的 UAC、开机恢复和隧道见
     [maintenance.md](maintenance.md) 2.1 节。
 - **macOS**：拖入"应用程序"文件夹完成安装，首次连接时激活系统扩展。设置页「系统扩展」提供停用入口（D35）：
-  确认后断开所有 Solaris 隧道、调用 `deactivationRequest`，系统确认完成后删除本应用的 VPN 配置，保留订阅、设置和凭据。
+  确认后断开所有 OpenWeir 隧道、调用 `deactivationRequest`，系统确认完成后删除本应用的 VPN 配置，保留订阅、设置和凭据。
   待用户处理、未完成、取消和失败分别显示，可重试；下次显式连接会重新激活扩展。应用不会自行删除自己的安装目录。
 
 ### 9.1 本地崩溃记录
@@ -829,7 +829,7 @@ macOS 不监听任何 socket，控制消息全部走 Network Extension 自带的
 macOS attach 后如果尚无可运行配置且连续两分钟没有界面消息，启动保护会终止扩展，使系统拆除空隧道；
 解析多份订阅时，消息持续刷新空闲预算。正常 Start 或 detach 永久取消保护，已运行隧道无需界面心跳。
 
-Windows 安装器为两个 Solaris 可执行文件设置独立的 WER mini dump 策略，卸载只移除本次安装拥有的键；
+Windows 安装器为两个 OpenWeir 可执行文件设置独立的 WER mini dump 策略，卸载只移除本次安装拥有的键；
 原生服务转储在 SYSTEM/管理员专用目录，不混入用户可读的日志。macOS 原生报告由系统生成与维护。
 界面只收集本人可读取且标识匹配的报告，禁止链接/重解析点、限制导出大小；不为日志启动隧道或改变权限。
 普通诊断只含类型、时间、大小与来源可用性；原始报告经过独立确认导出。保留与导出限额见 D37 和隐私说明。
@@ -841,28 +841,28 @@ Windows 安装器为两个 Solaris 可执行文件设置独立的 WER mini dump 
 | Windows 服务 | `go build -trimpath`，windows/amd64 或 windows/arm64，不用 cgo，使用 `with_gvisor,with_naive,with_purego`，注入版本并保留 DWARF |
 | macOS xcframework | 本仓库 Go 模块的 c-archive 构建，包含 engine 与控制分发器，导出供 `handleAppMessage` 调用的 C 函数 |
 | 协议绑定 | 由 `control.proto` 生成 Go 与 Python 代码 |
-| UI | Nuitka standalone（Windows 上是 `--mode=standalone` 的 `Solaris.exe`，用 MSVC；macOS 上是 `--mode=app`） |
+| UI | Nuitka standalone（Windows 上是 `--mode=standalone` 的 `OpenWeir.exe`，用 MSVC；macOS 上是 `--mode=app`） |
 | Windows 安装包 | MSVC x86 编译自定义安装器 UI 插件，NSIS 3 封装它与 x64 或 ARM64 原生应用；`scripts/build_windows.py --arch` 选择目标 |
-| macOS 包 | `scripts/build_app.py` 组装并签名 `Solaris.app`；发布工作流公证后做成 `.dmg` |
+| macOS 包 | `scripts/build_app.py` 组装并签名 `OpenWeir.app`；发布工作流公证后做成 `.dmg` |
 | 崩溃符号 | Nuitka `--unstripped`；macOS dSYM 校验 UUID；Windows PDB 与精确 Go 服务二进制独立存档，发布 artifact 保留 90 天 |
 
 - **Windows 构建**（`scripts/build_windows.py`，在 Windows 上运行，`uv run --with nuitka==4.2.2`）：拉取 GEO 数据
   （`scripts/fetch_geodata.py`）、构建服务、Nuitka 构建界面（不带界面用不到的 Qt 模块、QML 目录和图片格式插件，与
   macOS 相同；Qt 的 OpenSSL 后端也不带，TLS 用 Schannel，CPython 自带的 libssl 和 libcrypto 留着给 `ssl` 模块），
   ARM64 另给 Nuitka 加上依赖分析插件 `package/windows/nuitka_pefile.py`（原因见 [development.md](development.md)「从源码构建」），
-  x64 组装到 `build/windows/Solaris/`，ARM64 组装到 `build/windows-arm64/Solaris/`；检查必需文件、链接及每个 PE 的目标架构，
-  再生成卸载清单与 `Solaris-<版本>-windows-<x64|arm64>-setup.exe`。`--skip-installer` 停在安装目录，
+  x64 组装到 `build/windows/OpenWeir/`，ARM64 组装到 `build/windows-arm64/OpenWeir/`；检查必需文件、链接及每个 PE 的目标架构，
+  再生成卸载清单与 `OpenWeir-<版本>-windows-<x64|arm64>-setup.exe`。`--skip-installer` 停在安装目录，
   `--installer-only` 只从已有的安装目录编译安装包。`--sign` 只给发布工作流用（D42）：构建服务时打开 `SignedRelease`
   （5.3 节），编译安装包时先由 `package/windows/sign.ps1 -Directory` 给安装目录里没有发布者签名的 exe、dll、pyd 签名
   （微软的 C++ 运行库、Python 和 Qt 的库保留它们自己的签名；只认文件自带的签名，runner 上靠系统 catalog 才有效的文件
-  照样签，用户的机器上未必有那份 catalog；`Solaris.exe`、`solaris-service.exe` 必须是 Solaris 的签名），
-  再签安装界面插件 `SolarisSetupUI.dll`，然后经 makensis 的 `!uninstfinalize`、`!finalize` 签卸载器和安装器。
+  照样签，用户的机器上未必有那份 catalog；`OpenWeir.exe`、`openweir-service.exe` 必须是 OpenWeir 的签名），
+  再签安装界面插件 `OpenWeirSetupUI.dll`，然后经 makensis 的 `!uninstfinalize`、`!finalize` 签卸载器和安装器。
   Wintun 不是单独的文件：它嵌在服务里，随服务一起签名。每签一个文件，`sign.ps1` 都核对 Windows 信任这个签名、证书是
-  `Herta Network LLC` 的且带证书配置文件的 EKU、签名带时间戳；任何一步失败，makensis 和整个构建都失败。
+  `OpenWeir` 的且带证书配置文件的 EKU、签名带时间戳；任何一步失败，makensis 和整个构建都失败。
 - 需要的证书：Apple Developer ID；Windows 用 Azure Artifact Signing 的 Public Trust 证书配置文件（D42），证书由服务
   每天签发，不经手私钥。
 - **发布工作流** `.github/workflows/release.yml`：`v*` 标签或手动触发，在 `release` Environment 里经审批后运行；
-  macOS 上建临时钥匙串、签名、`notarytool` 公证、staple，产出 `Solaris-<版本>-macos-universal.dmg` 和它的 `.sha256`；
+  macOS 上建临时钥匙串、签名、`notarytool` 公证、staple，产出 `OpenWeir-<版本>-macos-universal.dmg` 和它的 `.sha256`；
   Windows 上以 `--skip-installer --sign` 构建安装目录，再经 `azure/login` 用 GitHub OIDC 以托管标识登录 Azure（不选订阅），
   立即取一次签名用的访问令牌，然后以 `--installer-only --sign` 签名并编译安装包，用 `signtool verify /pa /v` 和
   `sign.ps1 -Check` 核对安装包，用 `smoke-test.ps1 -Signed` 在 runner 上装一遍、升级、卸载，产出两种 Windows 架构的
@@ -873,7 +873,7 @@ Windows 安装器为两个 Solaris 可执行文件设置独立的 WER mini dump 
   写好说明后发布（release.md 第 1.1 节）。不上传源代码包，源代码是本仓库的标签（D43）。
 - 签名的范围：签名和构建在同一个 job 里，构建时运行的依赖（Nuitka、PyPI 包、Go 模块）与签名在同一台 runner 上，
   也能取到这个 job 的 OIDC 令牌，和 macOS 的签名证书在同一个 job 里一样。能换到的只是这个证书配置文件的签名权限，
-  只在这次运行里。`metadata.json` 的 `CorrelationId`（`solaris-<运行 ID>-<尝试次数>-<架构>`）把发布工作流的签名请求
+  只在这次运行里。`metadata.json` 的 `CorrelationId`（`openweir-<运行 ID>-<尝试次数>-<架构>`）把发布工作流的签名请求
   与运行对应起来，便于在 Azure 的签名日志里查找。
 - 许可：本项目以 GPL-3.0-only 发布（[LICENSE](../LICENSE)）；服务和扩展链接的 mihomo 同为 GPL-3.0。
   发布二进制时须同时提供对应的源代码，发布说明和 NOTICES 写明它在哪里（release.md 第 5 节、D43）；新增依赖须与
@@ -884,7 +884,7 @@ NSIS 及自定义安装窗口是 x86 引导组件，由系统仿真运行。更�
 即使当前 GUI 是仿真运行的 x64 版本，也会选择 ARM64 更新包。安装器沿用已有目录，先停止旧 GUI/服务并调用旧卸载清单，
 再替换为同架构新文件；用户与服务数据保持原位。`windows-arm64-upgrade` 在原生 ARM runner 验证 x64 → ARM64 迁移，
 包含只读的旧 protobuf 扩展；两种 Windows 安装器 job 还运行独立的临时目录回归，验证只读文件、占用失败、释放后重试
-与未知文件保留。该回归只复制和删除测试文件，不安装服务或启动 Solaris。
+与未知文件保留。该回归只复制和删除测试文件，不安装服务或启动 OpenWeir。
 
 ## 11. 开发与测试
 
@@ -894,7 +894,7 @@ NSIS 及自定义安装窗口是 x86 引导组件，由系统仿真运行。更�
   不进入任何发布包；macOS 正式版走 provider message，不使用 socket。
 
   ```bash
-  go -C src/core run ./service -socket /tmp/solaris-dev.sock
+  go -C src/core run ./service -socket /tmp/openweir-dev.sock
   ```
 
   `scripts/dev.py` 一步完成联调：构建并启动开发服务，界面的配置和设置放在单独的目录（默认临时目录），
@@ -912,7 +912,7 @@ NSIS 及自定义安装窗口是 x86 引导组件，由系统仿真运行。更�
 - **TUN 只在隔离环境里测试**：自管模式在 CI 的 Linux runner 上、独立的网络命名空间里测试；wintun 和
   strict-route 在 Windows 测试虚拟机里验证；macOS NE 在单独的测试 Mac 或虚拟机上验证，不在开发机上运行。
   - `internal/engine/tun_linux_test.go` 有三道开关：只在 `-tags tuntest` 时编译，只在
-    `SOLARIS_TUN_TEST=1` 时运行，并且拒绝在宿主机的网络命名空间里运行。本机执行 `go test ./...`
+    `OPENWEIR_TUN_TEST=1` 时运行，并且拒绝在宿主机的网络命名空间里运行。本机执行 `go test ./...`
     不会编译它。
   - CI 的 `tun` job 建两个命名空间，用 veth 相连：`md-tun` 里以 root 运行测试，`md-srv` 里起一个 HTTP 服务。
     服务监听在 `md-srv` 回环口上的 10.201.0.1，不在 `md-tun` 的链路网段里：auto-route 让主表里比默认路由
@@ -950,8 +950,8 @@ NSIS 及自定义安装窗口是 x86 引导组件，由系统仿真运行。更�
   切换订阅时重载不断开已有连接、断开重连与服务重启、混合端口被占用和局域网连接，以及模拟宿主与真实服务对一组
   配置的判定一致；自定义分流另有用例：只有节点的订阅加方案连接、域名规则把流量导向指定节点、连接快照带规则
   条目 id、重载改方案。分流用例需要 GEO 数据，用 `scripts/fetch_geodata.py` 拉取并缓存。默认跳过，设置
-  `SOLARIS_E2E=1` 才运行；`SOLARIS_E2E_SERVICE` 可以指向已
-  构建的服务，否则测试自己 `go build`；`SOLARIS_E2E_SCREENSHOTS` 指向一个目录时保存各页截图。CI 的
+  `OPENWEIR_E2E=1` 才运行；`OPENWEIR_E2E_SERVICE` 可以指向已
+  构建的服务，否则测试自己 `go build`；`OPENWEIR_E2E_SCREENSHOTS` 指向一个目录时保存各页截图。CI 的
   `e2e` job 在 macOS runner 上先构建服务再运行。全程只用回环地址，不需要 TUN。
 - **测试覆盖**：
   - engine：配置流水线的回归测试，对应 3.3 节各项；开发模式护栏；启停与重载；50 次启停的泄漏检查；

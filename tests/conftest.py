@@ -11,12 +11,12 @@ from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuick import QQuickWindow
 from pytestqt.qtbot import QtBot
 
-from solaris.app import load_ui
-from solaris.host.base import TAKEOVER_SETTINGS
-from solaris.models import credentials
-from solaris.models.store import ProfileStore
-from solaris.viewmodels.appearance import Appearance
-from solaris.viewmodels.composition import compose
+from openweir.app import load_ui
+from openweir.host.base import TAKEOVER_SETTINGS
+from openweir.models import credentials
+from openweir.models.store import ProfileStore
+from openweir.viewmodels.appearance import Appearance
+from openweir.viewmodels.composition import compose
 from tests.support.appearance import SystemColorScheme
 from tests.support.credentials import MemoryKeyring
 from tests.support.i18n import ui_language
@@ -103,7 +103,7 @@ def loaded(
 @pytest.fixture(autouse=True)
 def isolate_crash_sources(monkeypatch: pytest.MonkeyPatch) -> None:
     """UI tests use fixture reports, never real OS reports or the installed service's home."""
-    from solaris import crashes
+    from openweir import crashes
 
     monkeypatch.setattr(crashes, "default_sources", lambda directory: [(directory, "ui")])
 

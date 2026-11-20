@@ -10,7 +10,7 @@ import (
 	LC "github.com/metacubex/mihomo/listener/config"
 	"golang.org/x/sys/unix"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/admission"
+	"github.com/openweir/app-desktop/src/core/internal/admission"
 )
 
 // These tests stand pipes in for the TUN: none of them opens a TUN or touches the

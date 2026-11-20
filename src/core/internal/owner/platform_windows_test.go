@@ -58,7 +58,7 @@ func ace(t *testing.T, entry string) string {
 }
 
 func TestSecureDir(t *testing.T) {
-	root := filepath.Join(t.TempDir(), "Solaris")
+	root := filepath.Join(t.TempDir(), "OpenWeir")
 	openUp(t, root)
 	if err := secureDir(root, ""); err != nil {
 		t.Fatal(err)

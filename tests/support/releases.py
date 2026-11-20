@@ -12,8 +12,8 @@ from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from solaris import __version__
-from solaris.update.releases import (
+from openweir import __version__
+from openweir.update.releases import (
     CHECKSUMS_NAME,
     Asset,
     Release,
@@ -21,9 +21,9 @@ from solaris.update.releases import (
     UpdateError,
     installer_name,
 )
-from solaris.update.updater import Updater
+from openweir.update.updater import Updater
 
-LATEST_PATH = "/repos/Ember-Moth/Solaris/releases/latest"
+LATEST_PATH = "/repos/openweir/app-desktop/releases/latest"
 
 
 @dataclass
@@ -58,7 +58,7 @@ class FakeGitHub:
     def release_json(self) -> dict[str, object]:
         return {
             "tag_name": self.tag,
-            "html_url": f"https://github.com/Ember-Moth/Solaris/releases/tag/{self.tag}",
+            "html_url": f"https://github.com/openweir/app-desktop/releases/tag/{self.tag}",
             "draft": False,
             "prerelease": False,
             "assets": [
@@ -150,7 +150,7 @@ def sample_github(*, newer: bool) -> Iterator[FakeGitHub]:
     with fake_github() as github:
         version = "9.0.0" if newer else __version__
         github.tag = f"v{version}"
-        name = installer_name(version) or f"Solaris-{version}-macos-universal.dmg"
+        name = installer_name(version) or f"OpenWeir-{version}-macos-universal.dmg"
         github.add(name, b"sample installer " * 200_000)
         github.add_checksums(name)
         yield github

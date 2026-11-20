@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/compose"
-	"github.com/Ember-Moth/Solaris/src/core/internal/controlpb"
+	"github.com/openweir/app-desktop/src/core/internal/compose"
+	"github.com/openweir/app-desktop/src/core/internal/controlpb"
 )
 
 // Mesh outbounds are only ever outbounds here (docs/mesh.md §4). The core runs as SYSTEM

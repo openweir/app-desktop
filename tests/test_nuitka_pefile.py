@@ -3,7 +3,7 @@ for every file, on generated ARM64 images and, on Windows, on every PE file of t
 PySide6.
 
 Needs Nuitka, which is not a project dependency, and pefile: Nuitka installs its own copy only on
-Windows. Without them the tests are skipped, unless SOLARIS_NUITKA_TESTS=1, as on CI's Windows
+Windows. Without them the tests are skipped, unless OPENWEIR_NUITKA_TESTS=1, as on CI's Windows
 runners, where the python job runs them. Elsewhere:
 
     uv run --with nuitka==4.2.2 --with pefile==2024.8.26 pytest tests/test_nuitka_pefile.py
@@ -27,7 +27,7 @@ from scripts import build_windows
 
 
 def _unavailable(reason: str) -> None:
-    if os.environ.get("SOLARIS_NUITKA_TESTS") == "1":
+    if os.environ.get("OPENWEIR_NUITKA_TESTS") == "1":
         pytest.fail(reason, pytrace=False)
     pytest.skip(reason, allow_module_level=True)
 

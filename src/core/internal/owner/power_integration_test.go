@@ -12,20 +12,20 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/admission"
-	"github.com/Ember-Moth/Solaris/src/core/internal/control"
-	"github.com/Ember-Moth/Solaris/src/core/internal/controlpb"
-	"github.com/Ember-Moth/Solaris/src/core/internal/engine"
-	"github.com/Ember-Moth/Solaris/src/core/internal/geodata/geodatatest"
-	"github.com/Ember-Moth/Solaris/src/core/internal/porttest"
-	"github.com/Ember-Moth/Solaris/src/core/internal/power"
-	"github.com/Ember-Moth/Solaris/src/core/internal/product"
+	"github.com/openweir/app-desktop/src/core/internal/admission"
+	"github.com/openweir/app-desktop/src/core/internal/control"
+	"github.com/openweir/app-desktop/src/core/internal/controlpb"
+	"github.com/openweir/app-desktop/src/core/internal/engine"
+	"github.com/openweir/app-desktop/src/core/internal/geodata/geodatatest"
+	"github.com/openweir/app-desktop/src/core/internal/porttest"
+	"github.com/openweir/app-desktop/src/core/internal/power"
+	"github.com/openweir/app-desktop/src/core/internal/product"
 )
 
 // The actual dispatcher and mihomo runtime, but no TUN and an in-memory proxy platform.
 // This verifies selected-node persistence across the exact suspend/resume path used on Windows.
 func TestWakeRestoresSelectionWithTheRealCore(t *testing.T) {
-	const childHome = "SOLARIS_OWNER_POWER_TEST_HOME"
+	const childHome = "OPENWEIR_OWNER_POWER_TEST_HOME"
 	root := os.Getenv(childHome)
 	if root == "" {
 		// mihomo's cache.db is process-global and remains open after Engine.Close.

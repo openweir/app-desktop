@@ -144,7 +144,7 @@ def build(output: Path) -> Path:
     compiler = shutil.which("cl.exe", path=environment.get("PATH"))
     if not compiler:
         raise RuntimeError("MSVC x86 compiler could not be located")
-    dll = output / "SolarisSetupUI.dll"
+    dll = output / "OpenWeirSetupUI.dll"
     # NSIS's Unicode engine is x86 for both x64 and ARM64 application packages.
     command = [
         compiler,
@@ -165,16 +165,16 @@ def build(output: Path) -> Path:
         "/LD",
         str(SOURCE / "setup_ui.cpp"),
         f"/Fo{output / 'setup_ui.obj'}",
-        f"/Fd{output / 'SolarisSetupUI.compile.pdb'}",
+        f"/Fd{output / 'OpenWeirSetupUI.compile.pdb'}",
         f"/Fe{dll}",
         "/link",
         f"/DEF:{SOURCE / 'setup_ui.def'}",
         "/MACHINE:X86",
         "/INCREMENTAL:NO",
         "/DEBUG:FULL",
-        f"/PDB:{output / 'SolarisSetupUI.pdb'}",
+        f"/PDB:{output / 'OpenWeirSetupUI.pdb'}",
         "/PDBALTPATH:%_PDB%",
-        f"/IMPLIB:{output / 'SolarisSetupUI.lib'}",
+        f"/IMPLIB:{output / 'OpenWeirSetupUI.lib'}",
         "user32.lib",
         "gdi32.lib",
         "gdiplus.lib",
@@ -224,15 +224,15 @@ def build_preview(plugin: Path, makensis: Path, arch: str = "x64") -> Path:
     version = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"][
         "version"
     ]
-    executable = plugin.parent / "Solaris-setup-preview.exe"
+    executable = plugin.parent / "OpenWeir-setup-preview.exe"
     defines = {
         "APP_VERSION": version,
         "APP_ARCH": arch,
         "OUTPUT_FILE": executable,
-        "APP_ICON": ROOT / "package/icons/solaris.ico",
+        "APP_ICON": ROOT / "package/icons/openweir.ico",
         "INSTALLER_UI_DIR": plugin.parent,
         "INSTALLER_UI_INCLUDE": SOURCE / "interface.nsh",
-        "INSTALLER_FONTS": ROOT / "src/solaris/ui/fonts",
+        "INSTALLER_FONTS": ROOT / "src/openweir/ui/fonts",
         "INSTALLER_LICENSE": ROOT / "LICENSE",
     }
 

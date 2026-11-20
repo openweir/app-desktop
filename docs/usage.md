@@ -1,21 +1,21 @@
 # 使用指南
 
-Solaris 管理你提供的代理订阅和 mihomo 配置，不提供代理账户或节点。
+OpenWeir 管理你提供的代理订阅和 mihomo 配置，不提供代理账户或节点。
 
 ## 安装
 
-从 [GitHub Releases](https://github.com/Ember-Moth/Solaris/releases) 下载适合系统的安装包：
+从 [GitHub Releases](https://github.com/openweir/app-desktop/releases) 下载适合系统的安装包：
 
 | 系统 | 安装包 |
 | --- | --- |
-| macOS 26 及以上，Apple Silicon / Intel x64 | `Solaris-<版本>-macos-universal.dmg` |
-| Windows 10 / 11，x64 | `Solaris-<版本>-windows-x64-setup.exe` |
-| Windows 11，ARM64 | `Solaris-<版本>-windows-arm64-setup.exe` |
+| macOS 26 及以上，Apple Silicon / Intel x64 | `OpenWeir-<版本>-macos-universal.dmg` |
+| Windows 10 / 11，x64 | `OpenWeir-<版本>-windows-x64-setup.exe` |
+| Windows 11，ARM64 | `OpenWeir-<版本>-windows-arm64-setup.exe` |
 
-macOS：打开 DMG，将 Solaris 拖入「应用程序」。首次连接时按提示允许网络扩展并添加 VPN 配置。
+macOS：打开 DMG，将 OpenWeir 拖入「应用程序」。首次连接时按提示允许网络扩展并添加 VPN 配置。
 
-Windows：运行安装程序并允许管理员授权，授权提示里的发布者应是 Herta Network LLC。首次安装可选择安装位置，
-默认是 `C:\Program Files\Solaris`。日常使用无需以管理员身份打开 Solaris。SmartScreen 若提示「Windows 已保护你的电脑」，
+Windows：运行安装程序并允许管理员授权，授权提示里的发布者应是 OpenWeir。首次安装可选择安装位置，
+默认是 `C:\Program Files\OpenWeir`。日常使用无需以管理员身份打开 OpenWeir。SmartScreen 若提示「Windows 已保护你的电脑」，
 点「更多信息」核对发布者后再运行；发布附件中的 `SHA256SUMS` 可用于核对文件。
 
 ## 第一次连接
@@ -79,13 +79,13 @@ WARP 需要注册账户，VPN Gate 依赖其志愿者服务器。添加出口本
 
 ## 关闭窗口、退出与断开
 
-关闭窗口默认把 Solaris 留在托盘（macOS 上是菜单栏），连接继续运行。macOS 上窗口关闭后 Solaris 不在 Dock 中显示，
-从菜单栏图标选「打开主窗口」即可回到窗口。在「设置」里可以把关闭窗口改为「退出 Solaris」。
+关闭窗口默认把 OpenWeir 留在托盘（macOS 上是菜单栏），连接继续运行。macOS 上窗口关闭后 OpenWeir 不在 Dock 中显示，
+从菜单栏图标选「打开主窗口」即可回到窗口。在「设置」里可以把关闭窗口改为「退出 OpenWeir」。
 
 ![「设置」页：接管方式、界面、备份与同步，右侧有「关闭窗口时」等启动选项](images/settings-light.png)
 
-从托盘或菜单栏选「退出 Solaris」、在 macOS 上按 ⌘Q 或在 Dock 中退出，都会先断开连接，再退出应用。退出后不会自动重连，
-包括睡眠唤醒之后；下次打开 Solaris 后手动连接。断开失败时会询问重试还是仍然退出；仍然退出时，隧道可能仍在运行。
+从托盘或菜单栏选「退出 OpenWeir」、在 macOS 上按 ⌘Q 或在 Dock 中退出，都会先断开连接，再退出应用。退出后不会自动重连，
+包括睡眠唤醒之后；下次打开 OpenWeir 后手动连接。断开失败时会询问重试还是仍然退出；仍然退出时，隧道可能仍在运行。
 
 需要界面运行的自动任务会在退出后暂停，例如订阅和 GEO 数据更新。下次打开时会检查需要处理的更新。
 
@@ -107,7 +107,7 @@ WARP 需要注册账户，VPN Gate 依赖其志愿者服务器。添加出口本
 Windows 升级沿用已有安装位置；Windows on ARM 使用 ARM64 安装包。
 
 Windows 从「设置 → 应用」卸载，默认保留订阅、设置和日志，也可选择清除。
-macOS 卸载前先在 Solaris 设置中停用系统扩展，再删除应用。
+macOS 卸载前先在 OpenWeir 设置中停用系统扩展，再删除应用。
 
 ## 常见问题
 
@@ -116,18 +116,18 @@ macOS 卸载前先在 Solaris 设置中停用系统扩展，再删除应用。
 | macOS 无法连接，提示需要授权 | 按应用提示到系统设置允许网络扩展，确认 VPN 配置，再重试 |
 | Windows 提示后台服务不可用 | 使用对应架构的完整安装包重新安装；保留安装器显示的错误，勿仅替换某个 DLL |
 | 开着系统代理时 Microsoft Store 等应用打不开 | 这类应用默认不能访问本机回环地址，而系统代理指向本机。在「设置 → 接管方式」保持 TUN 开启、关闭系统代理即可；新安装默认就是这样 |
-| 升级提示文件占用或架构不一致 | 关闭正在使用 Solaris 文件的程序后重试；仍失败时提交错误信息，不手动混用不同架构的文件 |
+| 升级提示文件占用或架构不一致 | 关闭正在使用 OpenWeir 文件的程序后重试；仍失败时提交错误信息，不手动混用不同架构的文件 |
 | TCP 测速成功，但网页打不开 | 再做 HTTP 测速，检查模式、策略组、规则和节点认证信息 |
 | 游戏或语音通话不经过代理 | Windows 上开启 TUN 模式；在「连接」页筛选 UDP，链路显示 `DIRECT` 时换用支持 UDP 的节点 |
 | 导入后仍使用旧节点 | 确认正在使用该订阅的规则，或已将它加入「我的方案」节点池 |
-| 退出后网络仍经代理 | 退出时断开失败并选了仍然退出，或界面意外关闭。重新打开 Solaris，使用「断开」停止连接 |
+| 退出后网络仍经代理 | 退出时断开失败并选了仍然退出，或界面意外关闭。重新打开 OpenWeir，使用「断开」停止连接 |
 | 没有 Google Drive 入口 | 该安装包未提供此功能；可使用本地备份，macOS 还可使用 iCloud |
 
 Tor 出口暂未实现。链式出口和组网功能还需要对应服务或网络的账户、授权与可用连接。
 
 ## 反馈问题
 
-在 [GitHub Issues](https://github.com/Ember-Moth/Solaris/issues) 中说明系统与架构、Solaris 版本、操作步骤、预期结果
+在 [GitHub Issues](https://github.com/openweir/app-desktop/issues) 中说明系统与架构、OpenWeir 版本、操作步骤、预期结果
 和实际错误。可从「设置 → 关于」导出诊断信息；分享前检查其中的域名、节点名和错误内容。
 原始崩溃报告单独导出，不会自动上传。
 

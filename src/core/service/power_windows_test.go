@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/power"
+	"github.com/openweir/app-desktop/src/core/internal/power"
 )
 
 // Register for process-local notifications only; never put the CI runner to sleep.

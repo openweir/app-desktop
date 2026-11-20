@@ -15,7 +15,7 @@ import (
 
 	"google.golang.org/protobuf/encoding/protowire"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/controlpb"
+	"github.com/openweir/app-desktop/src/core/internal/controlpb"
 )
 
 // Both GeoSiteList and GeoIPList hold their entries in field 1, and each entry its

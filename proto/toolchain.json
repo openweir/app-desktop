@@ -10,6 +10,10 @@
       "name": "protoc-33.4-osx-x86_64.zip",
       "sha256": "a49bec10d039e902d3b43e49938c42526f90011467609864fa6386ac4014da58"
     },
+    "linux-arm64": {
+      "name": "protoc-33.4-linux-aarch_64.zip",
+      "sha256": "15aa988f4a6090636525ec236a8e4b3aab41eef402751bd5bb2df6afd9b7b5a5"
+    },
     "linux-x86_64": {
       "name": "protoc-33.4-linux-x86_64.zip",
       "sha256": "c0040ea9aef08fdeb2c74ca609b18d5fdbfc44ea0042fcfbfb38860d35f7dd66"

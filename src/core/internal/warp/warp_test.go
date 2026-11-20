@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/controlpb"
+	"github.com/openweir/app-desktop/src/core/internal/controlpb"
 )
 
 // cloudflare stands in for the registration API on loopback; no test reaches the real one.

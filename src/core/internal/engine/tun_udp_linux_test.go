@@ -3,7 +3,7 @@
 package engine
 
 // UDP through the TUN, the way games and QUIC take it: the owned-TUN and fd-mode tests send
-// datagrams from this process to SOLARIS_TUN_UDP_TARGET, an echo server in md-srv that the
+// datagrams from this process to OPENWEIR_TUN_UDP_TARGET, an echo server in md-srv that the
 // routes reach through the TUN, first DIRECT and then through a node. The sizes go past the
 // veth's MTU and past the TUN's own, so IP fragments meet mihomo's stack both ways.
 
@@ -21,18 +21,18 @@ import (
 	"github.com/metacubex/mihomo/listener"
 	"golang.org/x/sys/unix"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/admission"
+	"github.com/openweir/app-desktop/src/core/internal/admission"
 )
 
 func udpTarget(t *testing.T) netip.AddrPort {
 	t.Helper()
-	value := os.Getenv("SOLARIS_TUN_UDP_TARGET")
+	value := os.Getenv("OPENWEIR_TUN_UDP_TARGET")
 	if value == "" {
-		t.Fatal("SOLARIS_TUN_UDP_TARGET names the UDP echo server outside the namespace")
+		t.Fatal("OPENWEIR_TUN_UDP_TARGET names the UDP echo server outside the namespace")
 	}
 	target, err := netip.ParseAddrPort(value)
 	if err != nil {
-		t.Fatalf("SOLARIS_TUN_UDP_TARGET: %v", err)
+		t.Fatalf("OPENWEIR_TUN_UDP_TARGET: %v", err)
 	}
 	return target
 }

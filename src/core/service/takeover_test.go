@@ -7,10 +7,10 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/control"
-	"github.com/Ember-Moth/Solaris/src/core/internal/controlpb"
-	"github.com/Ember-Moth/Solaris/src/core/internal/frame"
-	"github.com/Ember-Moth/Solaris/src/core/internal/product"
+	"github.com/openweir/app-desktop/src/core/internal/control"
+	"github.com/openweir/app-desktop/src/core/internal/controlpb"
+	"github.com/openweir/app-desktop/src/core/internal/frame"
+	"github.com/openweir/app-desktop/src/core/internal/product"
 )
 
 // answer serves one request on conn with response, and hands back the request.

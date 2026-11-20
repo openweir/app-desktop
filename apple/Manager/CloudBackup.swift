@@ -1,9 +1,9 @@
 import CloudKit
 import Foundation
 import Security
-import SolarisManagerHeader
+import OpenWeirManagerHeader
 
-private let containerIdentifier = "iCloud.dev.tschen.solaris"
+private let containerIdentifier = "iCloud." + appBundleIdentifier
 /// The record type of a snapshot, with the string field `info` and the asset field `snapshot`.
 /// The container's production schema has to define it (apple/README.md).
 private let recordType = "Snapshot"
@@ -26,9 +26,9 @@ final class CloudBackup {
     container = hasContainerEntitlement() ? CKContainer(identifier: containerIdentifier) : nil
   }
 
-  /// A SOLARIS_ICLOUD_ value from SolarisManager.h.
+  /// A OPENWEIR_ICLOUD_ value from OpenWeirManager.h.
   func status(timeout: TimeInterval) throws -> Int {
-    guard let container else { return SOLARIS_ICLOUD_UNSUPPORTED }
+    guard let container else { return OPENWEIR_ICLOUD_UNSUPPORTED }
     let action = "read the iCloud account status"
     let status: CKAccountStatus
     do {
@@ -43,12 +43,12 @@ final class CloudBackup {
       throw managerError(error, action)
     }
     switch status {
-    case .available: return SOLARIS_ICLOUD_AVAILABLE
-    case .noAccount: return SOLARIS_ICLOUD_NO_ACCOUNT
-    case .restricted: return SOLARIS_ICLOUD_RESTRICTED
-    case .temporarilyUnavailable: return SOLARIS_ICLOUD_TEMPORARILY_UNAVAILABLE
-    case .couldNotDetermine: return SOLARIS_ICLOUD_COULD_NOT_DETERMINE
-    @unknown default: return SOLARIS_ICLOUD_COULD_NOT_DETERMINE
+    case .available: return OPENWEIR_ICLOUD_AVAILABLE
+    case .noAccount: return OPENWEIR_ICLOUD_NO_ACCOUNT
+    case .restricted: return OPENWEIR_ICLOUD_RESTRICTED
+    case .temporarilyUnavailable: return OPENWEIR_ICLOUD_TEMPORARILY_UNAVAILABLE
+    case .couldNotDetermine: return OPENWEIR_ICLOUD_COULD_NOT_DETERMINE
+    @unknown default: return OPENWEIR_ICLOUD_COULD_NOT_DETERMINE
     }
   }
 
@@ -57,7 +57,7 @@ final class CloudBackup {
     let record = CKRecord(recordType: recordType, recordID: try recordID(name))
     // An asset uploads from a file, which has to stay until the save is over.
     let file = FileManager.default.temporaryDirectory.appendingPathComponent(
-      "solaris-\(UUID().uuidString).json")
+      "openweir-\(UUID().uuidString).json")
     do {
       try snapshot.write(to: file)
     } catch {
@@ -106,7 +106,7 @@ final class CloudBackup {
           }
           operation.queryResultBlock = { done($0) }
         }
-      } catch let error as ManagerError where error.result == SOLARIS_MANAGER_NOT_FOUND {
+      } catch let error as ManagerError where error.result == OPENWEIR_MANAGER_NOT_FOUND {
         // A query on a record type the schema lacks reports an unknown item.
         throw ManagerError.failed(
           "The iCloud container has no \(recordType) record type; deploy its schema")
@@ -159,14 +159,14 @@ final class CloudBackup {
           done(failure.map { .failure($0) } ?? result)
         }
       }
-    } catch let error as ManagerError where error.result == SOLARIS_MANAGER_NOT_FOUND {
+    } catch let error as ManagerError where error.result == OPENWEIR_MANAGER_NOT_FOUND {
       return  // gone already
     }
   }
 
   private func privateDatabase() throws -> CKDatabase {
     guard let container else {
-      throw ManagerError.failed("This build of Solaris is not signed for iCloud")
+      throw ManagerError.failed("This build of OpenWeir is not signed for iCloud")
     }
     return container.privateCloudDatabase
   }

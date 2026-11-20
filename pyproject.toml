@@ -1,7 +1,7 @@
 [project]
-name = "solaris"
-version = "1.4.0"
-description = "Solaris, a mihomo desktop client for Windows and macOS (PySide6 / QML)"
+name = "openweir"
+version = "0.1.0"
+description = "OpenWeir, a mihomo desktop client for Windows and macOS (PySide6 / QML)"
 readme = "README.md"
 license = "GPL-3.0-only"
 license-files = ["LICENSE"]
@@ -17,14 +17,14 @@ dependencies = [
 ]
 
 [project.scripts]
-solaris = "solaris.bootstrap:main"
+openweir = "openweir.bootstrap:main"
 
 [build-system]
 requires = ["uv_build>=0.13.6,<0.14.0"]
 build-backend = "uv_build"
 
 [tool.uv.build-backend]
-module-name = "solaris"
+module-name = "openweir"
 module-root = "src"
 
 [dependency-groups]
@@ -38,7 +38,7 @@ dev = [
 ]
 
 [tool.ruff]
-extend-exclude = ["src/solaris/protocol/*_pb2.py", "src/solaris/protocol/*_pb2.pyi"]
+extend-exclude = ["src/openweir/protocol/*_pb2.py", "src/openweir/protocol/*_pb2.pyi"]
 target-version = "py314"
 line-length = 100
 src = ["src", "tests", "package", "scripts"]
@@ -57,12 +57,12 @@ select = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["solaris", "scripts", "tests"]
+known-first-party = ["openweir", "scripts", "tests"]
 
 [tool.ruff.lint.per-file-ignores]
 # Qt-facing API on ViewModels (slots, signals, properties) is camelCase to match QML;
 # their Chinese UI copy uses fullwidth punctuation.
-"src/solaris/viewmodels/**" = ["N802", "N815", "RUF001"]
+"src/openweir/viewmodels/**" = ["N802", "N815", "RUF001"]
 # Sample tables read better one row per line.
 "tests/support/simulated.py" = ["E501"]
 # Nuitka reads each `# nuitka-project:` option from a single comment line.
@@ -72,7 +72,7 @@ known-first-party = ["solaris", "scripts", "tests"]
 docstring-code-format = true
 
 [tool.pyright]
-exclude = ["src/solaris/protocol/*_pb2.py"]
+exclude = ["src/openweir/protocol/*_pb2.py"]
 include = ["src", "tests", "package", "scripts"]
 pythonVersion = "3.14"
 venvPath = "."
@@ -85,5 +85,5 @@ pythonpath = ["."]
 qt_api = "pyside6"
 addopts = "-ra --strict-markers"
 markers = [
-    "e2e: runs the UI against the development service; needs SOLARIS_E2E=1 (tests/e2e)",
+    "e2e: runs the UI against the development service; needs OPENWEIR_E2E=1 (tests/e2e)",
 ]

@@ -10,7 +10,7 @@ import (
 )
 
 func TestWatchdogTerminatesOnlyItsChild(t *testing.T) {
-	const child = "SOLARIS_WATCHDOG_TEST_CHILD"
+	const child = "OPENWEIR_WATCHDOG_TEST_CHILD"
 	if os.Getenv(child) == "1" {
 		executor := New(1, Terminate)
 		_, _ = Run(executor, context.Background(), "test_mutation", 20*time.Millisecond, 0,

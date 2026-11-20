@@ -10,13 +10,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/admission"
-	"github.com/Ember-Moth/Solaris/src/core/internal/control"
-	"github.com/Ember-Moth/Solaris/src/core/internal/controlpb"
-	"github.com/Ember-Moth/Solaris/src/core/internal/engine"
-	"github.com/Ember-Moth/Solaris/src/core/internal/geodata"
-	"github.com/Ember-Moth/Solaris/src/core/internal/operation"
-	"github.com/Ember-Moth/Solaris/src/core/internal/peer"
+	"github.com/openweir/app-desktop/src/core/internal/admission"
+	"github.com/openweir/app-desktop/src/core/internal/control"
+	"github.com/openweir/app-desktop/src/core/internal/controlpb"
+	"github.com/openweir/app-desktop/src/core/internal/engine"
+	"github.com/openweir/app-desktop/src/core/internal/geodata"
+	"github.com/openweir/app-desktop/src/core/internal/operation"
+	"github.com/openweir/app-desktop/src/core/internal/peer"
 )
 
 // session is one attached tunnel: an engine in fd mode and its dispatcher.

@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/operation"
+	"github.com/openweir/app-desktop/src/core/internal/operation"
 )
 
 // A UI can disappear between bringing up NE and sending its configuration. Do not

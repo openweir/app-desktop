@@ -99,7 +99,7 @@ def test_components_see_their_own_search_field() -> None:
     """QtQuick.Controls has a SearchField of its own since Qt 6.10, which outranks the one
     beside a component that imports the module, unless the directory is imported after it
     (docs/ui.md §0). qmllint takes either."""
-    components = Path(__file__).resolve().parents[1] / "src/solaris/ui/components"
+    components = Path(__file__).resolve().parents[1] / "src/openweir/ui/components"
     hidden = [
         path.name
         for path in sorted(components.glob("*.qml"))

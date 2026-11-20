@@ -12,7 +12,7 @@ import (
 	"github.com/metacubex/tailscale/tsnet"
 	"github.com/metacubex/tailscale/types/key"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/controlpb"
+	"github.com/openweir/app-desktop/src/core/internal/controlpb"
 )
 
 // The Tailscale probe reads v1.19.33's fields, and leaves an outbound that has not started

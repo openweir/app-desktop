@@ -115,7 +115,7 @@ def install() -> None:
 
 
 class PEFileDependencies(NuitkaPluginBase):
-    plugin_name = "solaris-pefile-dependencies"
+    plugin_name = "openweir-pefile-dependencies"
     plugin_desc = "Scan DLL dependencies with pefile, each file once and only its imports."
 
     def __init__(self) -> None:

@@ -19,9 +19,9 @@ import (
 	"github.com/metacubex/mihomo/component/geodata/router"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/admission"
-	"github.com/Ember-Moth/Solaris/src/core/internal/controlpb"
-	"github.com/Ember-Moth/Solaris/src/core/internal/porttest"
+	"github.com/openweir/app-desktop/src/core/internal/admission"
+	"github.com/openweir/app-desktop/src/core/internal/controlpb"
+	"github.com/openweir/app-desktop/src/core/internal/porttest"
 )
 
 func startGeo(t *testing.T) (*Engine, *controlpb.GetGeoUpdateResponse) {

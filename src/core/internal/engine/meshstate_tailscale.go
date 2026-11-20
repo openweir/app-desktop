@@ -13,7 +13,7 @@ import (
 	"github.com/metacubex/tailscale/ipn/ipnstate"
 	"github.com/metacubex/tailscale/tsnet"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/controlpb"
+	"github.com/openweir/app-desktop/src/core/internal/controlpb"
 )
 
 // tailscaleClient is the outbound's tsnet LocalAPI once its backend has come up. Before

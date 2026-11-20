@@ -11,16 +11,16 @@ from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuick import QQuickWindow
 from pytestqt.qtbot import QtBot
 
+from openweir.app import load_ui
+from openweir.host.base import TAKEOVER_NONE
+from openweir.host.service import ServiceHost
+from openweir.models.profiles import KIND_FILE, Profile, ProfileList
+from openweir.models.routing import MODE_PROFILE, RoutingStore
+from openweir.models.settings import DatabaseSettingsStore
+from openweir.models.store import ProfileStore
+from openweir.models.subscription import UrlFetcher
+from openweir.viewmodels.composition import compose
 from scripts.dev import DevService
-from solaris.app import load_ui
-from solaris.host.base import TAKEOVER_NONE
-from solaris.host.service import ServiceHost
-from solaris.models.profiles import KIND_FILE, Profile, ProfileList
-from solaris.models.routing import MODE_PROFILE, RoutingStore
-from solaris.models.settings import DatabaseSettingsStore
-from solaris.models.store import ProfileStore
-from solaris.models.subscription import UrlFetcher
-from solaris.viewmodels.composition import compose
 from tests.e2e.app import DIRECT_PROFILE, App, Network
 from tests.e2e.servers import free_port
 from tests.e2e.unix import unix_opener

@@ -12,8 +12,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/Ember-Moth/Solaris/src/core/internal/product"
 )
 
 // certificate is a self-signed DER certificate for commonName with the given extended key
@@ -54,39 +52,45 @@ func identifier(t *testing.T, dotted string) asn1.ObjectIdentifier {
 
 var codeSigning = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 3, 3}
 
+// A release's signer, as a signed build links into product.WindowsSigner and WindowsSignerEKU.
+const (
+	testSigner    = "OpenWeir"
+	testSignerEKU = "1.3.6.1.4.1.311.97.0"
+)
+
 func TestSignerNeedsTheNameAndTheProfilesUsage(t *testing.T) {
-	release := Signer{Name: product.WindowsSigner, EKU: product.WindowsSignerEKU}
-	profile := identifier(t, product.WindowsSignerEKU)
+	release := Signer{Name: testSigner, EKU: testSignerEKU}
+	profile := identifier(t, testSignerEKU)
 	// As Artifact Signing issues them: code signing and the certificate profile's own usage.
-	ours := certificate(t, product.WindowsSigner, codeSigning, profile)
-	if err := release.check(product.WindowsSigner, ours); err != nil {
-		t.Fatalf("Solaris's certificate: %v", err)
+	ours := certificate(t, testSigner, codeSigning, profile)
+	if err := release.check(testSigner, ours); err != nil {
+		t.Fatalf("OpenWeir's certificate: %v", err)
 	}
 	// Another organization verified under the same name gets its own profile's usage.
-	namesake := certificate(t, product.WindowsSigner, codeSigning, identifier(t, "1.3.6.1.4.1.311.97.1.2.3.4"))
-	if err := release.check(product.WindowsSigner, namesake); err == nil || !strings.Contains(err.Error(), "without the extended key usage") {
+	namesake := certificate(t, testSigner, codeSigning, identifier(t, "1.3.6.1.4.1.311.97.1.2.3.4"))
+	if err := release.check(testSigner, namesake); err == nil || !strings.Contains(err.Error(), "without the extended key usage") {
 		t.Fatalf("a namesake's certificate: %v", err)
 	}
-	if err := release.check(product.WindowsSigner, certificate(t, product.WindowsSigner)); err == nil {
+	if err := release.check(testSigner, certificate(t, testSigner)); err == nil {
 		t.Fatal("accepted a certificate without extended key usages")
 	}
-	if err := release.check("Someone Else", ours); err == nil || !strings.Contains(err.Error(), `not "Herta Network LLC"`) {
+	if err := release.check("Someone Else", ours); err == nil || !strings.Contains(err.Error(), `not "OpenWeir"`) {
 		t.Fatalf("another signer: %v", err)
 	}
-	if err := release.check(product.WindowsSigner, []byte("not a certificate")); err == nil {
+	if err := release.check(testSigner, []byte("not a certificate")); err == nil {
 		t.Fatal("accepted what is not a certificate")
 	}
 }
 
 func TestExtendedKeyUsages(t *testing.T) {
-	usages, err := extendedKeyUsages(certificate(t, "Solaris", codeSigning, identifier(t, product.WindowsSignerEKU)))
+	usages, err := extendedKeyUsages(certificate(t, "OpenWeir", codeSigning, identifier(t, testSignerEKU)))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := []string{"1.3.6.1.5.5.7.3.3", product.WindowsSignerEKU}; !slices.Equal(usages, want) {
+	if want := []string{"1.3.6.1.5.5.7.3.3", testSignerEKU}; !slices.Equal(usages, want) {
 		t.Fatalf("usages = %v, want %v", usages, want)
 	}
-	if usages, err := extendedKeyUsages(certificate(t, "Solaris")); err != nil || usages != nil {
+	if usages, err := extendedKeyUsages(certificate(t, "OpenWeir")); err != nil || usages != nil {
 		t.Fatalf("without the extension: %v, %v", usages, err)
 	}
 }

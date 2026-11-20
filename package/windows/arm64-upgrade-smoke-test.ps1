@@ -22,14 +22,14 @@ public static class MigrationArchitecture {
 if (-not [MigrationArchitecture]::IsArm64()) { throw 'The migration test needs native ARM64 Windows.' }
 $X64Installer = (Resolve-Path -LiteralPath $X64Installer).Path
 $ARM64Installer = (Resolve-Path -LiteralPath $ARM64Installer).Path
-$root = Join-Path $env:SystemDrive 'Solaris CI Migration'
-$client = Join-Path $root 'Solaris.exe'
-$serviceBinary = Join-Path $root 'solaris-service.exe'
+$root = Join-Path $env:SystemDrive 'OpenWeir CI Migration'
+$client = Join-Path $root 'OpenWeir.exe'
+$serviceBinary = Join-Path $root 'openweir-service.exe'
 $uninstaller = Join-Path $root 'uninstall.exe'
-$key = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Solaris'
-$userData = Join-Path $env:LOCALAPPDATA 'Solaris'
-$serviceData = Join-Path $env:ProgramData 'Solaris'
-if ((Test-Path $root) -or (Test-Path $key) -or (Get-Service SolarisService -ErrorAction SilentlyContinue) -or
+$key = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\OpenWeir'
+$userData = Join-Path $env:LOCALAPPDATA 'OpenWeir'
+$serviceData = Join-Path $env:ProgramData 'OpenWeir'
+if ((Test-Path $root) -or (Test-Path $key) -or (Get-Service OpenWeirService -ErrorAction SilentlyContinue) -or
     (Test-Path $userData) -or (Test-Path $serviceData)) { throw 'The migration test needs a fresh runner.' }
 
 function Run-Installer([string] $Executable, [string] $Arguments, [int] $ExpectedExit = 0) {
@@ -39,7 +39,7 @@ function Run-Installer([string] $Executable, [string] $Arguments, [int] $Expecte
         $null = $setupProcess.Handle
         if (-not $setupProcess.WaitForExit(300000)) { $setupProcess.Kill(); throw 'Installer timed out' }
         if ($setupProcess.ExitCode -ne $ExpectedExit) {
-            $errorLog = Join-Path $env:TEMP 'Solaris-setup-error.log'
+            $errorLog = Join-Path $env:TEMP 'OpenWeir-setup-error.log'
             if (Test-Path $errorLog) { Get-Content -LiteralPath $errorLog | Write-Output }
             throw "Installer returned $($setupProcess.ExitCode), expected $ExpectedExit"
         }
@@ -66,7 +66,7 @@ function Assert-Architecture([string] $Architecture, [int] $Machine) {
         Write-Output ('{0}: machine 0x{1:X4}, expected 0x{2:X4}' -f $file, $actual, $Machine)
         if ($actual -ne $Machine) { throw "Unexpected architecture: $file" }
     }
-    $service = Get-CimInstance Win32_Service -Filter "Name='SolarisService'"
+    $service = Get-CimInstance Win32_Service -Filter "Name='OpenWeirService'"
     if (-not $service -or $service.State -ne 'Running' -or $service.StartName -ne 'LocalSystem' -or
         $service.PathName -ne "`"$serviceBinary`"") { throw 'The expected system service is not running' }
     $log = Get-Content -LiteralPath (Join-Path $serviceData 'service.log') -Raw
@@ -113,8 +113,8 @@ try {
     [IO.File]::Copy((Join-Path $root 'libcronet.dll'), $staleRuntime)
     Write-Output 'Checking that mixed architecture residue blocks service startup.'
     Run-Installer $ARM64Installer '/S' 1603
-    if ((Get-Service SolarisService).Status -ne 'Stopped') { throw 'A mixed runtime started the service.' }
-    $errorLog = Join-Path $env:TEMP 'Solaris-setup-error.log'
+    if ((Get-Service OpenWeirService).Status -ne 'Stopped') { throw 'A mixed runtime started the service.' }
+    $errorLog = Join-Path $env:TEMP 'OpenWeir-setup-error.log'
     if (-not (Test-Path $staleRuntime) -or
         -not ([IO.File]::ReadAllText($errorLog, [Text.Encoding]::Unicode).Contains('ci-stale-x64.dll'))) {
         throw 'The mixed architecture failure did not preserve and identify the foreign DLL.'
@@ -154,7 +154,7 @@ try {
         }
     }
     if ((Test-Path $key) -or (Test-Path $userData) -or (Test-Path $serviceData) -or
-        (Get-Service SolarisService -ErrorAction SilentlyContinue)) { throw 'Migration cleanup left application state behind' }
+        (Get-Service OpenWeirService -ErrorAction SilentlyContinue)) { throw 'Migration cleanup left application state behind' }
     Write-Output 'x64 to ARM64 migration passed: native payload, running service/GUI, preserved data and clean uninstall.'
 } catch {
     if (Test-Path -LiteralPath $uninstaller) {

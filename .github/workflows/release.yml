@@ -1,6 +1,6 @@
 name: Release
 
-# The signed and notarized macOS build (apple/README.md): Solaris.app from scripts/build_app.py,
+# The signed and notarized macOS build (apple/README.md): OpenWeir.app from scripts/build_app.py,
 # notarized and stapled, in a notarized disk image with its SHA-256. And the Windows installers
 # from scripts/build_windows.py, signed with Azure Artifact Signing (D42), with their SHA-256.
 # Runs for v* tags and by hand, in the release environment: its reviewers approve each run
@@ -28,6 +28,9 @@ jobs:
     # The app needs macOS 26 (D28), so the release is built and checked on that system.
     runs-on: macos-26
     environment: release
+    env:
+      # product.json leaves the signing identities empty; the release sets them (D47).
+      OPENWEIR_APPLE_TEAM_ID: ${{ vars.OPENWEIR_APPLE_TEAM_ID }}
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v7
@@ -58,7 +61,7 @@ jobs:
             exit 1
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "dmg=Solaris-$version-macos-universal.dmg" >> "$GITHUB_OUTPUT"
+          echo "dmg=OpenWeir-$version-macos-universal.dmg" >> "$GITHUB_OUTPUT"
 
       # A keychain of its own holds the certificate; the two profiles go where Xcode and
       # scripts/build_apple.py look for them by name. The build checks the rest: the identity
@@ -66,7 +69,6 @@ jobs:
       # app may install system extensions and the extension may be a packet tunnel.
       - name: Signing materials
         env:
-          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
           MACOS_CERTIFICATE_NAME: ${{ vars.MACOS_CERTIFICATE_NAME }}
           MACOS_CERTIFICATE_BASE64: ${{ secrets.MACOS_CERTIFICATE_BASE64 }}
           MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
@@ -78,11 +80,11 @@ jobs:
           signing="$RUNNER_TEMP/signing"
           mkdir -m 700 "$signing"
           echo "SIGNING=$signing" >> "$GITHUB_ENV"
-          if ! grep -qx "TEAM = \"$APPLE_TEAM_ID\"" scripts/build_apple.py; then
-            echo "::error::APPLE_TEAM_ID is not the team in scripts/build_apple.py"
+          if [[ ! "$OPENWEIR_APPLE_TEAM_ID" =~ ^[A-Z0-9]{10}$ ]]; then
+            echo "::error::set the OPENWEIR_APPLE_TEAM_ID variable to the Developer ID team"
             exit 1
           fi
-          if [[ "$MACOS_CERTIFICATE_NAME" != "Developer ID Application: "*" ($APPLE_TEAM_ID)" ]]; then
+          if [[ "$MACOS_CERTIFICATE_NAME" != "Developer ID Application: "*" ($OPENWEIR_APPLE_TEAM_ID)" ]]; then
             echo "::error::MACOS_CERTIFICATE_NAME is not a Developer ID Application certificate of the team"
             exit 1
           fi
@@ -130,10 +132,10 @@ jobs:
       # build bundles it, and a build without one has no Google Drive backup.
       - name: Google OAuth client
         env:
-          SOLARIS_GOOGLE_CLIENT_ID: ${{ secrets.SOLARIS_GOOGLE_CLIENT_ID }}
-          SOLARIS_GOOGLE_CLIENT_SECRET: ${{ secrets.SOLARIS_GOOGLE_CLIENT_SECRET }}
+          OPENWEIR_GOOGLE_CLIENT_ID: ${{ secrets.OPENWEIR_GOOGLE_CLIENT_ID }}
+          OPENWEIR_GOOGLE_CLIENT_SECRET: ${{ secrets.OPENWEIR_GOOGLE_CLIENT_SECRET }}
         run: |
-          if [[ -z "$SOLARIS_GOOGLE_CLIENT_ID" || -z "$SOLARIS_GOOGLE_CLIENT_SECRET" ]]; then
+          if [[ -z "$OPENWEIR_GOOGLE_CLIENT_ID" || -z "$OPENWEIR_GOOGLE_CLIENT_SECRET" ]]; then
             echo "::warning::No Google OAuth client in the release environment; this app has no Google Drive backup."
           fi
 
@@ -143,10 +145,10 @@ jobs:
             sudo softwareupdate --install-rosetta --agree-to-license
           fi
 
-      - name: Build and sign Solaris.app
+      - name: Build and sign OpenWeir.app
         env:
-          SOLARIS_GOOGLE_CLIENT_ID: ${{ secrets.SOLARIS_GOOGLE_CLIENT_ID }}
-          SOLARIS_GOOGLE_CLIENT_SECRET: ${{ secrets.SOLARIS_GOOGLE_CLIENT_SECRET }}
+          OPENWEIR_GOOGLE_CLIENT_ID: ${{ secrets.OPENWEIR_GOOGLE_CLIENT_ID }}
+          OPENWEIR_GOOGLE_CLIENT_SECRET: ${{ secrets.OPENWEIR_GOOGLE_CLIENT_SECRET }}
         run: uv run --frozen --with nuitka==4.2.2 python scripts/build_app.py
 
       # The app is notarized and stapled first, so that it opens offline once copied out of
@@ -156,29 +158,29 @@ jobs:
           APP_STORE_CONNECT_KEY_ID: ${{ vars.APP_STORE_CONNECT_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ vars.APP_STORE_CONNECT_ISSUER_ID }}
         run: |
-          ditto -c -k --sequesterRsrc --keepParent build/app/Solaris.app "$RUNNER_TEMP/Solaris.zip"
-          uv run --no-project python scripts/notarize.py "$RUNNER_TEMP/Solaris.zip"
-          xcrun stapler staple build/app/Solaris.app
-          xcrun stapler validate build/app/Solaris.app
+          ditto -c -k --sequesterRsrc --keepParent build/app/OpenWeir.app "$RUNNER_TEMP/OpenWeir.zip"
+          uv run --no-project python scripts/notarize.py "$RUNNER_TEMP/OpenWeir.zip"
+          xcrun stapler staple build/app/OpenWeir.app
+          xcrun stapler validate build/app/OpenWeir.app
           # Notarization accepted and the ticket stapled are the gate. Gatekeeper's own checks
           # only warn (docs/maintenance.md §3): on the runner syspolicy_check stops at an
           # internal XProtect error that it does not report on a Mac, and spctl rejects the
           # app over items it takes for unsigned code although Apple notarized it. Opening the
           # downloaded image on the test Mac decides (§2.2).
-          syspolicy_check distribution build/app/Solaris.app \
+          syspolicy_check distribution build/app/OpenWeir.app \
             || echo "::warning::syspolicy_check did not pass the app; see its report above"
           spctl --status || true
-          spctl --assess --type execute -vvv build/app/Solaris.app \
+          spctl --assess --type execute -vvv build/app/OpenWeir.app \
             || echo "::warning::spctl rejected the notarized app; open the image on the test Mac"
 
-      # Solaris.app beside a shortcut to /Applications in a fixed Finder window over
+      # OpenWeir.app beside a shortcut to /Applications in a fixed Finder window over
       # package/dmg's background, HFS+ with LZMA compression; the script checks the image.
       - name: Disk image
         env:
           DMG: ${{ steps.version.outputs.dmg }}
         run: |
           uv run --no-project --with dmgbuild==1.6.7 python scripts/build_dmg.py \
-            build/app/Solaris.app "build/release/$DMG"
+            build/app/OpenWeir.app "build/release/$DMG"
           codesign --force --sign "$IDENTITY" --timestamp "build/release/$DMG"
           codesign --verify --strict "build/release/$DMG"
 
@@ -199,7 +201,7 @@ jobs:
 
       - uses: actions/upload-artifact@v7
         with:
-          name: solaris-${{ steps.version.outputs.version }}-macos-universal
+          name: openweir-${{ steps.version.outputs.version }}-macos-universal
           path: build/release/
           if-no-files-found: error
           compression-level: 0
@@ -208,7 +210,7 @@ jobs:
       - name: Retain macOS crash symbols
         uses: actions/upload-artifact@v7
         with:
-          name: solaris-${{ steps.version.outputs.version }}-macos-symbols-${{ github.sha }}
+          name: openweir-${{ steps.version.outputs.version }}-macos-symbols-${{ github.sha }}
           path: |
             build/apple/symbols/
             build/app/symbols/
@@ -219,13 +221,13 @@ jobs:
       - name: Keep the app for inspection
         if: failure()
         run: |
-          [[ -d build/app/Solaris.app ]] || exit 0
-          ditto -c -k --sequesterRsrc --keepParent build/app/Solaris.app "$RUNNER_TEMP/Solaris-inspect.zip"
+          [[ -d build/app/OpenWeir.app ]] || exit 0
+          ditto -c -k --sequesterRsrc --keepParent build/app/OpenWeir.app "$RUNNER_TEMP/OpenWeir-inspect.zip"
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
-          name: solaris-app-inspect
-          path: ${{ runner.temp }}/Solaris-inspect.zip
+          name: openweir-app-inspect
+          path: ${{ runner.temp }}/OpenWeir-inspect.zip
           if-no-files-found: ignore
           compression-level: 0
           retention-days: 7
@@ -269,6 +271,9 @@ jobs:
             build: build/windows-arm64
     env:
       UV_PYTHON_ARCH: ${{ matrix.python_arch }}
+      # product.json leaves the signing identities empty; the release sets them (D47).
+      OPENWEIR_WINDOWS_SIGNER: ${{ vars.OPENWEIR_WINDOWS_SIGNER }}
+      OPENWEIR_WINDOWS_SIGNER_EKU: ${{ vars.OPENWEIR_WINDOWS_SIGNER_EKU }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -297,25 +302,25 @@ jobs:
             exit 1
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "installer=Solaris-$version-windows-${{ matrix.arch }}-setup.exe" >> "$GITHUB_OUTPUT"
+          echo "installer=OpenWeir-$version-windows-${{ matrix.arch }}-setup.exe" >> "$GITHUB_OUTPUT"
 
       - name: Google OAuth client
         shell: bash
         env:
-          SOLARIS_GOOGLE_CLIENT_ID: ${{ secrets.SOLARIS_GOOGLE_CLIENT_ID }}
-          SOLARIS_GOOGLE_CLIENT_SECRET: ${{ secrets.SOLARIS_GOOGLE_CLIENT_SECRET }}
+          OPENWEIR_GOOGLE_CLIENT_ID: ${{ secrets.OPENWEIR_GOOGLE_CLIENT_ID }}
+          OPENWEIR_GOOGLE_CLIENT_SECRET: ${{ secrets.OPENWEIR_GOOGLE_CLIENT_SECRET }}
         run: |
-          if [[ -z "$SOLARIS_GOOGLE_CLIENT_ID" || -z "$SOLARIS_GOOGLE_CLIENT_SECRET" ]]; then
+          if [[ -z "$OPENWEIR_GOOGLE_CLIENT_ID" || -z "$OPENWEIR_GOOGLE_CLIENT_SECRET" ]]; then
             echo "::warning::No Google OAuth client in the release environment; this installer has no Google Drive backup."
           fi
 
-      # --sign links the service with SignedRelease: it accepts only a UI with Solaris's
+      # --sign links the service with SignedRelease: it accepts only a UI with OpenWeir's
       # signature (docs/architecture.md §5.3). Signing comes after the long build, so that the
       # Azure sign-in below is fresh when the first file is signed.
-      - name: Build Solaris.exe and the service
+      - name: Build OpenWeir.exe and the service
         env:
-          SOLARIS_GOOGLE_CLIENT_ID: ${{ secrets.SOLARIS_GOOGLE_CLIENT_ID }}
-          SOLARIS_GOOGLE_CLIENT_SECRET: ${{ secrets.SOLARIS_GOOGLE_CLIENT_SECRET }}
+          OPENWEIR_GOOGLE_CLIENT_ID: ${{ secrets.OPENWEIR_GOOGLE_CLIENT_ID }}
+          OPENWEIR_GOOGLE_CLIENT_SECRET: ${{ secrets.OPENWEIR_GOOGLE_CLIENT_SECRET }}
         run: uv run --frozen --with nuitka==4.2.2 python scripts/build_windows.py --arch ${{ matrix.arch }} --skip-installer --sign
 
       # Azure Artifact Signing (D42, docs/release.md §1): signtool with Artifact Signing's dlib,
@@ -367,7 +372,7 @@ jobs:
             Endpoint = $env:ARTIFACT_SIGNING_ENDPOINT
             CodeSigningAccountName = $env:ARTIFACT_SIGNING_ACCOUNT
             CertificateProfileName = $env:ARTIFACT_SIGNING_PROFILE
-            CorrelationId = "solaris-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT-$env:ARCH"
+            CorrelationId = "openweir-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT-$env:ARCH"
             ExcludeCredentials = @(
               'EnvironmentCredential', 'WorkloadIdentityCredential', 'ManagedIdentityCredential',
               'SharedTokenCacheCredential', 'VisualStudioCredential', 'VisualStudioCodeCredential',
@@ -383,7 +388,7 @@ jobs:
           "ARTIFACT_SIGNING_DLIB=$dlib" >> $env:GITHUB_ENV
           "ARTIFACT_SIGNING_METADATA=$metadata" >> $env:GITHUB_ENV
 
-      # The user-assigned managed identity id-solaris-release, through its federated credential
+      # The user-assigned managed identity id-openweir-release, through its federated credential
       # for this environment. Its only role is signer on the certificate profile, none in the
       # subscription, so the sign-in names no subscription: azure/login would select
       # AZURE_SUBSCRIPTION_ID and fail. The Azure CLI exchanges GitHub's short-lived token for
@@ -401,7 +406,7 @@ jobs:
       # package/windows/sign.ps1 signs every program in the install directory without a
       # publisher's signature, then the setup UI's plugin, the uninstaller and the installer
       # (makensis' !uninstfinalize and !finalize), each with a timestamp, and checks each
-      # one: Windows trusts it, and the certificate is Herta Network LLC's with the
+      # one: Windows trusts it, and the certificate is OpenWeir's with the
       # certificate profile's extended key usage. Any failure fails the job.
       - name: Sign and build the installer
         run: uv run --frozen python scripts/build_windows.py --arch ${{ matrix.arch }} --installer-only --sign
@@ -411,12 +416,12 @@ jobs:
         shell: pwsh
         env:
           INSTALLER: ${{ matrix.build }}/${{ steps.version.outputs.installer }}
-          DIRECTORY: ${{ matrix.build }}/Solaris
+          DIRECTORY: ${{ matrix.build }}/OpenWeir
         run: |
           $ErrorActionPreference = 'Stop'
           & $env:SIGNTOOL verify /pa /v $env:INSTALLER
           if ($LASTEXITCODE -ne 0) { throw "signtool verify failed with exit code $LASTEXITCODE" }
-          ./package/windows/sign.ps1 -Check $env:INSTALLER "$env:DIRECTORY/Solaris.exe" "$env:DIRECTORY/solaris-service.exe"
+          ./package/windows/sign.ps1 -Check $env:INSTALLER "$env:DIRECTORY/OpenWeir.exe" "$env:DIRECTORY/openweir-service.exe"
           if ($LASTEXITCODE -ne 0) { throw 'The installer or the programs are not signed as a release signs them' }
           $signature = Get-AuthenticodeSignature -LiteralPath $env:INSTALLER
           $signature.SignerCertificate | Format-List Subject, Issuer, Thumbprint, NotBefore, NotAfter, EnhancedKeyUsageList
@@ -432,8 +437,8 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: solaris-${{ steps.version.outputs.version }}-windows-${{ matrix.arch }}-ui
-          path: ${{ runner.temp }}/solaris-ui/
+          name: openweir-${{ steps.version.outputs.version }}-windows-${{ matrix.arch }}-ui
+          path: ${{ runner.temp }}/openweir-ui/
           if-no-files-found: ignore
           retention-days: 14
 
@@ -452,7 +457,7 @@ jobs:
 
       - uses: actions/upload-artifact@v7
         with:
-          name: solaris-${{ steps.version.outputs.version }}-windows-${{ matrix.arch }}
+          name: openweir-${{ steps.version.outputs.version }}-windows-${{ matrix.arch }}
           path: build/release/
           if-no-files-found: error
           compression-level: 0
@@ -461,7 +466,7 @@ jobs:
       - name: Retain Windows crash symbols
         uses: actions/upload-artifact@v7
         with:
-          name: solaris-${{ steps.version.outputs.version }}-windows-${{ matrix.arch }}-symbols-${{ github.sha }}
+          name: openweir-${{ steps.version.outputs.version }}-windows-${{ matrix.arch }}-symbols-${{ github.sha }}
           path: |
             ${{ matrix.build }}/symbols/
             ${{ matrix.build }}/nsis/ui/*.pdb
@@ -502,22 +507,22 @@ jobs:
           fi
           {
             echo "version=$version"
-            echo "dmg=Solaris-$version-macos-universal.dmg"
-            echo "installer=Solaris-$version-windows-x64-setup.exe"
-            echo "installer_arm64=Solaris-$version-windows-arm64-setup.exe"
+            echo "dmg=OpenWeir-$version-macos-universal.dmg"
+            echo "installer=OpenWeir-$version-windows-x64-setup.exe"
+            echo "installer_arm64=OpenWeir-$version-windows-arm64-setup.exe"
           } >> "$GITHUB_OUTPUT"
 
       - uses: actions/download-artifact@v8
         with:
-          name: solaris-${{ steps.version.outputs.version }}-macos-universal
+          name: openweir-${{ steps.version.outputs.version }}-macos-universal
           path: build/artifacts
       - uses: actions/download-artifact@v8
         with:
-          name: solaris-${{ steps.version.outputs.version }}-windows-x64
+          name: openweir-${{ steps.version.outputs.version }}-windows-x64
           path: build/artifacts
       - uses: actions/download-artifact@v8
         with:
-          name: solaris-${{ steps.version.outputs.version }}-windows-arm64
+          name: openweir-${{ steps.version.outputs.version }}-windows-arm64
           path: build/artifacts
 
       # The build jobs' own sums first: the artifacts arrived as they were built.
@@ -561,6 +566,6 @@ jobs:
             exit 1
           fi
           gh release create "$GITHUB_REF_NAME" --draft --verify-tag \
-            --title "Solaris $VERSION" --notes-file "$RUNNER_TEMP/notes.md" \
+            --title "OpenWeir $VERSION" --notes-file "$RUNNER_TEMP/notes.md" \
             "build/release/$DMG" "build/release/$INSTALLER" "build/release/$INSTALLER_ARM64" \
             build/release/SHA256SUMS

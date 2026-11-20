@@ -52,7 +52,7 @@ def merge_binary(inputs: Mapping[str, Path], output: Path) -> None:
     if set(inputs) != set(ARCHITECTURES):
         raise BuildError("a universal binary needs both arm64 and x86_64 inputs")
     output.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="solaris-lipo-") as temporary:
+    with tempfile.TemporaryDirectory(prefix="openweir-lipo-") as temporary:
         slices: list[Path] = []
         for arch in ARCHITECTURES:
             source = inputs[arch]

@@ -1,0 +1,650 @@
+"""Platform-neutral host boundary the models depend on (docs/ui.md).
+
+DTOs are immutable projections of the control protocol (proto/.../control.proto); enum
+values are the protocol names without their prefix, lower-cased (``RUN_STATE_RUNNING``
+becomes ``"running"``).
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, replace
+from typing import Protocol
+
+from openweir.host import geo_categories
+
+
+class HostError(Exception):
+    def __init__(self, code: str, message: str, *, retryable: bool = False) -> None:
+        super().__init__(f"{code}: {message}")
+        self.code = code
+        self.message = message
+        self.retryable = retryable
+
+
+# mihomo's TUN stacks (docs/architecture.md §3.4); gvisor and mixed need a core built with
+# with_gvisor.
+TUN_STACKS = ("system", "mips", "gvisor", "mixed")
+
+
+@dataclass(frozen=True)
+class RunOptions:
+    tun_enabled: bool = False
+    system_proxy_enabled: bool = False
+    mixed_port: int = 0  # 0 keeps the profile's own port
+    allow_lan: bool = False
+    tun_stack: str = ""  # one of TUN_STACKS; "" keeps the profile's own
+    # macOS only (D19): the tunnel includes all networks. Not in the protocol: MacExtensionHost
+    # writes it into the VPN configuration as it brings the tunnel up, and the extension tells
+    # the core.
+    include_all_networks: bool = False
+
+
+# What connecting takes over on a host (D26, docs/ui.md §8).
+TAKEOVER_SETTINGS = "settings"  # the Windows service: TUN and the system proxy as set
+TAKEOVER_TUN = "tun"  # the macOS extension: always a TUN, never the system proxy
+TAKEOVER_NONE = "none"  # the development service: neither, only the mixed port
+
+
+def taken_over(options: RunOptions, takeover: str) -> RunOptions:
+    """``options`` with the TUN and the system proxy a ``takeover`` host runs."""
+    if takeover == TAKEOVER_TUN:
+        return replace(options, tun_enabled=True, system_proxy_enabled=False)
+    if takeover == TAKEOVER_NONE:
+        return replace(options, tun_enabled=False, system_proxy_enabled=False)
+    return options
+
+
+@dataclass(frozen=True)
+class CompositionSource:
+    id: str
+    name: str
+    yaml: str  # the subscription as downloaded: a mihomo profile or share links
+
+
+WARP_PROTOCOLS = ("masque-h2", "masque-h3", "wireguard")  # docs/exits.md §3.1
+
+
+@dataclass(frozen=True)
+class WarpAccount:
+    """A Cloudflare WARP device, as register_warp made it (docs/exits.md §3.2). A credential:
+    kept in the system's credential store, out of backups, and handed back unchanged in
+    every composition."""
+
+    device_id: str
+    token: str
+    protocol: str  # one of WARP_PROTOCOLS; the key is for it
+    private_key: str
+    peer_public_key: str
+    endpoint: str  # host:port
+    address_v4: str
+    address_v6: str
+    client_id: str  # base64
+    registered_at_unix_ms: int
+
+
+@dataclass(frozen=True)
+class OpenVpnOptions:
+    """A VPN Gate server's OpenVPN configuration, as mihomo's openvpn outbound takes it."""
+
+    server: str  # an IP address
+    port: int
+    proto: str  # "tcp"
+    cipher: str
+    data_ciphers: tuple[str, ...]
+    auth: str
+    comp_lzo: str
+    ca: str  # PEM
+    cert: str
+    key: str
+    tls_auth: str
+    key_direction: str
+
+
+@dataclass(frozen=True)
+class VpnGateServer:
+    """A server of VPN Gate's list, run by a volunteer, as list_vpngate read it
+    (docs/exits.md §5.2). The ones the UI picks go back unchanged in every composition."""
+
+    host_name: str  # unique in the list
+    ip: str
+    country: str  # ISO 3166 code, upper case
+    score: int
+    ping_ms: int
+    speed_bps: int
+    sessions: int
+    uptime_ms: int
+    operator: str
+    openvpn: OpenVpnOptions
+
+
+@dataclass(frozen=True)
+class Egress:
+    """What the chained exits need (docs/exits.md §7.1). An exit without its material is
+    unavailable, and the rules that name it reject their connections (D21)."""
+
+    warp: WarpAccount | None = None
+    # The VPN Gate servers the UI picked, in the order the exit's group lists them.
+    vpngate: tuple[VpnGateServer, ...] = ()
+
+
+MESH_KINDS = ("tailscale", "zerotier", "easytier")  # docs/mesh.md §10.2
+
+
+@dataclass(frozen=True)
+class TailscaleSettings:
+    auth_key: str = ""  # a secret; "" logs in through the browser
+    control_url: str = ""  # "" is Tailscale's own; a Headscale server otherwise
+    hostname: str = ""  # the device's name in the tailnet
+
+
+@dataclass(frozen=True)
+class ZeroTierSettings:
+    network: str = ""  # the network id, 16 hex digits
+    identity_secret: str = ""  # a secret; "" lets the core make one
+
+
+@dataclass(frozen=True)
+class EasyTierSettings:
+    network_name: str = ""
+    network_secret: str = ""  # a secret, which the network needs
+    peers: tuple[str, ...] = ()  # such as tcp://example.com:11010
+    ipv4: str = ""  # such as 10.144.144.2/24; "" asks the network for one
+    hostname: str = ""
+
+
+type MeshSettings = TailscaleSettings | ZeroTierSettings | EasyTierSettings
+
+MESH_SETTINGS: dict[str, type[MeshSettings]] = {
+    "tailscale": TailscaleSettings,
+    "zerotier": ZeroTierSettings,
+    "easytier": EasyTierSettings,
+}
+# The settings that are secrets: they live in the system's credential store, out of the
+# database and of backups, and only the core sees them.
+MESH_SECRETS = ("auth_key", "identity_secret", "network_secret")
+
+
+@dataclass(frozen=True)
+class MeshNetwork:
+    """A mesh network the user added in the app (docs/mesh.md §10): an outbound of its own
+    that plans name ``mesh:<id>``."""
+
+    id: str
+    name: str
+    settings: MeshSettings
+    via: str = ""  # the group id it connects through; "" connects directly
+
+    @property
+    def kind(self) -> str:
+        return next(k for k, settings in MESH_SETTINGS.items() if type(self.settings) is settings)
+
+
+@dataclass(frozen=True)
+class Composition:
+    """The node pool and a plan, for "my plan" routing: the core assembles the configuration
+    (docs/routing.md §8). ``sources`` are the subscriptions in the pool in the order they were
+    imported; ``plan_json`` follows routing.md §8.5."""
+
+    sources: tuple[CompositionSource, ...]
+    plan_json: str
+    # Names of information nodes ("剩余流量"), in mihomo's regular expressions; "" keeps all.
+    info_filter: str = ""
+    egress: Egress = Egress()
+    # Every network the user added; the core removes the state of those it no longer gets.
+    mesh: tuple[MeshNetwork, ...] = ()
+
+
+@dataclass(frozen=True)
+class TunnelConfig:
+    """What Validate, Start and Reload carry: a subscription's own YAML, or a composition in
+    its place. Validate ignores ``options``."""
+
+    config_yaml: str = ""
+    # Override YAML texts in the order they apply: the global one, then the profile's own.
+    overrides: tuple[str, ...] = ()
+    options: RunOptions = RunOptions()
+    composition: Composition | None = None
+
+    def __post_init__(self) -> None:
+        if self.composition is not None and self.config_yaml:
+            raise ValueError("a TunnelConfig carries config_yaml or a composition, not both")
+
+
+@dataclass(frozen=True)
+class CompositionWarning:
+    entry_id: str  # a rule entry, or "fallback"
+    # "region_empty": the target region has no nodes; "group_empty": the target group has no
+    # members. Either way the entry goes to the built-in "proxy" group meanwhile.
+    # "egress_unavailable", "mesh_missing": the target exit or mesh outbound is unavailable,
+    # so the entry rejects its connections. "via_empty": an exit's via group (target) has no
+    # members; entry_id is the exit, such as "egress:warp". "mesh_restricted": an option of
+    # the mesh outbound entry_id that serves other devices (target) was turned off.
+    reason: str
+    target: str  # the target the plan names
+
+
+@dataclass(frozen=True)
+class ComposedGroup:
+    id: str  # "proxy", "auto", "region:HK" or the plan's own id
+    name: str  # in the generated configuration, as list_groups reports it
+    kind: str  # "builtin", "region" or "custom"
+    region: str  # region groups only: the region code
+    node_count: int
+
+
+@dataclass(frozen=True)
+class Rule:
+    type: str  # "GEOSITE", "MATCH", ...
+    payload: str
+    proxy: str  # the group or outbound the rule sends traffic to
+    entry_id: str  # the plan's rule entry, "fallback", or "" when not from a plan
+
+
+@dataclass(frozen=True)
+class PoolNode:
+    name: str  # in the generated configuration
+    original_name: str  # in the subscription
+    source_id: str
+    type: str
+    region: str  # region code; "ZZ" when none matched
+
+
+@dataclass(frozen=True)
+class MeshOutbound:
+    """A Tailscale, ZeroTier or EasyTier outbound from a pool subscription: not a pool node,
+    but a rule target of its own (docs/mesh.md §3)."""
+
+    # "mesh:<subscription id>/<name in the subscription>", or "mesh:<network id>" for a
+    # network of Composition.mesh; as plans name it
+    id: str
+    name: str  # in the generated configuration
+    type: str  # mihomo adapter type
+    source_id: str  # "" for a network of Composition.mesh
+
+
+@dataclass(frozen=True)
+class CompositionReport:
+    """What the core made of a composition."""
+
+    warnings: tuple[CompositionWarning, ...]
+    groups: tuple[ComposedGroup, ...]  # in configuration order
+    rules: tuple[Rule, ...]  # every generated rule, in order
+    nodes: tuple[PoolNode, ...]  # the pool after exclusions
+    mesh: tuple[MeshOutbound, ...] = ()
+
+
+@dataclass(frozen=True)
+class GroupPreview:
+    """The members a group of a draft plan gets with the pool (routing.md §4.5)."""
+
+    nodes: tuple[PoolNode, ...]  # in pool order
+    # The other members by id: group ids, "region:JP" for each region group with nodes,
+    # DIRECT, REJECT.
+    others: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class RuleMatch:
+    """The rule a connection would match (routing.md §8.3)."""
+
+    matched: bool  # False: no rule matched, so mihomo goes DIRECT
+    index: int  # the rule's position in the configuration
+    rule: Rule | None
+    # The rule's target first, then each group's current choice down to the node, as
+    # Connection.chains; the target alone when the core does not run that group.
+    chain: tuple[str, ...]
+    resolved_ip: str  # what the domain resolved to for an IP rule; "" otherwise
+
+
+@dataclass(frozen=True)
+class SkippedRule:
+    rule: str  # as the configuration wrote it
+    # "rule_set", "sub_rule", "target" (neither a group nor an outbound), "after_match",
+    # "invalid"
+    reason: str
+
+
+@dataclass(frozen=True)
+class PlanConversion:
+    """A subscription's groups and rules as a plan (routing.md §4.7)."""
+
+    plan_json: str
+    group_count: int
+    merged_group_count: int  # merged into 节点选择 or 自动选择
+    rule_count: int  # MATCH included
+    raw_rule_count: int
+    entry_count: int  # neighbouring rules may share an entry
+    skipped: tuple[SkippedRule, ...]
+
+
+EXPORT_SHARE = "share"  # proxy-groups and rules for another configuration
+EXPORT_GENERATED = "generated"  # the whole configuration the core would run
+
+
+@dataclass(frozen=True)
+class SourceNode:
+    name: str
+    type: str  # mihomo adapter type, as in Proxy.type
+    region: str  # region code; "ZZ" when none matched
+    info: bool  # matches the info filter, so the pool leaves it out
+    mesh: bool = False  # a Tailscale, ZeroTier or EasyTier outbound, kept out of the pool
+
+
+@dataclass(frozen=True)
+class SourceInspection:
+    nodes: tuple[SourceNode, ...]
+    has_rules: bool
+    group_count: int
+    rule_count: int
+
+    @property
+    def node_count(self) -> int:
+        """The nodes the source brings to the node pool: neither info nodes nor mesh
+        outbounds (docs/mesh.md §3). The subscriptions page counts these everywhere."""
+        return sum(not node.info and not node.mesh for node in self.nodes)
+
+
+@dataclass(frozen=True)
+class GeoDataset:
+    names: tuple[str, ...]  # lower-cased and sorted, as rules write them
+    sha256: str  # of the data file
+    updated_at_unix_ms: int  # 0 when unknown
+    bundled: bool  # the installer's list, because the core had no data to read
+
+
+@dataclass(frozen=True)
+class GeoCategories:
+    geosite: GeoDataset
+    geoip: GeoDataset
+
+
+@dataclass(frozen=True)
+class GeoUpdateFile:
+    name: str
+    url: str
+    updated_at_unix_ms: int
+
+
+@dataclass(frozen=True)
+class GeoUpdatePlan:
+    generation: str = ""
+    interval_hours: int = 0
+    files: tuple[GeoUpdateFile, ...] = ()
+
+
+def bundled_geo_categories() -> GeoCategories:
+    """The categories of the GEO data the installer ships, for when the core has none to list
+    or cannot be reached (docs/routing.md §8.4)."""
+    return GeoCategories(
+        GeoDataset(geo_categories.GEOSITE, geo_categories.GEOSITE_SHA256, 0, True),
+        GeoDataset(geo_categories.GEOIP, geo_categories.GEOIP_SHA256, 0, True),
+    )
+
+
+@dataclass(frozen=True)
+class HostInfo:
+    protocol_version: int
+    service_version: str
+    core_version: str
+    state: str  # RunState without its prefix, e.g. "stopped"
+    ownership: str  # Ownership without its prefix; "unspecified" on macOS
+
+
+@dataclass(frozen=True)
+class HostStatus:
+    state: str
+    mode: str  # "rule", "global" or "direct"
+    started_at_unix_ms: int  # 0 while stopped
+    memory_bytes: int
+    connection_count: int
+    tun_enabled: bool
+    system_proxy_enabled: bool
+    recovery_state: str = "none"  # Windows sleep/wake recovery; always none on macOS
+    recovery_error: str = ""  # stable reason code, not raw configuration/error text
+
+
+# How a latency test measures a node (D32): "http" asks for the test URL through it, "tcp"
+# times the TCP handshake with its server.
+DELAY_TESTS = ("http", "tcp")
+
+
+@dataclass(frozen=True)
+class Proxy:
+    name: str
+    type: str
+    delay_ms: int | None  # None until tested; 0 when the last test failed
+    # The last TCP test, likewise; also None for what has no TCP server to dial (D32).
+    tcp_delay_ms: int | None = None
+
+    def delay(self, test: str) -> int | None:
+        """What the test, one of DELAY_TESTS, measured last."""
+        return self.tcp_delay_ms if test == "tcp" else self.delay_ms
+
+
+@dataclass(frozen=True)
+class ProxyGroup:
+    name: str
+    type: str  # mihomo adapter type: "Selector", "URLTest", "Fallback", ...
+    now: str
+    proxies: tuple[Proxy, ...]
+
+    @property
+    def selectable(self) -> bool:
+        return self.type == "Selector"
+
+
+@dataclass(frozen=True)
+class TrafficSample:
+    up_bytes_per_second: int
+    down_bytes_per_second: int
+    up_total_bytes: int
+    down_total_bytes: int
+
+
+@dataclass(frozen=True)
+class Connection:
+    id: str
+    host: str  # the requested domain without its port; empty for a connection to an IP
+    network: str  # "tcp" or "udp", as mihomo writes it
+    rule: str  # "DOMAIN-SUFFIX,github.com", or the type alone for "MATCH"
+    chains: tuple[str, ...]  # outermost group first, final proxy last
+    process: str  # the process name, or its path when the name is unknown; may be empty
+    upload_bytes: int
+    download_bytes: int
+    started_at_unix_ms: int
+    source: str = ""  # "198.18.0.1:52344"
+    destination: str = ""  # "140.82.112.3:443"; brackets around an IPv6 address
+    rule_entry_id: str = ""  # the plan's rule entry the rule came from, as Rule.entry_id
+
+
+# How a mesh outbound stands (docs/mesh.md §10.5): starting or reaching its network, waiting
+# for a login in the browser or for the network's admin, online, or failed.
+MESH_STATES = ("starting", "needs_login", "waiting", "online", "failed")
+
+
+@dataclass(frozen=True)
+class MeshStatus:
+    name: str  # the outbound's name in the running configuration
+    id: str  # its mesh id when a composition made it; "" otherwise
+    type: str  # mihomo adapter type: "Tailscale", "ZeroTier" or "EasyTier"
+    state: str  # one of MESH_STATES
+    login_url: str = ""
+    addresses: tuple[str, ...] = ()  # the device's own, as CIDR
+    peer_count: int = 0  # the other devices it reaches
+    node_id: str = ""  # ZeroTier's node address, which the network's admin authorizes
+    network_name: str = ""
+    error: str = ""
+
+
+LOG_LEVELS = ("debug", "info", "warning", "error")  # lowest first
+
+
+@dataclass(frozen=True)
+class LogEntry:
+    level: str  # one of LOG_LEVELS
+    message: str  # mihomo's text, untranslated
+    time_unix_ms: int
+
+
+class TunnelHost(Protocol):
+    can_manage_extension: bool
+
+    async def deactivate_extension(self, timeout: float = 60.0) -> None:
+        """Deactivate this app's system extension and remove its VPN preferences, on macOS."""
+        ...
+
+    @property
+    def core_available(self) -> bool:
+        """A core answers now, so the methods that need one work (docs/architecture.md §6.3).
+        The Windows service and the development service always have one; the macOS system
+        extension runs only while the tunnel is connected."""
+        ...
+
+    # TAKEOVER_SETTINGS, TAKEOVER_TUN or TAKEOVER_NONE: the host runs every config with
+    # taken_over(options, takeover), whatever the settings asked for.
+    takeover: str
+
+    async def get_info(self) -> HostInfo: ...
+
+    async def get_status(self) -> HostStatus: ...
+
+    async def prepare_start(self, options: RunOptions) -> None:
+        """Have a core answer before Start, to read what was stored while none could (D27):
+        on macOS bring the tunnel up without a configuration; Start or stop must follow.
+        Nothing to do where a core always answers."""
+        ...
+
+    async def validate(self, config: TunnelConfig) -> CompositionReport | None:
+        """Run the config through the core's pipeline without applying it; raises
+        HostError("invalid_config") when the core rejects it. A composition comes back with
+        the core's report, a profile's own YAML with None; so for start and reload."""
+        ...
+
+    async def start(self, config: TunnelConfig) -> CompositionReport | None: ...
+
+    async def reload(self, config: TunnelConfig) -> CompositionReport | None:
+        """Replace the running config in place; raises HostError("not_running") when stopped."""
+        ...
+
+    async def inspect_source(self, yaml: str, info_filter: str = "") -> SourceInspection:
+        """Read a subscription as the core does: its nodes with their regions, and whether it
+        brings rules. Needs no running core; raises HostError("invalid_config") when the core
+        cannot read it."""
+        ...
+
+    async def list_geo_categories(self) -> GeoCategories:
+        """The GEOSITE and GEOIP categories of the core's GEO data; the installer's list for
+        a kind the core has no data of."""
+        ...
+
+    async def get_geo_update(self) -> GeoUpdatePlan: ...
+
+    async def upload_geo(
+        self,
+        generation: str,
+        transfer_id: str,
+        name: str,
+        size: int,
+        sha256: str,
+        offset: int,
+        data: bytes = b"",
+        *,
+        complete: bool = False,
+        abort: bool = False,
+    ) -> None: ...
+
+    async def preview_group(self, composition: Composition, group_id: str) -> GroupPreview:
+        """The members of a group of the composition's plan; raises
+        HostError("invalid_config") for a plan the core refuses."""
+        ...
+
+    async def match_rule(
+        self, host: str, port: int = 0, network: str = "tcp", config: TunnelConfig | None = None
+    ) -> RuleMatch:
+        """The rule a connection to ``host`` (a domain or an IP) would match: in ``config``
+        built on the side, or in the running configuration for None, which raises
+        HostError("not_running") while the core is stopped. Port 0 means 443."""
+        ...
+
+    async def convert_to_plan(
+        self, yaml: str, *, source_id: str = "", locale: str = "zh", info_filter: str = ""
+    ) -> PlanConversion:
+        """A subscription's or a configuration's groups and rules as a plan. ``source_id``
+        is the pool's subscription it came from; "" matches its nodes by name."""
+        ...
+
+    async def export_plan(self, config: TunnelConfig, export: str = EXPORT_SHARE) -> str:
+        """The composition's plan as YAML: EXPORT_SHARE or EXPORT_GENERATED, which applies
+        ``config``'s overrides and options."""
+        ...
+
+    async def register_warp(
+        self, via: str, protocol: str = "masque-h2", existing: WarpAccount | None = None
+    ) -> WarpAccount:
+        """Registers a WARP device through the running configuration's group ``via`` (its
+        name), or gives ``existing`` a key for ``protocol`` (docs/exits.md §3.2). Raises
+        HostError("not_running") while the core is stopped, and "operation_failed" with
+        Cloudflare's text when registration fails."""
+        ...
+
+    async def list_vpngate(self, via: str) -> list[VpnGateServer]:
+        """VPN Gate's TCP OpenVPN servers, best score first, fetched through the running
+        configuration's group ``via`` (its name; docs/exits.md §5.2). Raises
+        HostError("not_running") while the core is stopped, and "operation_failed" when the
+        list cannot be fetched."""
+        ...
+
+    async def get_mesh_status(self) -> list[MeshStatus]:
+        """The running configuration's mesh outbounds, in its order (docs/mesh.md §10.5).
+        Raises HostError("not_running") while the core is stopped."""
+        ...
+
+    async def login_mesh(self, name: str) -> str:
+        """A URL to open in the browser that logs the mesh outbound ``name`` in: Tailscale
+        starts a login, ZeroTier gives its network's sign-on. HostError("invalid_request")
+        when there is nothing to log in to."""
+        ...
+
+    async def stop(self) -> None: ...
+
+    async def set_mode(self, mode: str) -> None: ...
+
+    async def set_system_proxy(self, enabled: bool) -> None: ...
+
+    async def list_groups(self) -> list[ProxyGroup]: ...
+
+    async def list_rules(self) -> list[Rule]:
+        """The running configuration's rules in order, with the plan's rule entries."""
+        ...
+
+    async def select_proxy(self, group: str, proxy: str) -> None: ...
+
+    async def health_check(self, group: str, test: str = "http") -> None:
+        """Test the group's members with ``test``, one of DELAY_TESTS. Only the HTTP test
+        lets url-test and fallback groups choose again (D32)."""
+        ...
+
+    async def poll_traffic(self) -> list[TrafficSample]:
+        """Samples recorded since the previous poll, oldest first."""
+        ...
+
+    async def poll_connections(self) -> list[Connection]:
+        """The latest connection snapshot, oldest connection first. Polling again before the
+        core takes a new one returns the same snapshot, so several screens can share it."""
+        ...
+
+    async def close_connection(self, connection_id: str) -> None:
+        """Close one connection; one that has already ended is not an error. Raises
+        HostError("not_running") when the core is stopped."""
+        ...
+
+    async def close_all_connections(self) -> None: ...
+
+    async def poll_logs(self, level: str) -> list[LogEntry]:
+        """mihomo's log lines at ``level`` (one of LOG_LEVELS) or above that arrived since the
+        previous poll, oldest first. Lines arrive whether or not the core runs. The first
+        poll starts collecting; a poll with another level starts again at that level, so
+        lines below the previous level are not recovered."""
+        ...
+
+    async def close(self) -> None: ...

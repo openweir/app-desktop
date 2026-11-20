@@ -13,7 +13,7 @@ from typing import Any
 
 import pytest
 
-from solaris.models.backup import (
+from openweir.models.backup import (
     MAX_SNAPSHOT_BYTES,
     MERGE,
     REPLACE,
@@ -24,10 +24,10 @@ from solaris.models.backup import (
     read_file,
     write_file,
 )
-from solaris.models.backup_auto import BackupTargets
-from solaris.models.database import TOMBSTONE_DAYS
-from solaris.models.library import ProfileLibrary
-from solaris.models.profiles import (
+from openweir.models.backup_auto import BackupTargets
+from openweir.models.database import TOMBSTONE_DAYS
+from openweir.models.library import ProfileLibrary
+from openweir.models.profiles import (
     KIND_FILE,
     KIND_SUBSCRIPTION,
     Profile,
@@ -35,7 +35,7 @@ from solaris.models.profiles import (
     ProfileList,
     Usage,
 )
-from solaris.models.routing import (
+from openweir.models.routing import (
     MODE_PLAN,
     MODE_PROFILE,
     Plan,
@@ -43,9 +43,9 @@ from solaris.models.routing import (
     PlanRule,
     RoutingStore,
 )
-from solaris.models.settings import DatabaseSettingsStore, Settings
-from solaris.models.store import ProfileStore
-from solaris.models.subscription import Download
+from openweir.models.settings import DatabaseSettingsStore, Settings
+from openweir.models.store import ProfileStore
+from openweir.models.subscription import Download
 from tests.support.simulated import SimulatedFetcher, SimulatedHost, seed_profiles
 from tests.support.storage import stored
 
@@ -147,7 +147,7 @@ def test_a_snapshot_holds_the_users_data(tmp_path: Path) -> None:
     populate(machine)
     document = machine.at(1_234.5).snapshot().document
 
-    assert document["format"] == "solaris-backup"
+    assert document["format"] == "openweir-backup"
     assert document["version"] == 1
     assert document["created_at"] == 1_234.5
     assert (document["device"], document["app_version"]) == ("laptop", "1.0.0")

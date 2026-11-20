@@ -1,4 +1,4 @@
-// Solaris's installer surface. It never installs files, starts services or executes commands:
+// OpenWeir's installer surface. It never installs files, starts services or executes commands:
 // NSIS owns those operations and reports which step it is on to this UI thread.
 #include <windows.h>
 #include <windowsx.h>
@@ -25,7 +25,7 @@
 
 namespace {
 HINSTANCE module = nullptr;
-constexpr wchar_t windowClass[] = L"SolarisSetupWindow";
+constexpr wchar_t windowClass[] = L"OpenWeirSetupWindow";
 constexpr UINT updateMessage = WM_APP + 1;
 constexpr UINT finishMessage = WM_APP + 2;
 constexpr UINT captureMessage = WM_APP + 3;
@@ -228,17 +228,17 @@ std::wstring headline(const State& s) {
   const bool install = s.mode == Mode::Install, upgrade = s.mode == Mode::Upgrade;
   switch (s.phase) {
     case Phase::Ready:
-      return install ? s.tr(L"安装 Solaris", L"Install Solaris")
-           : upgrade ? s.tr(L"更新 Solaris", L"Update Solaris") : s.tr(L"卸载 Solaris", L"Uninstall Solaris");
+      return install ? s.tr(L"安装 OpenWeir", L"Install OpenWeir")
+           : upgrade ? s.tr(L"更新 OpenWeir", L"Update OpenWeir") : s.tr(L"卸载 OpenWeir", L"Uninstall OpenWeir");
     case Phase::Working:
-      return install ? s.tr(L"正在安装 Solaris", L"Installing Solaris")
-           : upgrade ? s.tr(L"正在更新 Solaris", L"Updating Solaris") : s.tr(L"正在卸载 Solaris", L"Uninstalling Solaris");
+      return install ? s.tr(L"正在安装 OpenWeir", L"Installing OpenWeir")
+           : upgrade ? s.tr(L"正在更新 OpenWeir", L"Updating OpenWeir") : s.tr(L"正在卸载 OpenWeir", L"Uninstalling OpenWeir");
     case Phase::Done:
-      return install ? s.tr(L"Solaris 已安装", L"Solaris was installed")
-           : upgrade ? s.tr(L"Solaris 已更新", L"Solaris was updated") : s.tr(L"Solaris 已卸载", L"Solaris was uninstalled");
+      return install ? s.tr(L"OpenWeir 已安装", L"OpenWeir was installed")
+           : upgrade ? s.tr(L"OpenWeir 已更新", L"OpenWeir was updated") : s.tr(L"OpenWeir 已卸载", L"OpenWeir was uninstalled");
     case Phase::Failed:
-      return install ? s.tr(L"未能安装 Solaris", L"Couldn’t install Solaris")
-           : upgrade ? s.tr(L"未能更新 Solaris", L"Couldn’t update Solaris") : s.tr(L"未能卸载 Solaris", L"Couldn’t uninstall Solaris");
+      return install ? s.tr(L"未能安装 OpenWeir", L"Couldn’t install OpenWeir")
+           : upgrade ? s.tr(L"未能更新 OpenWeir", L"Couldn’t update OpenWeir") : s.tr(L"未能卸载 OpenWeir", L"Couldn’t uninstall OpenWeir");
   }
   return {};
 }
@@ -247,14 +247,14 @@ std::wstring bodyText(const State& s) {
   const bool install = s.mode == Mode::Install, upgrade = s.mode == Mode::Upgrade;
   switch (s.phase) {
     case Phase::Ready:
-      return install ? s.tr(L"安装 Solaris 应用和后台连接服务", L"Installs the Solaris app and its background connection service.")
+      return install ? s.tr(L"安装 OpenWeir 应用和后台连接服务", L"Installs the OpenWeir app and its background connection service.")
            : upgrade ? s.tr(L"更新期间连接会短暂中断，订阅和设置会保留。", L"The connection pauses briefly during the update. Subscriptions and settings are kept.")
-           : s.tr(L"卸载会断开当前连接，并移除 Solaris 应用和后台连接服务。", L"Uninstalling disconnects Solaris and removes the app and its background connection service.");
+           : s.tr(L"卸载会断开当前连接，并移除 OpenWeir 应用和后台连接服务。", L"Uninstalling disconnects OpenWeir and removes the app and its background connection service.");
     case Phase::Working:
       return s.tr(L"完成前请保持此窗口打开。", L"Keep this window open until this finishes.");
     case Phase::Done:
-      if (install) return s.tr(L"打开 Solaris，导入订阅或配置后即可连接。", L"Open Solaris and import a subscription or configuration to connect.");
-      if (upgrade) return s.tr(L"打开 Solaris 即可继续使用。", L"Open Solaris to continue.");
+      if (install) return s.tr(L"打开 OpenWeir，导入订阅或配置后即可连接。", L"Open OpenWeir and import a subscription or configuration to connect.");
+      if (upgrade) return s.tr(L"打开 OpenWeir 即可继续使用。", L"Open OpenWeir to continue.");
       return s.purged ? s.tr(L"订阅、设置和日志已一并删除。", L"Subscriptions, settings and logs were deleted too.")
                       : s.tr(L"订阅、设置和日志仍保留在此电脑上，重新安装后可继续使用。", L"Subscriptions, settings and logs stay on this PC for when you reinstall.");
     case Phase::Failed:
@@ -273,18 +273,18 @@ std::wstring subtitleText(const State& s) {
 // The steps NSIS reports through Step; installer.nsi names the same boundaries.
 std::vector<std::wstring> stepNames(const State& s) {
   if (s.mode == Mode::Upgrade)
-    return {s.tr(L"停止 Solaris 和后台服务", L"Stop Solaris and the background service"),
-            s.tr(L"替换应用文件", L"Replace app files"), s.tr(L"注册 Solaris", L"Register Solaris"),
+    return {s.tr(L"停止 OpenWeir 和后台服务", L"Stop OpenWeir and the background service"),
+            s.tr(L"替换应用文件", L"Replace app files"), s.tr(L"注册 OpenWeir", L"Register OpenWeir"),
             s.tr(L"启动后台服务", L"Start the background service")};
   if (s.mode == Mode::Uninstall) {
-    std::vector<std::wstring> names{s.tr(L"关闭 Solaris", L"Close Solaris"),
+    std::vector<std::wstring> names{s.tr(L"关闭 OpenWeir", L"Close OpenWeir"),
                                     s.tr(L"移除后台服务", L"Remove the background service"),
                                     s.tr(L"移除应用文件", L"Remove app files")};
     if (s.purged) names.emplace_back(s.tr(L"删除订阅、设置和日志", L"Delete subscriptions, settings and logs"));
     return names;
   }
   return {s.tr(L"检查安装位置", L"Check the install location"), s.tr(L"复制应用文件", L"Copy app files"),
-          s.tr(L"注册 Solaris", L"Register Solaris"), s.tr(L"启动后台服务", L"Start the background service")};
+          s.tr(L"注册 OpenWeir", L"Register OpenWeir"), s.tr(L"启动后台服务", L"Start the background service")};
 }
 
 Mark mark(const State& s, int index) {
@@ -385,7 +385,7 @@ bool hasFont(const wchar_t* family) {
 }
 
 HICON loadIcon(State& s, int size) {
-  return static_cast<HICON>(LoadImageW(nullptr, (s.assets + L"\\solaris.ico").c_str(), IMAGE_ICON,
+  return static_cast<HICON>(LoadImageW(nullptr, (s.assets + L"\\openweir.ico").c_str(), IMAGE_ICON,
                                        s.px(size), s.px(size), LR_LOADFROMFILE));
 }
 
@@ -560,7 +560,7 @@ void render(State& s) {
     text(s.secondary, s.tr(L"取消", L"Cancel"));
   } else if (!busy) {
     // While hidden, the action keeps its name until the outcome: smoke-test.ps1 waits for it.
-    text(s.primary, done ? s.tr(L"打开 Solaris", L"Open Solaris") : s.tr(L"关闭", L"Close"));
+    text(s.primary, done ? s.tr(L"打开 OpenWeir", L"Open OpenWeir") : s.tr(L"关闭", L"Close"));
     text(s.secondary, s.tr(L"关闭", L"Close"));
   }
   show(s.primary, license || ready || (done && !uninstall));
@@ -900,7 +900,7 @@ void chooseDirectory(State& s) {
   Microsoft::WRL::ComPtr<IFileOpenDialog> dialog;
   if (FAILED(CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(dialog.GetAddressOf())))) return;
   dialog->SetOptions(FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM | FOS_NOCHANGEDIR);
-  dialog->SetTitle(s.tr(L"选择安装位置（将创建 Solaris 文件夹）", L"Choose a folder for Solaris"));
+  dialog->SetTitle(s.tr(L"选择安装位置（将创建 OpenWeir 文件夹）", L"Choose a folder for OpenWeir"));
   const auto slash = s.directory.find_last_of(L'\\');
   Microsoft::WRL::ComPtr<IShellItem> folder;
   if (slash != std::wstring::npos && SUCCEEDED(SHCreateItemFromParsingName(s.directory.substr(0, slash + 1).c_str(),
@@ -913,7 +913,7 @@ void chooseDirectory(State& s) {
   CoTaskMemFree(path);
   while (!directory.empty() && directory.back() == L'\\') directory.pop_back();
   const auto leaf = directory.substr(directory.find_last_of(L'\\') + 1);
-  if (_wcsicmp(leaf.c_str(), L"Solaris") != 0) directory += L"\\Solaris";
+  if (_wcsicmp(leaf.c_str(), L"OpenWeir") != 0) directory += L"\\OpenWeir";
   text(s.pathEdit, directory);
   SetFocus(s.pathEdit);
 }
@@ -929,8 +929,8 @@ bool selectedDirectory(State& s) {
   const DWORD length = drive && value.substr(2).find_first_of(L"<>:\"|?*\r\n") == std::wstring::npos
                        ? GetFullPathNameW(value.c_str(), 1024, full, nullptr) : 0;
   if (!length || length >= 1024) {
-    MessageBoxW(s.window.load(), s.tr(L"请选择本地磁盘上的完整文件夹路径，例如 D:\\Solaris。", L"Choose an absolute folder on a local drive, such as D:\\Solaris."),
-                L"Solaris", MB_OK | MB_ICONINFORMATION);
+    MessageBoxW(s.window.load(), s.tr(L"请选择本地磁盘上的完整文件夹路径，例如 D:\\OpenWeir。", L"Choose an absolute folder on a local drive, such as D:\\OpenWeir."),
+                L"OpenWeir", MB_OK | MB_ICONINFORMATION);
     SetFocus(s.pathEdit);
     return false;
   }
@@ -966,8 +966,8 @@ void makeControls(State& s) {
   s.logEdit = control(s, L"EDIT", L"", ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL | WS_VSCROLL | WS_TABSTOP, logID);
   SetWindowSubclass(s.logEdit, editProcedure, 1, 1);
   SendMessageW(s.logEdit, EM_LIMITTEXT, 32768, 0);
-  s.licenseNote = control(s, L"STATIC", s.tr(L"Solaris 以 GPL-3.0-only 发布，以下是许可证原文。",
-                                             L"Solaris is released under GPL-3.0-only. The license text follows."), SS_NOPREFIX);
+  s.licenseNote = control(s, L"STATIC", s.tr(L"OpenWeir 以 GPL-3.0-only 发布，以下是许可证原文。",
+                                             L"OpenWeir is released under GPL-3.0-only. The license text follows."), SS_NOPREFIX);
   s.licenseTitle = control(s, L"STATIC", s.tr(L"GPLv3 开源许可协议", L"GPLv3 open-source license"), SS_NOPREFIX);
   s.licenseEdit = control(s, L"EDIT", L"", ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL | WS_VSCROLL | WS_TABSTOP, licenseTextID);
   SendMessageW(s.licenseEdit, EM_LIMITTEXT, 131072, 0);
@@ -1233,8 +1233,8 @@ void run(State& s) {
     RECT work{};
     SystemParametersInfoW(SPI_GETWORKAREA, 0, &work, 0);
     const int width = size.right - size.left, height = size.bottom - size.top;
-    const wchar_t* caption = s.mode == Mode::Uninstall ? s.tr(L"Solaris 卸载程序", L"Solaris Uninstall")
-                                                       : s.tr(L"Solaris 安装程序", L"Solaris Setup");
+    const wchar_t* caption = s.mode == Mode::Uninstall ? s.tr(L"OpenWeir 卸载程序", L"OpenWeir Uninstall")
+                                                       : s.tr(L"OpenWeir 安装程序", L"OpenWeir Setup");
     HWND window = CreateWindowExW(WS_EX_CONTROLPARENT, windowClass, caption, style,
                                   work.left + (work.right - work.left - width) / 2,
                                   work.top + (work.bottom - work.top - height) / 2,

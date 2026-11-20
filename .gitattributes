@@ -6,6 +6,6 @@
 # Preserve upstream font bytes and licenses on Windows as well as macOS. The OFL
 # notices retain upstream trailing spaces, including in the generated aggregate.
 *.ttf binary
-src/solaris/ui/fonts/*/OFL.txt text eol=lf whitespace=-blank-at-eol
-src/solaris/ui/fonts/sources.json text eol=lf
-src/solaris/licenses/THIRD_PARTY_NOTICES.txt text eol=lf whitespace=-blank-at-eol
+src/openweir/ui/fonts/*/OFL.txt text eol=lf whitespace=-blank-at-eol
+src/openweir/ui/fonts/sources.json text eol=lf
+src/openweir/licenses/THIRD_PARTY_NOTICES.txt text eol=lf whitespace=-blank-at-eol

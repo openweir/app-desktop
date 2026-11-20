@@ -11,12 +11,12 @@ import (
 )
 
 func TestCaptureInChild(t *testing.T) {
-	if directory := os.Getenv("SOLARIS_CRASH_PROBE"); directory != "" {
+	if directory := os.Getenv("OPENWEIR_CRASH_PROBE"); directory != "" {
 		closeLog, err := Open(directory)
 		if err != nil {
 			panic(err)
 		}
-		if os.Getenv("SOLARIS_CRASH_MODE") == "panic" {
+		if os.Getenv("OPENWEIR_CRASH_MODE") == "panic" {
 			panic("isolated crash probe")
 		}
 		closeLog()
@@ -26,7 +26,7 @@ func TestCaptureInChild(t *testing.T) {
 		t.Run(mode, func(t *testing.T) {
 			directory := t.TempDir()
 			command := exec.Command(os.Args[0], "-test.run=^TestCaptureInChild$")
-			command.Env = append(os.Environ(), "SOLARIS_CRASH_PROBE="+directory, "SOLARIS_CRASH_MODE="+mode)
+			command.Env = append(os.Environ(), "OPENWEIR_CRASH_PROBE="+directory, "OPENWEIR_CRASH_MODE="+mode)
 			output, err := command.CombinedOutput()
 			files, _ := filepath.Glob(filepath.Join(directory, "go-*.log"))
 			if mode == "normal" {

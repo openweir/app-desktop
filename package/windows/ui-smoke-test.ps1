@@ -1,5 +1,5 @@
 # Read-only UI checks on the disposable Windows runner. The harness renders the same
-# native surface as setup/uninstall; it cannot install, uninstall or start Solaris.
+# native surface as setup/uninstall; it cannot install, uninstall or start OpenWeir.
 # It walks every state the preview reports (ui/preview.nsi) and saves a screenshot of each:
 # ready, license, every step, details, completion and failure, for install, update and
 # uninstall, in both languages, light and dark, and at 150%.
@@ -55,7 +55,7 @@ public static class SetupUI {
             GetWindowThreadProcessId(window, out process);
             var name = new StringBuilder(128);
             GetClassName(window, name, name.Capacity);
-            if (process == processId && name.ToString() == "SolarisSetupWindow") { found = window; return false; }
+            if (process == processId && name.ToString() == "OpenWeirSetupWindow") { found = window; return false; }
             return true;
         }, IntPtr.Zero);
         return found;
@@ -275,7 +275,7 @@ try {
     Wait-Until { [SetupUI]::FocusedControl($case.Window) -eq $PathId } 'Install did not start in the location field'
     $pathElement = Element $case.Window $PathId
     if (-not $pathElement.Current.Name) { throw 'The install path has no accessible label' }
-    $pathElement.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).SetValue('C:\Solaris Preview')
+    $pathElement.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).SetValue('C:\OpenWeir Preview')
     1..3 | ForEach-Object { [SetupUI]::Key($case.Window, $Tab) }
     Wait-Until { [SetupUI]::FocusedControl($case.Window) -eq $LinkId } 'Tab did not reach the license link'
     Snapshot $case 'ready-focus'
@@ -335,7 +335,7 @@ foreach ($sample in @(
         }
         $failAt = if ($sample.FailAt) { $sample.FailAt } else { 1 }
         Run-Steps $case $sample.Steps $sample.Outcome $failAt
-        if ($sample.Mode -eq 'uninstall' -and (Visible $case.Window $ActionId)) { throw 'Uninstall offers to open Solaris' }
+        if ($sample.Mode -eq 'uninstall' -and (Visible $case.Window $ActionId)) { throw 'Uninstall offers to open OpenWeir' }
         Invoke-Button $case.Window $sample.Finish
         Assert-Exit $case $sample.Code
     } finally { if (-not $case.Process.HasExited) { $case.Process.Kill() } }

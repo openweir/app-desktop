@@ -28,9 +28,9 @@ from PySide6.QtQuick import QQuickItem, QQuickWindow
 from PySide6.QtTest import QTest
 from pytestqt.qtbot import QtBot
 
-from solaris.app import MAIN_QML
-from solaris.fonts import BUNDLED, DIRECTORY, register_fonts
-from solaris.viewmodels.text_editing import TextEditing
+from openweir.app import MAIN_QML
+from openweir.fonts import BUNDLED, DIRECTORY, register_fonts
+from openweir.viewmodels.text_editing import TextEditing
 from tests.support.unicode import CLUSTERS, TEXT
 from tests.support.window import find
 
@@ -82,7 +82,7 @@ def shaped(text: str, family: str = "Inter", weight: int = 400) -> QTextLayout:
 @pytest.mark.parametrize(
     ("text", "expected"),
     [
-        ("Solaris 123", None),
+        ("OpenWeir 123", None),
         ("中文繁體龘", "Noto Sans SC"),
         ("🂡", "Noto Sans Symbols 2"),
         ("🇯🇵", "Noto Color Emoji"),
@@ -149,7 +149,7 @@ def test_missing_resources_are_diagnosed_in_a_fresh_application(tmp_path: Path) 
 import sys
 from pathlib import Path
 from PySide6.QtGui import QGuiApplication
-from solaris import fonts
+from openweir import fonts
 app = QGuiApplication([])
 fonts.DIRECTORY = Path(sys.argv[1])
 fonts.register_fonts()

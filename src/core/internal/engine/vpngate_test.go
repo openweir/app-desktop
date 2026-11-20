@@ -13,11 +13,11 @@ import (
 
 	C "github.com/metacubex/mihomo/constant"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/admission"
-	"github.com/Ember-Moth/Solaris/src/core/internal/controlpb"
-	"github.com/Ember-Moth/Solaris/src/core/internal/porttest"
-	"github.com/Ember-Moth/Solaris/src/core/internal/vpngate"
-	"github.com/Ember-Moth/Solaris/src/core/internal/vpngate/vpngatetest"
+	"github.com/openweir/app-desktop/src/core/internal/admission"
+	"github.com/openweir/app-desktop/src/core/internal/controlpb"
+	"github.com/openweir/app-desktop/src/core/internal/porttest"
+	"github.com/openweir/app-desktop/src/core/internal/vpngate"
+	"github.com/openweir/app-desktop/src/core/internal/vpngate/vpngatetest"
 )
 
 // fakeVpnGateList serves a list of two servers on loopback and counts the downloads.

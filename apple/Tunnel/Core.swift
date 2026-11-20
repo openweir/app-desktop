@@ -1,21 +1,21 @@
 import Foundation
-import SolarisCore
+import OpenWeirCore
 
-/// The Go core linked from libsolaris.a (src/core/apple): the engine in fd mode and the
+/// The Go core linked from libopenweir.a (src/core/apple): the engine in fd mode and the
 /// control dispatcher. Swift only forwards bytes; Go decodes the Request, checks its size and
 /// encodes the Response.
 enum Core {
   static func crashLogs(home: URL) {
-    home.path.withCString { solaris_crash_logs(UnsafeMutablePointer(mutating: $0)) }
+    home.path.withCString { openweir_crash_logs(UnsafeMutablePointer(mutating: $0)) }
   }
 
   /// The tunnel's network as Go defines it (admission.FDNetwork).
   static func network() throws -> TunnelNetwork {
     var length = 0
-    guard let buffer = solaris_tunnel_network(&length) else {
+    guard let buffer = openweir_tunnel_network(&length) else {
       throw TunnelError("The core did not describe the tunnel's network")
     }
-    defer { solaris_free(buffer) }
+    defer { openweir_free(buffer) }
     let decoder = JSONDecoder()
     decoder.keyDecodingStrategy = .convertFromSnakeCase
     return try decoder.decode(TunnelNetwork.self, from: Data(bytes: buffer, count: length))
@@ -30,13 +30,13 @@ enum Core {
   ) throws {
     let failure = home.path.withCString { home in
       resources.path.withCString { resources in
-        solaris_attach_tun(
+        openweir_attach_tun(
           fileDescriptor, UnsafeMutablePointer(mutating: home),
           UnsafeMutablePointer(mutating: resources), includeAllNetworks)
       }
     }
     if let failure {
-      defer { solaris_free(failure) }
+      defer { openweir_free(failure) }
       throw TunnelError(String(cString: failure))
     }
   }
@@ -44,17 +44,17 @@ enum Core {
   /// Stops the core and closes Go's duplicates of the descriptor. It waits for the messages
   /// in flight, which it cancels; afterwards NetworkExtension may close the descriptor.
   static func detach() {
-    solaris_detach_tun()
+    openweir_detach_tun()
   }
 
   static func handle(_ request: Data) -> Data? {
     request.withUnsafeBytes { bytes in
       var length = 0
       guard
-        let response = solaris_handle_message(
+        let response = openweir_handle_message(
           UnsafeMutableRawPointer(mutating: bytes.baseAddress), bytes.count, &length)
       else { return nil }
-      defer { solaris_free(response) }
+      defer { openweir_free(response) }
       return Data(bytes: response, count: length)
     }
   }

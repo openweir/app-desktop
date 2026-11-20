@@ -1,2 +1,2 @@
-"CFBundleDisplayName" = "Solaris";
-"NSSystemExtensionUsageDescription" = "Solaris uses this network extension to route traffic according to your connection settings.";
+"CFBundleDisplayName" = "OpenWeir";
+"NSSystemExtensionUsageDescription" = "OpenWeir uses this network extension to route traffic according to your connection settings.";

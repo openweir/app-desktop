@@ -6,17 +6,17 @@ from pathlib import Path
 
 import pytest
 
-from solaris.host.base import (
+from openweir.host.base import (
     EasyTierSettings,
     MeshNetwork,
     TailscaleSettings,
     ZeroTierSettings,
 )
-from solaris.models import mesh
-from solaris.models.backup import MERGE, REPLACE, Backups, Snapshot
-from solaris.models.credentials import CredentialError, MeshSecrets
-from solaris.models.mesh import MeshStore
-from solaris.models.store import ProfileStore
+from openweir.models import mesh
+from openweir.models.backup import MERGE, REPLACE, Backups, Snapshot
+from openweir.models.credentials import CredentialError, MeshSecrets
+from openweir.models.mesh import MeshStore
+from openweir.models.store import ProfileStore
 from tests.support.credentials import MemoryCredentials
 
 HOME = MeshNetwork(
@@ -48,7 +48,7 @@ def test_rows_keep_everything_but_the_secrets(tmp_path: Path) -> None:
     for network in (HOME, OFFICE, LAB):
         store.put(network)
     assert store.networks() == tuple(mesh.without_secrets(n) for n in (HOME, OFFICE, LAB))
-    data = (tmp_path / "solaris.db").read_bytes()
+    data = (tmp_path / "openweir.db").read_bytes()
     for secret in (b"tskey-auth-secret", b"id-secret", b"net-secret"):
         assert secret not in data
     # A change keeps the place; a deletion is a mark.

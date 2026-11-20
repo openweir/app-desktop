@@ -1,6 +1,6 @@
 # XcodeGen spec for the macOS native parts (apple/README.md). scripts/build_apple.py generates
-# Solaris.xcodeproj from it next to this file; the project is not committed.
-name: Solaris
+# OpenWeir.xcodeproj from it next to this file; the project is not committed.
+name: OpenWeir
 options:
   developmentLanguage: en
   deploymentTarget:
@@ -13,13 +13,17 @@ settings:
     ARCHS: "arm64 x86_64"
     ONLY_ACTIVE_ARCH: NO
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "1.4.0"
+    MARKETING_VERSION: "0.1.0"
     CURRENT_PROJECT_VERSION: "1"
     DEAD_CODE_STRIPPING: YES
     DEBUG_INFORMATION_FORMAT: dwarf-with-dsym
     # Developer ID, signed by hand with the team's certificate. Builds without the certificate
-    # pass CODE_SIGNING_ALLOWED=NO (scripts/build_apple.py without --sign).
-    DEVELOPMENT_TEAM: GY9ZKZMAZA
+    # pass CODE_SIGNING_ALLOWED=NO (scripts/build_apple.py without --sign). The team, the bundle
+    # id and the profile names come from product.json: scripts/build_apple.py passes them to
+    # xcodebuild, and the entitlements and Info.plist refer to them.
+    DEVELOPMENT_TEAM: ""
+    OPENWEIR_BUNDLE_ID: ""
+    OPENWEIR_TUNNEL_PROFILE: ""
     CODE_SIGN_STYLE: Manual
     CODE_SIGN_IDENTITY: Developer ID Application
     ENABLE_HARDENED_RUNTIME: YES
@@ -29,8 +33,8 @@ settings:
     # Notarization needs a secure timestamp.
     OTHER_CODE_SIGN_FLAGS: --timestamp
 targets:
-  # SolarisManager.dylib: the C interface the Python host loads with ctypes.
-  SolarisManager:
+  # OpenWeirManager.dylib: the C interface the Python host loads with ctypes.
+  OpenWeirManager:
     type: library.dynamic
     platform: macOS
     sources:
@@ -44,14 +48,14 @@ targets:
       - sdk: Security.framework
     settings:
       base:
-        PRODUCT_NAME: SolarisManager
+        PRODUCT_NAME: OpenWeirManager
         EXECUTABLE_PREFIX: ""
-        LD_DYLIB_INSTALL_NAME: "@rpath/SolarisManager.dylib"
-        # Imports SolarisManager.h so that each export is checked against its declaration.
+        LD_DYLIB_INSTALL_NAME: "@rpath/OpenWeirManager.dylib"
+        # Imports OpenWeirManager.h so that each export is checked against its declaration.
         SWIFT_INCLUDE_PATHS: $(SRCROOT)/Manager
         SKIP_INSTALL: YES
-  # dev.tschen.solaris.tunnel.systemextension: the packet tunnel provider with the Go dispatcher.
-  SolarisTunnel:
+  # <bundle id>.tunnel.systemextension: the packet tunnel provider with the Go dispatcher.
+  OpenWeirTunnel:
     type: system-extension
     platform: macOS
     sources:
@@ -68,26 +72,26 @@ targets:
         buildPhase: resources
     dependencies:
       # Built from src/core/apple by scripts/build_apple.py.
-      - framework: ../build/apple/SolarisCore.xcframework
+      - framework: ../build/apple/OpenWeirCore.xcframework
         embed: false
       - sdk: NetworkExtension.framework
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: dev.tschen.solaris.tunnel
+        PRODUCT_BUNDLE_IDENTIFIER: $(OPENWEIR_BUNDLE_ID).tunnel
         # A system extension's bundle is named after its identifier.
-        PRODUCT_NAME: dev.tschen.solaris.tunnel
-        PRODUCT_MODULE_NAME: SolarisTunnel
+        PRODUCT_NAME: $(OPENWEIR_BUNDLE_ID).tunnel
+        PRODUCT_MODULE_NAME: OpenWeirTunnel
         INFOPLIST_FILE: Tunnel/Info.plist
-        CODE_SIGN_ENTITLEMENTS: Tunnel/SolarisTunnel.entitlements
-        PROVISIONING_PROFILE_SPECIFIER: Solaris Tunnel Developer ID
+        CODE_SIGN_ENTITLEMENTS: Tunnel/OpenWeirTunnel.entitlements
+        PROVISIONING_PROFILE_SPECIFIER: $(OPENWEIR_TUNNEL_PROFILE)
         SKIP_INSTALL: YES
         # strip -x before signing: the local symbols of Swift and the Go archive go.
         DEPLOYMENT_POSTPROCESSING: YES
         STRIP_INSTALLED_PRODUCT: YES
         STRIP_STYLE: non-global
 schemes:
-  Solaris:
+  OpenWeir:
     build:
       targets:
-        SolarisManager: all
-        SolarisTunnel: all
+        OpenWeirManager: all
+        OpenWeirTunnel: all

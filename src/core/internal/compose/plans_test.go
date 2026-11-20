@@ -9,7 +9,7 @@ import (
 
 	"github.com/metacubex/mihomo/common/yaml"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/controlpb"
+	"github.com/openweir/app-desktop/src/core/internal/controlpb"
 )
 
 func nodeNames(nodes []*controlpb.PoolNode) []string {

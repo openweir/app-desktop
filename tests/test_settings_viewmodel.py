@@ -7,12 +7,12 @@ import pytest
 from PySide6.QtCore import QObject
 from pytestqt.qtbot import QtBot
 
-from solaris.desktop.login import LoginItemError, LoginItemStatus
-from solaris.host.base import RunOptions
-from solaris.models.settings import DatabaseSettingsStore, Settings
-from solaris.models.store import ProfileStore, open_database
-from solaris.viewmodels import settings as settings_view_model
-from solaris.viewmodels.composition import ViewModels, compose
+from openweir.desktop.login import LoginItemError, LoginItemStatus
+from openweir.host.base import RunOptions
+from openweir.models.settings import DatabaseSettingsStore, Settings
+from openweir.models.store import ProfileStore, open_database
+from openweir.viewmodels import settings as settings_view_model
+from openweir.viewmodels.composition import ViewModels, compose
 from tests.support import simulated
 from tests.support.simulated import SimulatedFetcher, SimulatedHost, seed_profiles
 from tests.support.storage import refuse_writes

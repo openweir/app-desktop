@@ -11,9 +11,9 @@ import pytest
 from PySide6.QtCore import QObject, Qt
 from pytestqt.qtbot import QtBot
 
-from solaris.host.base import ProxyGroup
-from solaris.models.store import ProfileStore
-from solaris.viewmodels.composition import ViewModels, compose
+from openweir.host.base import ProxyGroup
+from openweir.models.store import ProfileStore
+from openweir.viewmodels.composition import ViewModels, compose
 from tests.support.simulated import SAMPLE_CONFIG, SimulatedFetcher, SimulatedHost, seed_profiles
 from tests.support.window import Loaded, kind
 

@@ -2,8 +2,8 @@
 ; old extension module must not be silently retained during an architecture upgrade.
 ; The including script supplies LogicLib, the Fail macro and a RemovalFailed macro, which
 ; fails with a message naming PATH.
-!ifndef SOLARIS_REMOVE_FILES_INCLUDED
-!define SOLARIS_REMOVE_FILES_INCLUDED
+!ifndef OPENWEIR_REMOVE_FILES_INCLUDED
+!define OPENWEIR_REMOVE_FILES_INCLUDED
 
 !macro RemoveInstalledFile PATH
   Push "${PATH}"

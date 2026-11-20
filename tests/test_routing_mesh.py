@@ -16,18 +16,18 @@ import pytest
 from PySide6.QtCore import QObject, Qt, QUrl
 from pytestqt.qtbot import QtBot
 
-from solaris.host.base import (
+from openweir.host.base import (
     EasyTierSettings,
     MeshStatus,
     TailscaleSettings,
 )
-from solaris.models import plans
-from solaris.models.routing import PlanRule
-from solaris.models.store import ProfileStore
-from solaris.viewmodels import routing_mesh
-from solaris.viewmodels.composition import ViewModels, compose
-from solaris.viewmodels.routing import RoutingViewModel
-from solaris.viewmodels.routing_mesh import MeshNetworks
+from openweir.models import plans
+from openweir.models.routing import PlanRule
+from openweir.models.store import ProfileStore
+from openweir.viewmodels import routing_mesh
+from openweir.viewmodels.composition import ViewModels, compose
+from openweir.viewmodels.routing import RoutingViewModel
+from openweir.viewmodels.routing_mesh import MeshNetworks
 from tests.support.credentials import MemoryCredentials
 from tests.support.simulated import MESH_LOGIN, SimulatedFetcher, SimulatedHost, seed_profiles
 from tests.support.window import Loaded, texts
@@ -182,7 +182,7 @@ def test_secrets_stay_in_the_credential_store(
     assert json.loads(credentials.secrets[f"mesh:{network_id}"]) == {
         "network_secret": "s3cret-value"
     }
-    assert b"s3cret-value" not in (tmp_path / "solaris.db").read_bytes()
+    assert b"s3cret-value" not in (tmp_path / "openweir.db").read_bytes()
     assert host.config is not None
     assert host.config.composition is not None
     (network,) = host.config.composition.mesh

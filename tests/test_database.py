@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from solaris.models.database import (
+from openweir.models.database import (
     DATABASE_NAME,
     MIGRATIONS,
     SCHEMA_VERSION,
@@ -243,7 +243,7 @@ def test_a_database_nobody_closed_closes_quietly(tmp_path: Path) -> None:
 
 
 def test_v1_subscription_migrates_with_cached_body_and_no_entity_tag(tmp_path: Path) -> None:
-    from solaris.models.store import ProfileStore
+    from openweir.models.store import ProfileStore
 
     old = Database(tmp_path / DATABASE_NAME, migrations=MIGRATIONS[:1])
     with old.transaction() as connection:
@@ -267,7 +267,7 @@ def test_v1_subscription_migrates_with_cached_body_and_no_entity_tag(tmp_path: P
 
 
 def test_v2_routing_migration_preserves_an_existing_choice(tmp_path: Path) -> None:
-    from solaris.models.routing import RoutingStore
+    from openweir.models.routing import RoutingStore
 
     path = tmp_path / DATABASE_NAME
     old = Database(path, migrations=MIGRATIONS[:2])

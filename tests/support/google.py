@@ -19,13 +19,13 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 from urllib.parse import parse_qs, urlencode, urlsplit
 
-from solaris.models.backup_google import (
+from openweir.models.backup_google import (
     SCOPE,
     Endpoints,
     GoogleClient,
     GoogleDriveProvider,
 )
-from solaris.models.credentials import CredentialStore
+from openweir.models.credentials import CredentialStore
 
 CLIENT = GoogleClient("test-client.apps.googleusercontent.com", "test-client-secret")
 QUOTA_EXCEEDED = (

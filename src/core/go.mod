@@ -1,4 +1,4 @@
-module github.com/Ember-Moth/Solaris/src/core
+module github.com/openweir/app-desktop/src/core
 
 go 1.26.0
 

@@ -10,7 +10,7 @@ final class SystemExtensionRequests: NSObject, OSSystemExtensionRequestDelegate 
   static let shared = SystemExtensionRequests()
 
   enum Action: String { case activate, deactivate }
-  private let queue = DispatchQueue(label: "dev.tschen.solaris.manager.extensions")
+  private let queue = DispatchQueue(label: appBundleIdentifier + ".manager.extensions")
   private let lock = NSLock()
   private let submit: (OSSystemExtensionRequest) -> Void
   private var pending: Attempt?

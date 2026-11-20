@@ -13,9 +13,9 @@ from PySide6.QtQuick import QQuickItem, QQuickWindow
 from PySide6.QtTest import QTest
 from pytestqt.qtbot import QtBot
 
-from solaris.app import load_ui
-from solaris.models.store import ProfileStore
-from solaris.viewmodels.composition import compose
+from openweir.app import load_ui
+from openweir.models.store import ProfileStore
+from openweir.viewmodels.composition import compose
 from tests.support.i18n import ui_language
 from tests.support.releases import offline_updater
 from tests.support.simulated import SimulatedFetcher, SimulatedHost, seed_profiles

@@ -7,8 +7,8 @@ import pytest
 from PySide6.QtCore import Qt
 from pytestqt.qtbot import QtBot
 
-from solaris.host.base import TAKEOVER_TUN, HostError
-from solaris.models.backup import Backups
+from openweir.host.base import TAKEOVER_TUN, HostError
+from openweir.models.backup import Backups
 from tests.support.credentials import MemoryKeyring
 from tests.support.simulated import SimulatedHost
 from tests.support.window import Loaded, kind
@@ -40,7 +40,7 @@ def test_deactivation_confirms_and_keeps_profiles_settings_and_credentials(
     before = backups.snapshot().digest
     settings = models.settings_store.current
     configs = {profile.id: store.read_config(profile.id) for profile in store.load().profiles}
-    keyring.secrets[("Solaris", "maintenance-test")] = "kept"
+    keyring.secrets[("OpenWeir", "maintenance-test")] = "kept"
     secrets = dict(keyring.secrets)
     loaded.key(qtbot, Qt.Key.Key_Space)
     qtbot.waitUntil(lambda: loaded.focused_text() in ("取消", "Cancel"))

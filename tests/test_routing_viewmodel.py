@@ -9,11 +9,11 @@ import pytest
 from PySide6.QtCore import QObject
 from pytestqt.qtbot import QtBot
 
-from solaris.host.base import CompositionReport, HostError, TunnelConfig
-from solaris.models.store import ProfileStore
-from solaris.viewmodels.composition import ViewModels, compose
-from solaris.viewmodels.routing import RoutingViewModel
-from solaris.viewmodels.rule_editor import RuleEditor
+from openweir.host.base import CompositionReport, HostError, TunnelConfig
+from openweir.models.store import ProfileStore
+from openweir.viewmodels.composition import ViewModels, compose
+from openweir.viewmodels.routing import RoutingViewModel
+from openweir.viewmodels.rule_editor import RuleEditor
 from tests.support.simulated import SimulatedFetcher, SimulatedHost, seed_profiles
 
 NOW = datetime(2026, 10, 29, 12).timestamp()

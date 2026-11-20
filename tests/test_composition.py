@@ -8,7 +8,7 @@ from dataclasses import replace
 
 import pytest
 
-from solaris.host.base import (
+from openweir.host.base import (
     ComposedGroup,
     Composition,
     CompositionReport,
@@ -28,8 +28,8 @@ from solaris.host.base import (
     WarpAccount,
     bundled_geo_categories,
 )
-from solaris.host.service import ServiceHost
-from solaris.protocol import control_pb2
+from openweir.host.service import ServiceHost
+from openweir.protocol import control_pb2
 from tests.support.simulated import (
     SAMPLE_CONFIG,
     VPNGATE_SERVERS,

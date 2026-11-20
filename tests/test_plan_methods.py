@@ -8,7 +8,7 @@ import json
 import pytest
 import yaml
 
-from solaris.host.base import (
+from openweir.host.base import (
     EXPORT_GENERATED,
     Composition,
     CompositionSource,
@@ -22,8 +22,8 @@ from solaris.host.base import (
     SkippedRule,
     TunnelConfig,
 )
-from solaris.host.service import ServiceHost
-from solaris.protocol import control_pb2
+from openweir.host.service import ServiceHost
+from openweir.protocol import control_pb2
 from tests.support.simulated import SAMPLE_CONFIG, SimulatedHost
 from tests.test_control_client import serve
 

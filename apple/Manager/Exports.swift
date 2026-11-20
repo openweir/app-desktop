@@ -1,32 +1,32 @@
 import Foundation
-import SolarisManagerHeader
+import OpenWeirManagerHeader
 
-// The C functions declared in SolarisManager.h. Each converts between C and Swift and leaves the
+// The C functions declared in OpenWeirManager.h. Each converts between C and Swift and leaves the
 // work to SystemExtensionRequests, TunnelController and CloudBackup.
 
-@_cdecl("solaris_manager_activate")
-public func solarisManagerActivate(
+@_cdecl("openweir_manager_activate")
+public func openweirManagerActivate(
   _ timeout: Double, _ error: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> Int32 {
   run(error) { try SystemExtensionRequests.shared.activate(timeout: timeout) }
 }
 
-@_cdecl("solaris_manager_deactivate")
-public func solarisManagerDeactivate(
+@_cdecl("openweir_manager_deactivate")
+public func openweirManagerDeactivate(
   _ timeout: Double, _ error: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> Int32 {
   run(error) { try TunnelController.shared.deactivate(timeout: timeout) }
 }
 
-@_cdecl("solaris_manager_configure")
-public func solarisManagerConfigure(
+@_cdecl("openweir_manager_configure")
+public func openweirManagerConfigure(
   _ includeAllNetworks: Bool, _ error: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> Int32 {
   run(error) { try TunnelController.shared.configure(includeAllNetworks: includeAllNetworks) }
 }
 
-@_cdecl("solaris_manager_start")
-public func solarisManagerStart(
+@_cdecl("openweir_manager_start")
+public func openweirManagerStart(
   _ timeout: Double, _ includeAllNetworks: Bool,
   _ error: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> Int32 {
@@ -35,26 +35,26 @@ public func solarisManagerStart(
   }
 }
 
-@_cdecl("solaris_manager_stop")
-public func solarisManagerStop(
+@_cdecl("openweir_manager_stop")
+public func openweirManagerStop(
   _ timeout: Double, _ error: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> Int32 {
   run(error) { try TunnelController.shared.stop(timeout: timeout) }
 }
 
-@_cdecl("solaris_manager_status")
-public func solarisManagerStatus(
+@_cdecl("openweir_manager_status")
+public func openweirManagerStatus(
   _ status: UnsafeMutablePointer<Int32>?,
   _ error: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> Int32 {
   run(error) {
     guard let status else { throw ManagerError.failed("status must not be NULL") }
-    status.pointee = SolarisTunnelStatus(try TunnelController.shared.status())
+    status.pointee = OpenWeirTunnelStatus(try TunnelController.shared.status())
   }
 }
 
-@_cdecl("solaris_manager_send")
-public func solarisManagerSend(
+@_cdecl("openweir_manager_send")
+public func openweirManagerSend(
   _ request: UnsafePointer<UInt8>?, _ requestLength: Int, _ timeout: Double,
   _ response: UnsafeMutablePointer<UnsafeMutablePointer<UInt8>?>?,
   _ responseLength: UnsafeMutablePointer<Int>?,
@@ -73,19 +73,19 @@ public func solarisManagerSend(
   }
 }
 
-@_cdecl("solaris_manager_icloud_status")
-public func solarisManagerICloudStatus(
+@_cdecl("openweir_manager_icloud_status")
+public func openweirManagerICloudStatus(
   _ timeout: Double, _ status: UnsafeMutablePointer<Int32>?,
   _ error: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> Int32 {
   run(error) {
     guard let status else { throw ManagerError.failed("status must not be NULL") }
-    status.pointee = SolarisICloudStatus(try CloudBackup.shared.status(timeout: timeout))
+    status.pointee = OpenWeirICloudStatus(try CloudBackup.shared.status(timeout: timeout))
   }
 }
 
-@_cdecl("solaris_manager_icloud_save")
-public func solarisManagerICloudSave(
+@_cdecl("openweir_manager_icloud_save")
+public func openweirManagerICloudSave(
   _ name: UnsafePointer<CChar>?, _ info: UnsafePointer<CChar>?,
   _ snapshot: UnsafePointer<UInt8>?, _ snapshotLength: Int, _ timeout: Double,
   _ error: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
@@ -100,8 +100,8 @@ public func solarisManagerICloudSave(
   }
 }
 
-@_cdecl("solaris_manager_icloud_list")
-public func solarisManagerICloudList(
+@_cdecl("openweir_manager_icloud_list")
+public func openweirManagerICloudList(
   _ timeout: Double, _ list: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?,
   _ error: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> Int32 {
@@ -116,8 +116,8 @@ public func solarisManagerICloudList(
   }
 }
 
-@_cdecl("solaris_manager_icloud_download")
-public func solarisManagerICloudDownload(
+@_cdecl("openweir_manager_icloud_download")
+public func openweirManagerICloudDownload(
   _ name: UnsafePointer<CChar>?, _ timeout: Double,
   _ snapshot: UnsafeMutablePointer<UnsafeMutablePointer<UInt8>?>?,
   _ snapshotLength: UnsafeMutablePointer<Int>?,
@@ -135,8 +135,8 @@ public func solarisManagerICloudDownload(
   }
 }
 
-@_cdecl("solaris_manager_icloud_delete")
-public func solarisManagerICloudDelete(
+@_cdecl("openweir_manager_icloud_delete")
+public func openweirManagerICloudDelete(
   _ name: UnsafePointer<CChar>?, _ timeout: Double,
   _ error: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> Int32 {
@@ -146,8 +146,8 @@ public func solarisManagerICloudDelete(
   }
 }
 
-@_cdecl("solaris_manager_free")
-public func solarisManagerFree(_ pointer: UnsafeMutableRawPointer?) {
+@_cdecl("openweir_manager_free")
+public func openweirManagerFree(_ pointer: UnsafeMutableRawPointer?) {
   free(pointer)
 }
 
@@ -159,20 +159,20 @@ private func run(
   let failure: ManagerError
   do {
     guard !Thread.isMainThread else {
-      throw ManagerError.failed("SolarisManager blocks; call it from a background thread")
+      throw ManagerError.failed("OpenWeirManager blocks; call it from a background thread")
     }
     try body()
-    return SolarisManagerResult(SOLARIS_MANAGER_OK)
+    return OpenWeirManagerResult(OPENWEIR_MANAGER_OK)
   } catch let managerError as ManagerError {
     failure = managerError
   } catch let other {
     failure = ManagerError.failed(other.localizedDescription)
   }
   error?.pointee = strdup(failure.message)
-  return SolarisManagerResult(failure.result)
+  return OpenWeirManagerResult(failure.result)
 }
 
-/// `data` in a buffer the caller releases with solaris_manager_free. malloc(0) may return NULL,
+/// `data` in a buffer the caller releases with openweir_manager_free. malloc(0) may return NULL,
 /// and an empty Response is still a Response, so the buffer has at least one byte.
 private func copy(_ data: Data) throws -> UnsafeMutablePointer<UInt8> {
   guard let buffer = malloc(max(data.count, 1))?.assumingMemoryBound(to: UInt8.self) else {
@@ -184,19 +184,19 @@ private func copy(_ data: Data) throws -> UnsafeMutablePointer<UInt8> {
 
 private func same<T>(_: T, _: T) {}
 
-// Never called: it compiles only while each export matches its declaration in SolarisManager.h.
+// Never called: it compiles only while each export matches its declaration in OpenWeirManager.h.
 private func checkHeader() {
-  same(solaris_manager_activate, solarisManagerActivate)
-  same(solaris_manager_deactivate, solarisManagerDeactivate)
-  same(solaris_manager_configure, solarisManagerConfigure)
-  same(solaris_manager_start, solarisManagerStart)
-  same(solaris_manager_stop, solarisManagerStop)
-  same(solaris_manager_status, solarisManagerStatus)
-  same(solaris_manager_send, solarisManagerSend)
-  same(solaris_manager_icloud_status, solarisManagerICloudStatus)
-  same(solaris_manager_icloud_save, solarisManagerICloudSave)
-  same(solaris_manager_icloud_list, solarisManagerICloudList)
-  same(solaris_manager_icloud_download, solarisManagerICloudDownload)
-  same(solaris_manager_icloud_delete, solarisManagerICloudDelete)
-  same(solaris_manager_free, solarisManagerFree)
+  same(openweir_manager_activate, openweirManagerActivate)
+  same(openweir_manager_deactivate, openweirManagerDeactivate)
+  same(openweir_manager_configure, openweirManagerConfigure)
+  same(openweir_manager_start, openweirManagerStart)
+  same(openweir_manager_stop, openweirManagerStop)
+  same(openweir_manager_status, openweirManagerStatus)
+  same(openweir_manager_send, openweirManagerSend)
+  same(openweir_manager_icloud_status, openweirManagerICloudStatus)
+  same(openweir_manager_icloud_save, openweirManagerICloudSave)
+  same(openweir_manager_icloud_list, openweirManagerICloudList)
+  same(openweir_manager_icloud_download, openweirManagerICloudDownload)
+  same(openweir_manager_icloud_delete, openweirManagerICloudDelete)
+  same(openweir_manager_free, openweirManagerFree)
 }

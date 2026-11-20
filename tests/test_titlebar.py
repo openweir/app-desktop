@@ -13,8 +13,8 @@ from PySide6.QtQuick import QQuickItem
 from PySide6.QtTest import QTest
 from pytestqt.qtbot import QtBot
 
-from solaris.desktop import titlebar
-from solaris.desktop.titlebar import (
+from openweir.desktop import titlebar
+from openweir.desktop.titlebar import (
     HTCLIENT,
     HTMAXBUTTON,
     HTTOP,
@@ -39,8 +39,8 @@ from solaris.desktop.titlebar import (
     titlebar_style,
     window_flags,
 )
-from solaris.viewmodels import titlebar as titlebar_view_model
-from solaris.viewmodels.titlebar import TitleBar
+from openweir.viewmodels import titlebar as titlebar_view_model
+from openweir.viewmodels.titlebar import TitleBar
 from tests.support.window import Loaded, accessible, find_all, kind
 
 # DESIGN.md's spacing tokens.
@@ -274,7 +274,7 @@ def test_the_filter_answers_for_its_window_only(
 def style(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> str:
     """The window in this style, whatever system the tests run on. Request it before
     ``loaded``."""
-    monkeypatch.setattr("solaris.viewmodels.desktop.titlebar_style", lambda _: request.param)
+    monkeypatch.setattr("openweir.viewmodels.desktop.titlebar_style", lambda _: request.param)
     return request.param
 
 

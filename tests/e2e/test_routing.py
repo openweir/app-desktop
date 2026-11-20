@@ -17,9 +17,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts.dev import DevService
-from scripts.fetch_geodata import GEOIP, GEOSITE, seed
-from solaris.host.base import (
+from openweir.host.base import (
     EXPORT_GENERATED,
     Composition,
     CompositionSource,
@@ -31,12 +29,14 @@ from solaris.host.base import (
     TunnelConfig,
     bundled_geo_categories,
 )
-from solaris.host.service import ServiceHost
-from solaris.models.library import ProfileLibrary
-from solaris.models.profiles import ProfileError
-from solaris.models.routing import MODE_PLAN, Plan, RoutingStore
-from solaris.models.store import ProfileStore
-from solaris.models.subscription import UrlFetcher
+from openweir.host.service import ServiceHost
+from openweir.models.library import ProfileLibrary
+from openweir.models.profiles import ProfileError
+from openweir.models.routing import MODE_PLAN, Plan, RoutingStore
+from openweir.models.store import ProfileStore
+from openweir.models.subscription import UrlFetcher
+from scripts.dev import DevService
+from scripts.fetch_geodata import GEOIP, GEOSITE, seed
 from tests.e2e.app import Network, Stream
 from tests.e2e.servers import ProxyNode, WebServer, free_port
 from tests.e2e.unix import unix_opener

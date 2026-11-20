@@ -8,7 +8,7 @@
 「关于」分组（[ui.md](ui.md) 第 8 节）。面向用户的材料：README 的"下载与安装"、[PRIVACY.md](../PRIVACY.md) 和发布
 说明的模板 `.github/release-notes.md`。
 
-Windows 安装包由 Azure Artifact Signing 签名（D42），更新时核对校验和与签名者（第 3 节）。`solaris:`、`clash:`、`mihomo:`、
+Windows 安装包由 Azure Artifact Signing 签名（D42），更新时核对校验和与签名者（第 3 节）。`openweir:`、`clash:`、`mihomo:`、
 `clashmeta:` 四个 scheme 由打包向系统注册（macOS 的 Info.plist，Windows 安装器写在 HKLM，第 6 节）。
 
 Windows 安装器采用自定义 Win32 界面（D39），由 MSVC 编译为 NSIS 的 x86 Unicode 插件；它只随安装器/卸载器
@@ -18,18 +18,18 @@ Windows 安装器采用自定义 Win32 界面（D39），由 MSVC 编译为 NSIS
 
 ## 1. 发布物
 
-每个版本是 GitHub 仓库 `Ember-Moth/Solaris` 的一个 Release，由发布工作流创建。界面只认下面这套约定，发布工作流
+每个版本是 GitHub 仓库 `openweir/app-desktop` 的一个 Release，由发布工作流创建。界面只认下面这套约定，发布工作流
 必须照此命名：
 
 | 项目 | 约定 |
 | --- | --- |
 | 标签 | `v<版本>`，版本即 `pyproject.toml` 的 `version`，形如 `1.0.0`（三段数字）。预发布和草稿不提供给更新 |
-| 标题与说明 | `Solaris <版本>`；说明取自 `.github/release-notes.md`，`{{version}}` 换成版本，"更新内容"在草稿里手写 |
-| macOS 安装包 | `Solaris-<版本>-macos-universal.dmg`：由 `scripts/build_dmg.py` 制作，挂载后是一个固定的窗口，左边 `Solaris.app`、右边“应用程序”的快捷方式（apple/README.md 的“磁盘映像”）；磁盘映像用 Developer ID（Team `GY9ZKZMAZA`）签名、公证并 staple |
-| Windows 安装包 | `Solaris-<版本>-windows-x64-setup.exe`：NSIS 安装器（architecture.md 第 9 节）。安装器、卸载器和装进去的程序用 Azure Artifact Signing 做 Authenticode 签名并加时间戳，签名者是 `Herta Network LLC`（D42）；更新时核对校验和与签名者（第 3 节第 4 步）。1.0.0 不签名（D29） |
-| Windows ARM64 安装包 | `Solaris-<版本>-windows-arm64-setup.exe`：Windows 11 ARM64 原生应用、服务及匹配的 Cronet/Wintun；NSIS 引导仍为 x86，安装逻辑与签名与 x64 版相同 |
+| 标题与说明 | `OpenWeir <版本>`；说明取自 `.github/release-notes.md`，`{{version}}` 换成版本，"更新内容"在草稿里手写 |
+| macOS 安装包 | `OpenWeir-<版本>-macos-universal.dmg`：由 `scripts/build_dmg.py` 制作，挂载后是一个固定的窗口，左边 `OpenWeir.app`、右边“应用程序”的快捷方式（apple/README.md 的“磁盘映像”）；磁盘映像用 Developer ID（Team 为 `OPENWEIR_APPLE_TEAM_ID`）签名、公证并 staple |
+| Windows 安装包 | `OpenWeir-<版本>-windows-x64-setup.exe`：NSIS 安装器（architecture.md 第 9 节）。安装器、卸载器和装进去的程序用 Azure Artifact Signing 做 Authenticode 签名并加时间戳，签名者是 `OpenWeir`（D42）；更新时核对校验和与签名者（第 3 节第 4 步）。1.0.0 不签名（D29） |
+| Windows ARM64 安装包 | `OpenWeir-<版本>-windows-arm64-setup.exe`：Windows 11 ARM64 原生应用、服务及匹配的 Cronet/Wintun；NSIS 引导仍为 x86，安装逻辑与签名与 x64 版相同 |
 | 校验和 | `SHA256SUMS`：`sha256sum` 的输出格式，每行 `<64 位小写十六进制>  <文件名>`，覆盖本次发布的其他每个文件 |
-| 源代码 | 不上传源代码包（D43）：源代码是本仓库的 `v<版本>` 标签，mihomo 和其他 Go 依赖由标签里的 `src/core/go.mod`、`go.sum` 固定；发布说明和 NOTICES 写明这些位置（第 5 节）。1.0.0 的 Release 另有 `Solaris-1.0.0-source.tar.gz`，保留不动 |
+| 源代码 | 不上传源代码包（D43）：源代码是本仓库的 `v<版本>` 标签，mihomo 和其他 Go 依赖由标签里的 `src/core/go.mod`、`go.sum` 固定；发布说明和 NOTICES 写明这些位置（第 5 节）。1.0.0 的 Release 另有 `OpenWeir-1.0.0-source.tar.gz`，保留不动 |
 
 Release 上有三个安装包和 SHA256SUMS，共四个文件（1.0.0 另有源代码包）。支持 Windows x64、Windows 11 ARM64 和 macOS arm64 / x64（通用包，D2、D40）。其他平台的界面不提供
 下载，「检查更新」照常显示有没有新版本。
@@ -41,12 +41,12 @@ Release 上有三个安装包和 SHA256SUMS，共四个文件（1.0.0 另有源�
 
 1. **macOS universal** 和 **Windows x64 / ARM64** 三个构建任务分别构建、签名、公证（macOS）安装包，Windows 的安装包还在
    runner 上装一遍、升级、卸载（architecture.md 第 10 节）。产物连同各自的 `.sha256` 存为 workflow artifact。各构建任务都把 Environment
-   的机密 `SOLARIS_GOOGLE_CLIENT_ID`、`SOLARIS_GOOGLE_CLIENT_SECRET` 交给构建脚本，打包进 Google Drive 备份用的 OAuth
+   的机密 `OPENWEIR_GOOGLE_CLIENT_ID`、`OPENWEIR_GOOGLE_CLIENT_SECRET` 交给构建脚本，打包进 Google Drive 备份用的 OAuth
    客户端（storage.md 第 4 节）；没有这两个机密时给出警告，照常构建，安装包里没有 Google Drive 备份。客户端在 Google
    Cloud 里的设置见 [maintenance.md](maintenance.md) 2.8 节。
 
    Windows 的签名（D42）：job 有 `id-token: write`，构建完安装目录后由 `azure/login` 用 GitHub 的 OIDC 令牌以托管标识
-   `id-solaris-release` 登录 Azure。它的联合凭据只认这个仓库的 `release` 环境；它只在证书配置文件上有
+   `id-openweir-release` 登录 Azure。它的联合凭据只认这个仓库的 `release` 环境；它只在证书配置文件上有
    「Artifact Signing Certificate Profile Signer」角色，订阅里没有角色，所以登录设 `allow-no-subscriptions` 且不选订阅。
    用到 Environment 的这些变量（不是机密）：`AZURE_CLIENT_ID`、`AZURE_TENANT_ID`、`ARTIFACT_SIGNING_ENDPOINT`、
    `ARTIFACT_SIGNING_ACCOUNT`、`ARTIFACT_SIGNING_PROFILE`；`AZURE_SUBSCRIPTION_ID` 不用。签名由 `package/windows/sign.ps1`
@@ -62,7 +62,7 @@ Release 上有三个安装包和 SHA256SUMS，共四个文件（1.0.0 另有源�
    `tests/test_release_workflow.py` 核对这几步：上传的正是界面要找的三个安装包和 `SHA256SUMS`，没有源代码包；发布说明
    和 NOTICES 写着第 5 节的源代码位置。
 
-**为什么是草稿**：界面检查更新用的 `releases/latest` 跳过草稿，Release 一旦发布，所有装了 Solaris 的机器就会看到它。
+**为什么是草稿**：界面检查更新用的 `releases/latest` 跳过草稿，Release 一旦发布，所有装了 OpenWeir 的机器就会看到它。
 审批发生在构建之前，审批人那时还看不到产物；本机又不能运行组装好的 app。所以由人从草稿下载三个安装包在真机上
 试过、写好"更新内容"再发布；草稿有错可以直接删掉重来。发版的步骤见 [maintenance.md](maintenance.md) 第 4 节。
 
@@ -72,15 +72,15 @@ GitHub 把正文里的换行原样显示，所以模板的段落不折行；除 
 
 ## 2. 检查更新
 
-代码在 `src/solaris/update/`：`releases.py` 读 GitHub、`download.py` 下载与校验和、`signature.py` 校验签名，
+代码在 `src/openweir/update/`：`releases.py` 读 GitHub、`download.py` 下载与校验和、`signature.py` 校验签名，
 `viewmodels/about.py` 是设置页「关于」分组的 ViewModel。
 
-- **来源**：`GET https://api.github.com/repos/Ember-Moth/Solaris/releases/latest`，不需要认证。请求头
-  `Accept: application/vnd.github+json`、`X-GitHub-Api-Version: 2022-11-28`、`User-Agent: solaris/<版本>`。
+- **来源**：`GET https://api.github.com/repos/openweir/app-desktop/releases/latest`，不需要认证。请求头
+  `Accept: application/vnd.github+json`、`X-GitHub-Api-Version: 2022-11-28`、`User-Agent: openweir/<版本>`。
   这个接口只返回最新的正式发布，跳过草稿和预发布；仓库还没有任何发布时它回 404，界面当作已是最新版本。
   未认证的请求每个 IP 每小时 60 次，自动检查一天最多几次，够用；超限时 GitHub 回 403 或 429，界面显示
   「检查更新失败：HTTP 403」。
-- **版本比较**：标签去掉开头的 `v` 后必须是 `X.Y.Z`，按三段整数比较；当前版本是 `solaris.__version__`（取自
+- **版本比较**：标签去掉开头的 `v` 后必须是 `X.Y.Z`，按三段整数比较；当前版本是 `openweir.__version__`（取自
   安装的包元数据，打包时须保留，见第 6 节）。标签不是这个形式时视为检查失败（「发布的版本号无法识别」），
   不会把它当成新版本。
 - **下载地址只接受 https**，测试用的回环地址（`127.0.0.1`、`localhost`）例外。
@@ -104,7 +104,7 @@ GitHub 把正文里的换行原样显示，所以模板的段落不折行；除 
 4. **校验签名**（`update/signature.py`），都在工作线程里运行：
    - **macOS**：对磁盘映像依次运行
      - `codesign --verify --deep --strict --verbose=2`：签名有效、内容未被改动；
-     - `codesign --display --verbose=2`：输出里的 `TeamIdentifier` 必须是 `GY9ZKZMAZA`；
+     - `codesign --display --verbose=2`：输出里的 `TeamIdentifier` 必须是随包 `product.json` 里的 Team ID（发布时由 `OPENWEIR_APPLE_TEAM_ID` 写入）；
      - `spctl --assess --type open --context context:primary-signature --verbose=2`：Gatekeeper 接受，也就是
        公证过的 Developer ID。
 
@@ -117,19 +117,19 @@ GitHub 把正文里的换行原样显示，所以模板的段落不折行；除 
        确认框写明安装包未签名（第 5 步）。这样的构建遇到签了名的安装包也照常接受。
      - **有**（1.0.0 以后的版本，D42）：经 ctypes 调用 `WinVerifyTrust`（`WINTRUST_ACTION_GENERIC_VERIFY_V2`，整条证书链
        检查吊销，不弹任何界面），通过后用 `WTHelperProvDataFromStateData` 取出签名者证书，`CertGetNameStringW` 读出它的
-       显示名，必须等于 `WINDOWS_SIGNER`（`Herta Network LLC`）；`CertGetEnhancedKeyUsage` 读出证书扩展里的 EKU，必须含
-       `WINDOWS_SIGNER_EKU`，Artifact Signing 只把它发给 Solaris 的证书配置文件，同名的别的组织拿不到。两个常量与
+       显示名，必须等于 `WINDOWS_SIGNER`（`OpenWeir`）；`CertGetEnhancedKeyUsage` 读出证书扩展里的 EKU，必须含
+       `WINDOWS_SIGNER_EKU`，Artifact Signing 只把它发给 OpenWeir 的证书配置文件，同名的别的组织拿不到。两个常量与
        `product.WindowsSigner`、`product.WindowsSignerEKU` 相同。Artifact Signing 每天换证书，中间 CA 也会变，所以不认
        具体证书。未签名的、别人签的安装包都被拒绝。
    - 其他平台没有安装包，不会走到这一步。
-5. **确认安装**：校验通过后按钮变成「打开安装包…」。点它先弹普通确认框「打开 Solaris 1.1.0 的安装包？」，
+5. **确认安装**：校验通过后按钮变成「打开安装包…」。点它先弹普通确认框「打开 OpenWeir 1.1.0 的安装包？」，
    正文写明接下来发生什么：
-   - macOS：「打开磁盘映像后 Solaris 会退出。将 Solaris 拖到“应用程序”文件夹，替换旧版本即可升级。」
-   - Windows：「安装器会请求管理员权限，打开后 Solaris 会退出。」没有校验签名时（第 4 步），前面再加一句「安装包未签名，
+   - macOS：「打开磁盘映像后 OpenWeir 会退出。将 OpenWeir 拖到“应用程序”文件夹，替换旧版本即可升级。」
+   - Windows：「安装器会请求管理员权限，打开后 OpenWeir 会退出。」没有校验签名时（第 4 步），前面再加一句「安装包未签名，
      Windows 会提示“未知发布者”。」，因为 UAC 的确认框会这样写。
 
    确认后再算一次哈希（文件在用户可写的目录里），对上了才用系统打开它：macOS 由 Finder 挂载映像，Windows 由
-   ShellExecute 运行安装器、弹出 UAC。系统接受打开请求后，Solaris 界面按升级路径退出。若校验或打开失败，界面会显示错误。
+   ShellExecute 运行安装器、弹出 UAC。系统接受打开请求后，OpenWeir 界面按升级路径退出。若校验或打开失败，界面会显示错误。
    界面从不静默安装，也不自己替换文件；升级本身由安装器和 Finder 完成
    （architecture.md 第 9 节）。
 
@@ -144,12 +144,12 @@ GitHub 把正文里的换行原样显示，所以模板的段落不折行；除 
 | `checksum_mismatch` | 「下载的文件与校验和不符」 |
 | `download_failed` | 「下载失败：…」 |
 | `signature_invalid` | 「安装包的签名无效：…」，细节是 codesign、spctl 或 WinVerifyTrust 的原话 |
-| `signer_mismatch` | 「安装包不是由 Solaris 的开发者签名的」；Windows 上签名者的显示名不符，或证书没有 Solaris 证书配置文件的 EKU。只在配置了签名者的构建里出现 |
+| `signer_mismatch` | 「安装包不是由 OpenWeir 的开发者签名的」；Windows 上签名者的显示名不符，或证书没有 OpenWeir 证书配置文件的 EKU。只在配置了签名者的构建里出现 |
 
 ## 4. 诊断信息
 
-「关于」分组里的「诊断信息」一行，按「导出…」选择保存位置，默认文件名 `solaris-diagnostics-<日期>-<时间>.zip`。
-代码在 `src/solaris/diagnostics.py`。zip 里有：
+「关于」分组里的「诊断信息」一行，按「导出…」选择保存位置，默认文件名 `openweir-diagnostics-<日期>-<时间>.zip`。
+代码在 `src/openweir/diagnostics.py`。zip 里有：
 
 | 文件 | 内容 |
 | --- | --- |
@@ -182,16 +182,16 @@ GitHub 把正文里的换行原样显示，所以模板的段落不折行；除 
 
 `scripts/gen_licenses.py` 生成两份文件，提交进仓库（与 Theme.qml、`.qm` 一样），打包时随包附带：
 
-- `src/solaris/licenses/third_party.json`：组件清单，每项是名称、版本、SPDX 许可证表达式、类别、主页，以及它的
+- `src/openweir/licenses/third_party.json`：组件清单，每项是名称、版本、SPDX 许可证表达式、类别、主页，以及它的
   各段全文在下一个文件里的编号。设置页的「开源许可」对话框读它；
-- `src/solaris/licenses/THIRD_PARTY_NOTICES.txt`：开头是 Solaris 自己的许可声明和源代码的获取方式，然后是每个
+- `src/openweir/licenses/THIRD_PARTY_NOTICES.txt`：开头是 OpenWeir 自己的许可声明和源代码的获取方式，然后是每个
   组件的版权与许可证全文。完全相同的全文只写一次，列出共用它的组件。
 
 覆盖的组件：
 
 | 类别 | 来源 |
 | --- | --- |
-| Python | 从 `solaris` 的 `Requires-Dist` 递归求出的运行时依赖（protobuf、PySide6 及其拆分出的包、shiboken6、keyring 等），读安装的包元数据和 `.dist-info` 里的许可证文件；再加上 CPython 自身（Nuitka 把解释器打进包里）和它的构建链接进解释器的第三方库，见下文 |
+| Python | 从 `openweir` 的 `Requires-Dist` 递归求出的运行时依赖（protobuf、PySide6 及其拆分出的包、shiboken6、keyring 等），读安装的包元数据和 `.dist-info` 里的许可证文件；再加上 CPython 自身（Nuitka 把解释器打进包里）和它的构建链接进解释器的第三方库，见下文 |
 | Go | `go list -deps` 使用两平台真实发布标签（D38）列出实际链接的模块，并跟随 replace 记录来源和版本；许可证文件取自模块缓存里模块的根目录，根目录没有时取被链接的包所在目录。另加 Go 标准库、Wintun，以及 purego 动态加载而不出现在 Go 包依赖中的 Windows Cronet 原生模块 |
 | Qt | Qt 6.12.0 本身（LGPL-3.0-only，全文在 `package/licenses/LGPL-3.0-only.txt`），以及随附的 Qt 模块（Core、GUI、Network、Qml、Quick、Quick Controls、Image Formats）里的第三方代码。后者来自 Qt 文档的《Third-Party Code Used in Qt》和各组件的说明页，由 `--qt-docs <Qt 文档目录>` 读取后存成 `package/licenses/qt.json`，平时生成时直接用它；升级 Qt 时用新版本的文档重新生成 |
 | 字体 | `ui/fonts/` 下的 Inter、JetBrains Mono、Noto Sans SC、Noto Sans Symbols 2 和 Noto Color Emoji，版本读自字体文件的 name 表，全文是各自的 `OFL.txt`；固定来源及哈希见 `sources.json` |
@@ -233,11 +233,11 @@ GitHub 把正文里的换行原样显示，所以模板的段落不折行；除 
   与清单里的 CPython 同一版本且每个库都写了模块和平台、Wintun 一项在、Qt 的组件都有全文，所以升级依赖后
   忘了重新生成会失败。
 - **源代码**：GPL-3.0 要求发布二进制时提供对应的源代码。Release 不附带源代码包（D43），发布说明的「源代码与许可」和
-  NOTICES 的开头写明在哪里取得：Solaris 是本仓库的 `v<版本>` 标签；服务和扩展链接的 mihomo 是
+  NOTICES 的开头写明在哪里取得：OpenWeir 是本仓库的 `v<版本>` 标签；服务和扩展链接的 mihomo 是
   `github.com/openweir/mihomo` 上由这个标签的 `src/core/go.mod` 里 `replace` 固定的提交；其他 Go 模块的版本和校验和
   由 `src/core/go.mod`、`go.sum` 固定，`go mod download` 从 Go 模块代理（默认 `proxy.golang.org`）取得；GitHub 给每个 Release 自动附带的
   "Source code"只有本仓库的代码。所以 `v*` 标签和 mihomo 分支上被引用过的提交都不删除。Qt 和 PySide6 的源代码在
-  download.qt.io 的同一版本下。1.0.0 的 Release 附带了源代码包 `Solaris-1.0.0-source.tar.gz`（含 vendor 的 Go
+  download.qt.io 的同一版本下。1.0.0 的 Release 附带了源代码包 `OpenWeir-1.0.0-source.tar.gz`（含 vendor 的 Go
   依赖），1.0.0 的 NOTICES 指向它，所以它一直保留。
 - **设置页**：「关于」分组的「开源许可」一行写组件的个数，「查看…」打开对话框：搜索框加上按类别分节的列表
   （名称、版本、许可证），样式与可搜索列表相同，只是没有复选框；「打开全文」用系统的文本查看器打开 NOTICES
@@ -245,26 +245,26 @@ GitHub 把正文里的换行原样显示，所以模板的段落不折行；除 
 
 ## 6. 打包须知
 
-- Nuitka 打包时，`package/entry.py` 的 `nuitka-project` 选项把 `src/solaris/licenses/` 复制到
-  `solaris/licenses/`，把仓库根目录的 `LICENSE` 复制到程序目录；还要带上 `solaris` 的包元数据
-  （`--include-distribution-metadata=solaris`），否则 `__version__` 是 `0.0.0`，每个 Release 都会被当成新版本。
+- Nuitka 打包时，`package/entry.py` 的 `nuitka-project` 选项把 `src/openweir/licenses/` 复制到
+  `openweir/licenses/`，把仓库根目录的 `LICENSE` 复制到程序目录；还要带上 `openweir` 的包元数据
+  （`--include-distribution-metadata=openweir`），否则 `__version__` 是 `0.0.0`，每个 Release 都会被当成新版本。
 - Windows 的界面由 `scripts/build_windows.py` 用同一个 `package/entry.py` 构建（architecture.md 第 10 节），这些选项
   两个平台共用。
-- Google OAuth 客户端不进仓库：环境变量 `SOLARIS_GOOGLE_CLIENT_ID`、`SOLARIS_GOOGLE_CLIENT_SECRET` 都设了时，两个构建
-  脚本把它写成 `build/<平台>/google_client.json`，以 `--include-data-files` 放到 `solaris/google_client.json`；只设了一个
+- Google OAuth 客户端不进仓库：环境变量 `OPENWEIR_GOOGLE_CLIENT_ID`、`OPENWEIR_GOOGLE_CLIENT_SECRET` 都设了时，两个构建
+  脚本把它写成 `build/<平台>/google_client.json`，以 `--include-data-files` 放到 `openweir/google_client.json`；只设了一个
   时构建失败（storage.md 第 4 节）。
-- `solaris:`、`clash:`、`mihomo:`、`clashmeta:` 四个 scheme（`links.SCHEMES`，D6、D45）由打包注册：macOS 在
+- `openweir:`、`clash:`、`mihomo:`、`clashmeta:` 四个 scheme（`links.SCHEMES`，D6、D45）由打包注册：macOS 在
   `Info.plist` 的 `CFBundleURLTypes` 里（`scripts/build_app.py` 的 `URL_SCHEMES`），Windows 由安装器写在 HKLM 的
-  `Software\Classes\<scheme>` 下，命令是 `"<安装目录>\Solaris.exe" "%1"`。写在 HKLM 而不是 HKCU：安装器以管理员
+  `Software\Classes\<scheme>` 下，命令是 `"<安装目录>\OpenWeir.exe" "%1"`。写在 HKLM 而不是 HKCU：安装器以管理员
   身份运行，这个管理员不一定是使用者本人。后三个可能已被其他客户端注册：安装时覆盖 HKLM 里的，卸载时只删除仍指向
   本程序的键。
 - 用户自己 HKCU 的 `Software\Classes\<scheme>` 优先于 HKLM。别的客户端删除后可能在那里留下一个打开命令指向已经
-  不存在的程序的键，Windows 打开这个 scheme 的链接时就报「找不到应用程序」，Solaris 收不到链接。界面在 Windows 上
+  不存在的程序的键，Windows 打开这个 scheme 的链接时就报「找不到应用程序」，OpenWeir 收不到链接。界面在 Windows 上
   启动时（以这个用户身份运行，`desktop/associations.py`，D45）在后台线程里对四个 scheme 逐个检查 HKCU 的
   `<scheme>\shell\open\command`：
   - 按 CreateProcess 的规则找出命令里的程序：带引号的到右引号为止；不带引号的依次是到每个空格为止的一段，路径
     含空格时每段都算；没有扩展名的加上 `.exe`。先展开 `%NAME%` 形式的环境变量（REG_EXPAND_SZ 和 REG_SZ 都展开）。
-  - 只有这些路径都不存在、而它所在的盘存在时，才删除整个 HKCU `Software\Classes\<scheme>` 键，让 HKLM 里 Solaris 的
+  - 只有这些路径都不存在、而它所在的盘存在时，才删除整个 HKCU `Software\Classes\<scheme>` 键，让 HKLM 里 OpenWeir 的
     注册生效；删除时记一条警告日志，写明 scheme 和原来的命令。
   - 程序仍然存在（用户装着的其他客户端）时不动：不抢占用户有效的选择，「最后安装的接管」不采纳。键或命令不存在时
     也不动。
@@ -276,12 +276,12 @@ GitHub 把正文里的换行原样显示，所以模板的段落不折行；除 
 
 ## 7. 一键导入
 
-服务商网站上的「一键导入」按钮打开 `solaris://install-config?url=<订阅链接>&name=<名称>`，或其他客户端注册的同样
+服务商网站上的「一键导入」按钮打开 `openweir://install-config?url=<订阅链接>&name=<名称>`，或其他客户端注册的同样
 格式的链接：Clash 系客户端通用的 `clash://`（D6）、Clash Party 的 `mihomo://`、Clash Meta for Android 和 FlClash 的
-`clashmeta://`（Remnawave 的订阅页也生成这种，D45）。后三个也可能由别的客户端注册，网页要指定 Solaris 时用
-`solaris://`。代码在 `src/solaris/desktop/links.py`。
+`clashmeta://`（Remnawave 的订阅页也生成这种，D45）。后三个也可能由别的客户端注册，网页要指定 OpenWeir 时用
+`openweir://`。代码在 `src/openweir/desktop/links.py`。
 
-- **解析**：scheme 是 `solaris`、`clash`、`mihomo` 或 `clashmeta`（不区分大小写），主机是 `install-config`
+- **解析**：scheme 是 `openweir`、`clash`、`mihomo` 或 `clashmeta`（不区分大小写），主机是 `install-config`
   （允许末尾的 `/`）；查询参数按 `application/x-www-form-urlencoded` 解码，`url` 必填，`name` 可选（去掉首尾空白，
   最长 100 个字符）。`url` 必须是 http 或 https 的链接。不符合的链接视为无法识别。没有编码的 `&` 会把订阅链接截断，
   这种链接无法正确识别，与其他客户端相同。
@@ -305,7 +305,7 @@ GitHub 把正文里的换行原样显示，所以模板的段落不折行；除 
   签名、仍要求 `SHA256SUMS` 里有这个文件且哈希一致、结果标为未签名；配置了签名者时未签名的安装包被拒；显示名对但
   没有那个 EKU 的签名者被拒；更新器、服务和 `sign.ps1` 的签名者常量一致。macOS 上
   另用系统自带的 App 真实运行 `codesign`，确认 Team ID 不符时被拒；Windows 上真实调用 `WinVerifyTrust`，未签名的
-  文件被拒，找得到带内嵌签名的程序（如 PowerShell 7）时确认签名者不符被拒、读出代码签名的 EKU、没有 Solaris 的 EKU 时被拒。
+  文件被拒，找得到带内嵌签名的程序（如 PowerShell 7）时确认签名者不符被拒、读出代码签名的 EKU、没有 OpenWeir 的 EKU 时被拒。
 - `tests/test_about.py`：「关于」分组的各个状态与按钮、自动检查的计时与设置项、确认后才打开安装包、未签名的
   Windows 安装包在确认框里写明未签名和"未知发布者"；诊断 zip
   的内容，订阅链接、名称、路径、覆写原文和方案内容不出现在任何文件里，设置项全部归了类；许可证列表与搜索。

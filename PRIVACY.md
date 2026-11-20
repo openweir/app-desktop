@@ -1,42 +1,42 @@
 # 隐私说明
 
-Solaris 是网络代理客户端。它没有账户，不收集使用数据，不做统计、广告或崩溃上报，开发者没有接收任何数据的服务器。
+OpenWeir 是网络代理客户端。它没有账户，不收集使用数据，不做统计、广告或崩溃上报，开发者没有接收任何数据的服务器。
 下面列出会离开本机的数据，以及本机保存的数据。
 
 ## 会离开本机的数据
 
 | 场景 | 发往 | 内容 |
 | --- | --- | --- |
-| 下载和更新订阅 | 订阅链接所在的服务器 | 一次普通的 HTTP 请求：订阅链接（常含令牌）、你的 IP、User-Agent `solaris/<版本> clash.meta`。由界面以当前用户身份发出，跟随系统代理设置；订阅默认每 12 小时自动更新一次，可以按订阅关闭 |
+| 下载和更新订阅 | 订阅链接所在的服务器 | 一次普通的 HTTP 请求：订阅链接（常含令牌）、你的 IP、User-Agent `OpenWeir/<版本> (Windows 或 macOS) clash.meta`。由界面以当前用户身份发出，跟随系统代理设置；订阅默认每 12 小时自动更新一次，可以按订阅关闭 |
 | 连接代理 | 配置里的节点和服务器 | 内核按配置连接节点；配置里的 proxy provider 和规则集由内核按配置下载；策略组的延迟测试访问配置里的测速地址 |
 | GEO 数据更新 | 配置指定的下载站点，默认是 GitHub（MetaCubeX/meta-rules-dat） | 启用自动更新时，按配置周期更新正在使用的数据库，默认周期为 24 小时。请求从界面进程发出，遵循系统代理设置；完全退出界面后暂停，下次打开补查 |
-| 检查更新 | GitHub（`api.github.com`） | 一次不带认证的请求：你的 IP、User-Agent `solaris/<版本>`。自动检查默认开启，可以在设置页"关于"里关闭；下载安装包和 `SHA256SUMS` 也来自 GitHub |
+| 检查更新 | GitHub（`api.github.com`） | 一次不带认证的请求：你的 IP、User-Agent `openweir/<版本>`。自动检查默认开启，可以在设置页"关于"里关闭；下载安装包和 `SHA256SUMS` 也来自 GitHub |
 | 注册 WARP 出口 | Cloudflare（`api.cloudflareclient.com`） | 只在你注册时：内核新生成的公钥、随机的设备标识、时间、语言 `en-US`。请求经你选择的"经由"节点发出，Cloudflare 看到的是节点的 IP。之后经 WARP 出口的流量由 Cloudflare 转发，适用 Cloudflare 的隐私政策 |
 | 使用 VPN Gate 出口 | VPN Gate（`www.vpngate.net`）和它的志愿者服务器 | 打开出口后，内核经你选择的"经由"节点下载公开的服务器列表，VPN Gate 看到的是节点的 IP。之后经这个出口的流量由志愿者运营的服务器转发 |
 | 组网 | 组网服务的控制服务器和网络里的其他设备 | 配置里有 Tailscale、ZeroTier、EasyTier 出站，或在应用里添加了网络时，内核按配置连接它们的服务；Tailscale 的登录页在你的浏览器里打开 |
 | iCloud 备份（仅 macOS） | Apple（CloudKit） | 只在你开启时：备份快照（见下面的"备份"）存进你自己 iCloud 账户的私有数据库 |
 | Google Drive 备份 | Google（`accounts.google.com`、`oauth2.googleapis.com`、`www.googleapis.com`） | 只在你登录后：登录时浏览器打开 Google 的授权页；之后界面以当前用户身份、跟随系统代理设置，换取访问令牌，读取账户的邮箱，把备份快照存进你自己 Google 云端硬盘里本应用专属的隐藏目录。退出登录时向 Google 撤销授权 |
 
-GitHub、Cloudflare、VPN Gate、组网服务、Apple 和 Google 收到数据后如何处理，适用它们各自的隐私政策。点击网页上的"一键导入"链接只会在 Solaris 里预填订阅
+GitHub、Cloudflare、VPN Gate、组网服务、Apple 和 Google 收到数据后如何处理，适用它们各自的隐私政策。点击网页上的"一键导入"链接只会在 OpenWeir 里预填订阅
 链接和名称，由你确认后才下载。
 
 ## 本机保存的数据
 
-- **订阅、覆写、分流方案和设置**：在用户数据目录的 `solaris.db` 里，Windows 是 `%LOCALAPPDATA%\Solaris\`，macOS 是
-  `~/Library/Application Support/Solaris/`。
-- **运行中的配置**：Windows 上服务把当前用户的配置存在 `C:\ProgramData\Solaris\`，只有系统和你本人能读，用于开机后
+- **订阅、覆写、分流方案和设置**：在用户数据目录的 `openweir.db` 里，Windows 是 `%LOCALAPPDATA%\OpenWeir\`，macOS 是
+  `~/Library/Application Support/OpenWeir/`。
+- **运行中的配置**：Windows 上服务把当前用户的配置存在 `C:\ProgramData\OpenWeir\`，只有系统和你本人能读，用于开机后
   恢复连接；macOS 上存在系统扩展自己的目录里。
 - **WARP 账户、组网密钥和 Google 登录**：在应用里注册的 WARP 账户、添加组网时填的密钥、登录 Google Drive 得到的令牌
   存在系统凭据库（Windows 凭据管理器、macOS 钥匙串），不进数据库、备份或诊断信息。组网的登录状态和设备身份由内核存在运行中的配置所在的目录里。
 - **日志**：内核日志只在内存里，由你在日志页导出；Windows 服务自己的运行日志（启动、停止、出错）在
-  `C:\ProgramData\Solaris\service.log`。
+  `C:\ProgramData\OpenWeir\service.log`。
 - **崩溃记录**：界面的未处理异常和致命堆栈保存在用户数据目录的 `crashes/`；Go 宿主的 panic 和运行时致命错误
   保存在其 home 下的 `crashes/`。它们可能含文件路径、错误内容、源代码行或堆栈中的敏感数据，不主动读取局部变量。
   专用日志在启动及界面维护时清理，保留最多 30 天、20 份、64 MiB；崩溃写入期间可能暂时超过限额。
-- **原生报告**：Windows 安装器只为 `Solaris.exe` 和 `solaris-service.exe` 配置本地小型转储，每进程最多 5 份，
+- **原生报告**：Windows 安装器只为 `OpenWeir.exe` 和 `openweir-service.exe` 配置本地小型转储，每进程最多 5 份，
   不配置完整内存转储。界面转储位于 `crashes/native/`，服务转储位于系统保护的服务目录；启动时按 30 天、64 MiB 清理。
-  macOS 使用操作系统的崩溃报告，应用只查找当前用户报告目录内标识属于 Solaris 的报告，不清理系统报告。
-  小型转储仍可能含少量内存中的数据。操作系统自己的诊断共享由系统设置控制，Solaris 不上传这些报告。
+  macOS 使用操作系统的崩溃报告，应用只查找当前用户报告目录内标识属于 OpenWeir 的报告，不清理系统报告。
+  小型转储仍可能含少量内存中的数据。操作系统自己的诊断共享由系统设置控制，OpenWeir 不上传这些报告。
 
 Windows 卸载时可以选择删除订阅、设置和日志；凭据库里的账户、密钥和令牌留着，可以在凭据管理器里删除。
 
@@ -49,17 +49,17 @@ Windows 卸载时可以选择删除订阅、设置和日志；凭据库里的账
 
 - **iCloud**（仅 macOS）：快照存在你自己 iCloud 账户的私有数据库里，占用你的 iCloud 空间。
 - **Google Drive**：快照存在你自己 Google 云端硬盘里本应用专属的隐藏目录（appDataFolder），占用你的云端硬盘空间，
-  在云端硬盘里看不到；Solaris 只申请这个目录的权限，读不到你的其他文件。退出登录后快照仍在，可以在设置页"删除云端
+  在云端硬盘里看不到；OpenWeir 只申请这个目录的权限，读不到你的其他文件。退出登录后快照仍在，可以在设置页"删除云端
   备份"。
 
 ## 诊断信息
 
-设置页"关于"里的"诊断信息"只在你导出时生成一个 zip 文件，保存在你选择的位置，Solaris 不会上传它。分享给别人之前，
+设置页"关于"里的"诊断信息"只在你导出时生成一个 zip 文件，保存在你选择的位置，OpenWeir 不会上传它。分享给别人之前，
 请自己检查内容：
 
 | 文件 | 内容 |
 | --- | --- |
-| `about.json` | Solaris、Python、Qt 的版本，操作系统与架构，界面语言，导出时间 |
+| `about.json` | OpenWeir、Python、Qt 的版本，操作系统与架构，界面语言，导出时间 |
 | `host.json` | 服务或系统扩展报告的版本与运行状态 |
 | `settings.json` | 设置，以及订阅、覆写和分流的概况：订阅只有序号、类型、节点数、更新时间这类信息，不含名称、链接、路径和原文；覆写和规则只有有无和条数，不含内容 |
 | `mihomo.log` | 日志页里的内核日志，最多 5000 条，**含访问过的网站和节点名** |

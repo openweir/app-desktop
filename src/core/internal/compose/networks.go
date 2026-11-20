@@ -13,7 +13,7 @@ import (
 
 	C "github.com/metacubex/mihomo/constant"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/controlpb"
+	"github.com/openweir/app-desktop/src/core/internal/controlpb"
 )
 
 // The mesh networks the user added in the app (docs/mesh.md §10.3): each one an outbound of

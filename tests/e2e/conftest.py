@@ -5,8 +5,8 @@ the profiles and settings in a temporary directory and drives the real ViewModel
 QML loaded offscreen. Traffic goes to local servers through the mixed port, so nothing
 leaves the machine and the machine's network does not change (docs/architecture.md §11).
 
-The tests only run with SOLARIS_E2E=1. They build the service with ``go build``
-unless SOLARIS_E2E_SERVICE names a binary built already.
+The tests only run with OPENWEIR_E2E=1. They build the service with ``go build``
+unless OPENWEIR_E2E_SERVICE names a binary built already.
 """
 
 from __future__ import annotations
@@ -23,23 +23,23 @@ from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuick import QQuickWindow
 from pytestqt.qtbot import QtBot
 
+from openweir.app import load_ui
+from openweir.host.base import TAKEOVER_NONE
+from openweir.host.service import ServiceHost
+from openweir.models.settings import DatabaseSettingsStore
+from openweir.models.store import ProfileStore
+from openweir.models.subscription import UrlFetcher
+from openweir.product import DISPLAY_NAME
+from openweir.viewmodels.composition import compose
 from scripts.dev import DevService, build_service
-from solaris.app import load_ui
-from solaris.host.base import TAKEOVER_NONE
-from solaris.host.service import ServiceHost
-from solaris.models.settings import DatabaseSettingsStore
-from solaris.models.store import ProfileStore
-from solaris.models.subscription import UrlFetcher
-from solaris.product import DISPLAY_NAME
-from solaris.viewmodels.composition import compose
 from tests.e2e.app import App, Network
 from tests.e2e.servers import ProxyNode, WebServer, free_port
 from tests.e2e.unix import unix_opener
 from tests.support.i18n import ui_language
 from tests.support.releases import offline_updater
 
-E2E_ENV = "SOLARIS_E2E"
-SERVICE_ENV = "SOLARIS_E2E_SERVICE"
+E2E_ENV = "OPENWEIR_E2E"
+SERVICE_ENV = "OPENWEIR_E2E_SERVICE"
 
 
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
@@ -64,7 +64,7 @@ def service_binary(tmp_path_factory: pytest.TempPathFactory) -> Path:
 @pytest.fixture
 def service(service_binary: Path, tmp_path: Path) -> Iterator[DevService]:
     # tmp_path is too long for a Unix socket on macOS.
-    with tempfile.TemporaryDirectory(prefix="solaris-e2e-") as run:
+    with tempfile.TemporaryDirectory(prefix="openweir-e2e-") as run:
         socket = Path(run) / "control.sock"
         with DevService(
             service_binary, socket, tmp_path / "dev-core", tmp_path / "service.log"

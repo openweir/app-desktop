@@ -36,11 +36,11 @@ WORKFLOW = ci.ROOT / ".github/workflows/ci.yml"
         ),
         (["docs/examples/mihomo-fork/naive-http2.yaml"], {"go"}),
         (
-            ["src/solaris/models/library/core.py"],
+            ["src/openweir/models/library/core.py"],
             {"python", "e2e", "apple", "windows-installer", "windows-arm64-upgrade"},
         ),
         (
-            ["src/solaris/ui/fonts/inter/Inter-Regular.ttf"],
+            ["src/openweir/ui/fonts/inter/Inter-Regular.ttf"],
             {
                 "python",
                 "e2e",
@@ -103,7 +103,7 @@ def test_shared_or_unknown_inputs_select_everything(path: str) -> None:
 
 
 def test_protocol_changes_include_both_hosts_and_generated_bindings() -> None:
-    plan = ci.select(["proto/solaris/protocol/control.proto"])
+    plan = ci.select(["proto/openweir/protocol/control.proto"])
     assert plan.protocol
     assert {
         "python",
@@ -114,7 +114,7 @@ def test_protocol_changes_include_both_hosts_and_generated_bindings() -> None:
         "windows-arm64-upgrade",
         "tun",
     } <= plan.jobs
-    assert not ci.select(["src/solaris/ui/Main.qml"]).protocol
+    assert not ci.select(["src/openweir/ui/Main.qml"]).protocol
 
 
 def test_a_code_change_after_hundreds_of_docs_is_not_truncated() -> None:

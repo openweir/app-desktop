@@ -2,7 +2,7 @@
 of their own instead of the user data directory.
 
     uv run python scripts/dev.py                         # a fresh temporary directory
-    uv run python scripts/dev.py --data ~/solaris-dev    # keep the profiles between runs
+    uv run python scripts/dev.py --data ~/openweir-dev    # keep the profiles between runs
     uv run python scripts/dev.py --lang en --appearance dark
 
 The script builds the service (go build), starts it as a child process on a socket in a
@@ -95,21 +95,21 @@ class DevService:
 @contextlib.contextmanager
 def short_directory() -> Iterator[Path]:
     """A temporary directory for the socket: a Unix socket path holds about 100 bytes."""
-    with tempfile.TemporaryDirectory(prefix="solaris-dev-") as directory:
+    with tempfile.TemporaryDirectory(prefix="openweir-dev-") as directory:
         yield Path(directory)
 
 
 def main() -> int:
     sys.path.insert(0, str(ROOT))
-    from solaris.app import main as run_ui
-    from solaris.host.service import ServiceHost
+    from openweir.app import main as run_ui
+    from openweir.host.service import ServiceHost
 
     if sys.platform == "win32":
         raise SystemExit("scripts/dev.py talks to the development service over a Unix socket")
+    from openweir.host.transport import unix_opener
+    from openweir.models.store import ProfileStore
+    from openweir.viewmodels.appearance import MODES
     from scripts.fetch_geodata import seed
-    from solaris.host.transport import unix_opener
-    from solaris.models.store import ProfileStore
-    from solaris.viewmodels.appearance import MODES
 
     parser = argparse.ArgumentParser(description="Run the UI against the development service")
     parser.add_argument("--data", type=Path, help="profiles and settings (default: temporary)")
@@ -119,7 +119,7 @@ def main() -> int:
     sys.argv[1:] = qt_args
     with contextlib.ExitStack() as stack:
         data = args.data or Path(
-            stack.enter_context(tempfile.TemporaryDirectory(prefix="solaris-dev-"))
+            stack.enter_context(tempfile.TemporaryDirectory(prefix="openweir-dev-"))
         )
         data.mkdir(parents=True, exist_ok=True)
         run = stack.enter_context(short_directory())

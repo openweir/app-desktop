@@ -2,15 +2,15 @@
 # signature. The release workflow runs it, through scripts/build_windows.py --sign; never a
 # developer's machine.
 #
-#     ./package/windows/sign.ps1 -Directory build/windows/Solaris   # the install directory
+#     ./package/windows/sign.ps1 -Directory build/windows/OpenWeir   # the install directory
 #     ./package/windows/sign.ps1 <file> [<file> ...]                # these files
 #     ./package/windows/sign.ps1 -Check <file> [<file> ...]         # only check them
 #
 # -Directory signs every .exe, .dll and .pyd under it that does not carry a signature of its
 # own that Windows trusts. Those another publisher signed keep their signature: Microsoft's C++
 # runtime, Python's and Qt's libraries. A file Windows finds only in a catalog of the build
-# machine's is signed: users' machines may lack the catalog. Solaris.exe and
-# solaris-service.exe must end up signed by Solaris. The setup UI's plugin is signed on its
+# machine's is signed: users' machines may lack the catalog. OpenWeir.exe and
+# openweir-service.exe must end up signed by OpenWeir. The setup UI's plugin is signed on its
 # own, and the uninstaller and the installer through makensis' !uninstfinalize and !finalize
 # (package/windows/installer.nsi).
 #
@@ -20,7 +20,7 @@
 # its metadata.json; and the Azure CLI signed in (azure/login) as an identity allowed to sign
 # with the certificate profile. Each file signed is then checked as the service and the updater
 # check the UI and the installer (docs/architecture.md §5.3, docs/release.md §3): Windows
-# trusts the signature, the certificate is Herta Network LLC's and has the certificate
+# trusts the signature, the certificate is OpenWeir's and has the certificate
 # profile's extended key usage; and the signature has a timestamp, without which it would
 # expire with the certificate in three days. -Check does only that.
 [CmdletBinding(DefaultParameterSetName = 'Files')]
@@ -39,14 +39,19 @@ if ($PSVersionTable.PSEdition -eq 'Desktop') {
     Import-Module (Join-Path $PSHOME 'Modules\Microsoft.PowerShell.Security\Microsoft.PowerShell.Security.psd1')
 }
 
-# src/core/internal/product's WindowsSigner and WindowsSignerEKU; tests/test_update.py
-# keeps the three copies equal.
-$Signer = 'Herta Network LLC'
-$SignerEku = '1.3.6.1.4.1.311.97.242074350.326480862.720558710.91084369'
+# The signer and its certificate profile's extended key usage, from the release environment, as
+# scripts/build_windows.py links them into the service as WindowsSigner and WindowsSignerEKU and
+# bundles them in the UI's product.json (docs/decisions.md D47).
+$Signer = "$env:OPENWEIR_WINDOWS_SIGNER".Trim()
+$SignerEku = "$env:OPENWEIR_WINDOWS_SIGNER_EKU".Trim()
+if (-not $Signer -or -not $SignerEku) {
+    throw 'Set OPENWEIR_WINDOWS_SIGNER and OPENWEIR_WINDOWS_SIGNER_EKU to sign or check a release'
+}
+$Product = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\..\product.json') -Raw -Encoding UTF8 | ConvertFrom-Json
 $TimestampServer = 'http://timestamp.acs.microsoft.com'
 $Programs = @('.exe', '.dll', '.pyd')  # scripts/build_windows.py's PE_SUFFIXES
 # PowerShell names ignore case: $OwnNames, not $Own, beside $own below.
-$OwnNames = @('Solaris.exe', 'solaris-service.exe')
+$OwnNames = @($Product.windows.uiExecutable, $Product.windows.serviceExecutable)
 # A command line holds 32767 characters; each signtool run gets a batch of files well under.
 $BatchLength = 16000
 

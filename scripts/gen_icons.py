@@ -1,9 +1,9 @@
-"""Generate Solaris's icons from one geometry: the corona mark (DESIGN.md "Shapes").
+"""Generate OpenWeir's icons from one geometry: the corona mark (DESIGN.md "Shapes").
 
     uv run python scripts/gen_icons.py
 
-Writes the app icons (src/solaris/ui/brand/*.svg, package/icons/solaris.ico and, on macOS
-with iconutil, package/icons/solaris.icns) and the six tray SVGs in src/solaris/ui/tray/.
+Writes the app icons (src/openweir/ui/brand/*.svg, package/icons/openweir.ico and, on macOS
+with iconutil, package/icons/openweir.icns) and the six tray SVGs in src/openweir/ui/tray/.
 The mark: a solid core and a ring with a gap at the upper right. The ring runs clockwise
 from -40 degrees to 250 degrees, leaving 70 degrees open; angles as in SVG, y down.
 Everything is committed, so a build needs no renderer; run this after changing the
@@ -22,8 +22,8 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-BRAND = ROOT / "src" / "solaris" / "ui" / "brand"
-TRAY = ROOT / "src" / "solaris" / "ui" / "tray"
+BRAND = ROOT / "src" / "openweir" / "ui" / "brand"
+TRAY = ROOT / "src" / "openweir" / "ui" / "tray"
 PACKAGE = ROOT / "package" / "icons"
 
 GRAPHITE = "#15171C"  # DESIGN.md light `text`
@@ -134,7 +134,7 @@ def main() -> None:
     def windows_tile(size: int) -> str:
         return windows if size > 32 else tile_svg(size, 0.03, small=True)
 
-    (PACKAGE / "solaris.ico").write_bytes(
+    (PACKAGE / "openweir.ico").write_bytes(
         ico({s: render(windows_tile(s), s) for s in (16, 20, 24, 32, 40, 48, 64, 128, 256)})
     )
 
@@ -148,10 +148,10 @@ def main() -> None:
 
     iconutil = shutil.which("iconutil")
     if iconutil is None:
-        print("iconutil is macOS only; solaris.icns left as it is")
+        print("iconutil is macOS only; openweir.icns left as it is")
         return
     with tempfile.TemporaryDirectory() as temp:
-        iconset = Path(temp) / "solaris.iconset"
+        iconset = Path(temp) / "openweir.iconset"
         iconset.mkdir()
         for points in (16, 32, 128, 256, 512):
             for scale in (1, 2):
@@ -160,7 +160,7 @@ def main() -> None:
                 name = f"icon_{points}x{points}{'@2x' if scale == 2 else ''}.png"
                 (iconset / name).write_bytes(render(svg, pixels))
         subprocess.run(
-            [iconutil, "-c", "icns", str(iconset), "-o", str(PACKAGE / "solaris.icns")], check=True
+            [iconutil, "-c", "icns", str(iconset), "-o", str(PACKAGE / "openweir.icns")], check=True
         )
     print("wrote", ", ".join(str(p.relative_to(ROOT)) for p in (BRAND, PACKAGE, TRAY)))
 

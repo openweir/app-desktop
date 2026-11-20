@@ -10,12 +10,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/admission"
-	"github.com/Ember-Moth/Solaris/src/core/internal/compose"
-	"github.com/Ember-Moth/Solaris/src/core/internal/controlpb"
-	"github.com/Ember-Moth/Solaris/src/core/internal/engine"
-	"github.com/Ember-Moth/Solaris/src/core/internal/frame"
-	"github.com/Ember-Moth/Solaris/src/core/internal/peer"
+	"github.com/openweir/app-desktop/src/core/internal/admission"
+	"github.com/openweir/app-desktop/src/core/internal/compose"
+	"github.com/openweir/app-desktop/src/core/internal/controlpb"
+	"github.com/openweir/app-desktop/src/core/internal/engine"
+	"github.com/openweir/app-desktop/src/core/internal/frame"
+	"github.com/openweir/app-desktop/src/core/internal/peer"
 )
 
 // vectorEngine answers the shared vectors' requests with fixed results and keeps what it

@@ -13,9 +13,9 @@ from pathlib import Path
 
 import pytest
 
-from solaris import platforms
-from solaris.update import download
-from solaris.update.releases import (
+from openweir import platforms, product
+from openweir.update import download
+from openweir.update.releases import (
     CHECKSUMS_NAME,
     ReleaseSource,
     UpdateError,
@@ -25,7 +25,7 @@ from solaris.update.releases import (
     parse_release,
     parse_version,
 )
-from solaris.update.signature import (
+from openweir.update.signature import (
     APPLE_TEAM_ID,
     CODESIGN,
     SPCTL,
@@ -38,15 +38,15 @@ from solaris.update.signature import (
     default_verifier,
     trusted_signer,
 )
-from solaris.update.updater import Updater
+from openweir.update.updater import Updater
 from tests.support.releases import FakeGitHub, FakeVerifier, fake_github
 
 ROOT = Path(__file__).resolve().parents[1]
-MAC_DMG = "Solaris-1.1.0-macos-universal.dmg"
+MAC_DMG = "OpenWeir-1.1.0-macos-universal.dmg"
 SIGNER = "Ember Moth"  # a Windows signer, for the signed path
 CODE_SIGNING = "1.3.6.1.5.5.7.3.3"
-WINDOWS_EXE = "Solaris-1.1.0-windows-x64-setup.exe"
-WINDOWS_ARM64_EXE = "Solaris-1.1.0-windows-arm64-setup.exe"
+WINDOWS_EXE = "OpenWeir-1.1.0-windows-x64-setup.exe"
+WINDOWS_ARM64_EXE = "OpenWeir-1.1.0-windows-arm64-setup.exe"
 BODY = b"installer " * 100_000  # a little under 1 MB: several chunks
 
 
@@ -150,10 +150,10 @@ def test_check_finds_the_newer_release(github: FakeGitHub, tmp_path: Path) -> No
     assert check.installer == MAC_DMG
     assert check.release.page_url.endswith("/releases/tag/v1.1.0")
     path, headers = github.requests[0]
-    assert path == "/repos/Ember-Moth/Solaris/releases/latest"
+    assert path == "/repos/openweir/app-desktop/releases/latest"
     assert headers["accept"] == "application/vnd.github+json"
     assert headers["x-github-api-version"] == "2022-11-28"
-    assert headers["user-agent"].startswith("solaris/")
+    assert headers["user-agent"].startswith("openweir/")
     assert "authorization" not in headers
 
 
@@ -258,7 +258,9 @@ def test_the_verifier_per_platform_and_signer() -> None:
     assert isinstance(default_verifier("darwin"), MacVerifier)
     assert isinstance(default_verifier("darwin", ""), MacVerifier)
     assert isinstance(default_verifier("win32", SIGNER), WindowsVerifier)
-    assert isinstance(default_verifier("win32"), WindowsVerifier)  # signed releases (D42)
+    # A signed release bundles its signer in product.json (D42, D47); the repository has none.
+    signed = WindowsVerifier if product.WINDOWS_SIGNER else ChecksumOnly
+    assert isinstance(default_verifier("win32"), signed)
     assert isinstance(default_verifier("win32", ""), ChecksumOnly)
     assert default_verifier("linux") is None
     assert [v.signed for v in (MacVerifier(), WindowsVerifier(SIGNER), ChecksumOnly())] == [
@@ -271,15 +273,21 @@ def test_the_verifier_per_platform_and_signer() -> None:
 def test_the_windows_signer_is_the_services_and_the_signing_scripts() -> None:
     # The updater, the service (docs/architecture.md §5.3) and the release workflow's signing
     # script name the same signer: Artifact Signing's verified organization and the
-    # extended key usage of Solaris's certificate profile (D42).
-    product = (ROOT / "src/core/internal/product/product.go").read_text(encoding="utf-8")
-    go = dict(re.findall(r'^\s*(WindowsSigner(?:EKU)?)\s*=\s*"([^"]*)"', product, re.MULTILINE))
-    script = (ROOT / "package/windows/sign.ps1").read_text(encoding="utf-8")
-    ps = dict(re.findall(r"^\$(Signer(?:Eku)?) = '([^']*)'", script, re.MULTILINE))
-    assert WINDOWS_SIGNER == "Herta Network LLC"
-    assert re.fullmatch(r"1\.3\.6\.1\.4\.1\.311\.97(\.\d+)+", WINDOWS_SIGNER_EKU)
+    # extended key usage of OpenWeir's certificate profile (D42). All three take it from the
+    # release environment (D47): the UI through its bundled product.json, the service through
+    # -X at link time (scripts/build_windows.py), the script from the variables themselves.
+    assert (WINDOWS_SIGNER, WINDOWS_SIGNER_EKU) == (
+        product.WINDOWS_SIGNER,
+        product.WINDOWS_SIGNER_EKU,
+    )
+    generated = (ROOT / "src/core/internal/product/product_gen.go").read_text(encoding="utf-8")
+    go = dict(re.findall(r'^\s*(WindowsSigner(?:EKU)?)\s*=\s*"([^"]*)"', generated, re.MULTILINE))
     assert go == {"WindowsSigner": WINDOWS_SIGNER, "WindowsSignerEKU": WINDOWS_SIGNER_EKU}
-    assert ps == {"Signer": WINDOWS_SIGNER, "SignerEku": WINDOWS_SIGNER_EKU}
+    script = (ROOT / "package/windows/sign.ps1").read_text(encoding="utf-8")
+    assert '$Signer = "$env:OPENWEIR_WINDOWS_SIGNER".Trim()' in script
+    assert '$SignerEku = "$env:OPENWEIR_WINDOWS_SIGNER_EKU".Trim()' in script
+    assert product.SIGNING_ENVIRONMENT["windowsSigner"] == "OPENWEIR_WINDOWS_SIGNER"
+    assert product.SIGNING_ENVIRONMENT["windowsSignerEku"] == "OPENWEIR_WINDOWS_SIGNER_EKU"
 
 
 def test_the_windows_verifier_needs_the_profiles_usage(tmp_path: Path) -> None:
@@ -349,7 +357,7 @@ def test_with_a_windows_signer_an_unsigned_installer_is_refused(
 def test_download_clears_earlier_ones(github: FakeGitHub, tmp_path: Path) -> None:
     update = updater(github, tmp_path)
     update.directory.mkdir(parents=True)
-    (update.directory / "Solaris-0.1.5-macos-universal.dmg").write_bytes(b"old")
+    (update.directory / "OpenWeir-0.1.5-macos-universal.dmg").write_bytes(b"old")
     (update.directory / "stale.part").write_bytes(b"half")
     update.download(update.check())
     assert sorted(p.name for p in update.directory.iterdir()) == [MAC_DMG]
@@ -430,14 +438,14 @@ def test_ready_checks_the_file_again(github: FakeGitHub, tmp_path: Path) -> None
 
 def test_parse_checksums() -> None:
     text = (
-        f"{'A' * 64}  Solaris-0.2.0-macos-universal.dmg\n"
-        f"{'b' * 64} *Solaris-0.2.0-windows-x64-setup.exe\r\n"
+        f"{'A' * 64}  OpenWeir-0.2.0-macos-universal.dmg\n"
+        f"{'b' * 64} *OpenWeir-0.2.0-windows-x64-setup.exe\r\n"
         "not a line\n"
         f"{'c' * 63}  short\n"
     )
     assert download.parse_checksums(text) == {
-        "Solaris-0.2.0-macos-universal.dmg": "a" * 64,
-        "Solaris-0.2.0-windows-x64-setup.exe": "b" * 64,
+        "OpenWeir-0.2.0-macos-universal.dmg": "a" * 64,
+        "OpenWeir-0.2.0-windows-x64-setup.exe": "b" * 64,
     }
 
 
@@ -547,7 +555,7 @@ def test_windows_verifier_names_the_signer() -> None:
         WindowsVerifier(SIGNER).verify(program)
     assert (caught.value.code, caught.value.message) == ("signer_mismatch", signer.name)
     WindowsVerifier(signer.name, eku=CODE_SIGNING).verify(program)
-    # Only Solaris's certificate profile has Solaris's usage.
+    # Only OpenWeir's certificate profile has OpenWeir's usage.
     with pytest.raises(UpdateError) as caught:
         WindowsVerifier(signer.name).verify(program)
     assert caught.value.code == "signer_mismatch"

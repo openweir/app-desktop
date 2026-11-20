@@ -7,7 +7,7 @@ import (
 	"github.com/dlclark/regexp2"
 	"go.yaml.in/yaml/v3"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/controlpb"
+	"github.com/openweir/app-desktop/src/core/internal/controlpb"
 )
 
 // Export writes the plan as proxy-groups and rules for another mihomo configuration

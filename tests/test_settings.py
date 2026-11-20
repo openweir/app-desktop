@@ -5,9 +5,9 @@ from pathlib import Path
 
 import pytest
 
-from solaris.host.base import RunOptions
-from solaris.models.database import Database
-from solaris.models.settings import (
+from openweir.host.base import RunOptions
+from openweir.models.database import Database
+from openweir.models.settings import (
     LOCAL,
     SYNCED,
     DatabaseSettingsStore,
@@ -17,7 +17,7 @@ from solaris.models.settings import (
     scope,
     write_settings,
 )
-from solaris.models.store import open_database
+from openweir.models.store import open_database
 from tests.support.storage import allow_writes, refuse_writes, stored
 
 

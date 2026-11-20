@@ -10,17 +10,17 @@ from typing import Any
 
 import pytest
 
-from solaris.models.backup import BackupError, Backups, Snapshot
-from solaris.models.backup_auto import AutoBackup, BackupTargets, Changes, Outcome, Target
-from solaris.models.backup_icloud import ICloudProvider
-from solaris.models.backup_providers import (
+from openweir.models.backup import BackupError, Backups, Snapshot
+from openweir.models.backup_auto import AutoBackup, BackupTargets, Changes, Outcome, Target
+from openweir.models.backup_icloud import ICloudProvider
+from openweir.models.backup_providers import (
     BackupEntry,
     BackupProvider,
     DirectoryProvider,
     MemoryProvider,
 )
-from solaris.models.profiles import KIND_SUBSCRIPTION, Profile, ProfileList
-from solaris.models.store import ProfileStore
+from openweir.models.profiles import KIND_SUBSCRIPTION, Profile, ProfileList
+from openweir.models.store import ProfileStore
 from tests.support.credentials import MemoryCredentials
 from tests.support.google import FakeGoogle
 from tests.support.icloud import FakeICloud
@@ -133,7 +133,7 @@ def test_a_directory_lists_only_its_own_snapshots(tmp_path: Path) -> None:
         assert await provider.sign_in() == str(folder)
         entry = await provider.upload(data.backups.snapshot())
         (folder / "notes.json").write_text("{}")
-        (folder / "solaris-backup-20260101-000000-000000000000.json").write_text("not json")
+        (folder / "openweir-backup-20260101-000000-000000000000.json").write_text("not json")
         assert [e.id for e in await provider.list()] == [entry.id]
         for name in ("../escape.json", "notes.json", str(folder / entry.id)):
             with pytest.raises(BackupError):

@@ -1,14 +1,14 @@
 ; The Windows installer and uninstaller (docs/architecture.md §9). scripts/build_windows.py
 ; compiles it with these definitions:
-;   APP_DIRECTORY    the install directory as built: Solaris.exe, solaris-service.exe, geodata\
+;   APP_DIRECTORY    the install directory as built: OpenWeir.exe, openweir-service.exe, geodata\
 ;   APP_VERSION      pyproject.toml's version, X.Y.Z
-;   OUTPUT_FILE      Solaris-<version>-windows-x64-setup.exe
+;   OUTPUT_FILE      OpenWeir-<version>-windows-x64-setup.exe
 ;   SETUP_SCRIPT     package/windows/setup.ps1, which closes the UI and handles the service
 ;   UNINSTALL_FILES  RemoveInstalledFile and RMDir lines for the owned payload
 ;   REMOVE_FILES_INCLUDE  shared removal routine with retries and error propagation
 ;   SIGN_SCRIPT      package/windows/sign.ps1, in signed releases only (--sign, D42)
 ;
-; It is the only place Solaris asks for elevation: the installer and the uninstaller run as
+; It is the only place OpenWeir asks for elevation: the installer and the uninstaller run as
 ; administrator, the UI never does. Custom directories are verified and protected before
 ; files are written: the service accepts the UI only from its own directory.
 ;
@@ -28,9 +28,7 @@ SetCompressor /SOLID lzma
 !include x64.nsh
 !include "${INSTALLER_UI_INCLUDE}"
 
-!define PRODUCT "Solaris"
-!define CLIENT "Solaris.exe"
-!define SERVICE_EXECUTABLE "solaris-service.exe"
+; PRODUCT, CLIENT and SERVICE_EXECUTABLE come from product.json through scripts/build_windows.py.
 !define UNINSTALLER "uninstall.exe"
 !define UNINSTALL_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT}"
 ; One-click import (D6, docs/release.md §7): the link is the UI's first argument.
@@ -105,7 +103,7 @@ VIAddVersionKey /LANG=${LANG_ENGLISH} "LegalCopyright" "GPL-3.0-only"
   FileWriteUTF16LE /BOM $9 "${PRODUCT} ${APP_VERSION}: ${MESSAGE}$\r$\n"
   FileClose $9
   ${If} $UiEnabled == 1
-    SolarisSetupUI::Finish "failure" "${MESSAGE}"
+    OpenWeirSetupUI::Finish "failure" "${MESSAGE}"
     Pop $9
     StrCpy $UiEnabled 0
   ${Else}
@@ -191,7 +189,7 @@ FunctionEnd
 Section
   InitPluginsDir
   File "/oname=$PLUGINSDIR\setup.ps1" "${SETUP_SCRIPT}"
-  ; The window's steps: check the location (stop Solaris, for an update), copy (replace) the
+  ; The window's steps: check the location (stop OpenWeir, for an update), copy (replace) the
   ; files, register, start the service.
   !insertmacro UiStep 0
   !insertmacro UiStatus "$(CheckingDirectory)"
@@ -258,7 +256,7 @@ Section
   WriteRegStr HKLM "${UNINSTALL_KEY}" "InstallArchitecture" "${APP_ARCH}"
   WriteRegStr HKLM "${UNINSTALL_KEY}" "UninstallString" '"$INSTDIR\${UNINSTALLER}"'
   WriteRegStr HKLM "${UNINSTALL_KEY}" "QuietUninstallString" '"$INSTDIR\${UNINSTALLER}" /S'
-  WriteRegStr HKLM "${UNINSTALL_KEY}" "URLInfoAbout" "https://github.com/Ember-Moth/Solaris"
+  WriteRegStr HKLM "${UNINSTALL_KEY}" "URLInfoAbout" "https://github.com/openweir/app-desktop"
   WriteRegDWORD HKLM "${UNINSTALL_KEY}" "NoModify" 1
   WriteRegDWORD HKLM "${UNINSTALL_KEY}" "NoRepair" 1
   ${GetSize} "$INSTDIR" "/S=0K" $0 $1 $2
@@ -266,7 +264,7 @@ Section
   ; In HKLM: the installer runs as an administrator who may not be the user. A key in a
   ; user's own HKCU, from another client, still wins for that user; the UI removes one whose
   ; program no longer exists when that user starts it (D45).
-  !insertmacro RegisterScheme solaris
+  !insertmacro RegisterScheme openweir
   !insertmacro RegisterScheme clash
   !insertmacro RegisterScheme mihomo
   !insertmacro RegisterScheme clashmeta
@@ -279,7 +277,7 @@ Section
   !insertmacro Setup install-service
 SectionEnd
 
-; The finish page's "Open Solaris". Started from this elevated process, the UI would run as
+; The finish page's "Open OpenWeir". Started from this elevated process, the UI would run as
 ; administrator; Explorer starts it as the signed-in user instead.
 Function OpenUI
   Exec '"$WINDIR\explorer.exe" "$INSTDIR\${CLIENT}"'
@@ -287,7 +285,7 @@ FunctionEnd
 
 Function .onInstSuccess
   ${If} $UiEnabled == 1
-    SolarisSetupUI::Finish "success" ""
+    OpenWeirSetupUI::Finish "success" ""
     Pop $0
     StrCpy $UiEnabled 0
     ${If} $0 == "open"
@@ -298,7 +296,7 @@ FunctionEnd
 
 Function .onInstFailed
   ${If} $UiEnabled == 1
-    SolarisSetupUI::Finish "failure" "$(SetupFailed)"
+    OpenWeirSetupUI::Finish "failure" "$(SetupFailed)"
     Pop $0
     StrCpy $UiEnabled 0
   ${EndIf}
@@ -306,7 +304,7 @@ FunctionEnd
 
 Function un.onUninstSuccess
   ${If} $UiEnabled == 1
-    SolarisSetupUI::Finish "success" ""
+    OpenWeirSetupUI::Finish "success" ""
     Pop $0
     StrCpy $UiEnabled 0
   ${EndIf}
@@ -314,7 +312,7 @@ FunctionEnd
 
 Function un.onUninstFailed
   ${If} $UiEnabled == 1
-    SolarisSetupUI::Finish "failure" "$(SetupFailed)"
+    OpenWeirSetupUI::Finish "failure" "$(SetupFailed)"
     Pop $0
     StrCpy $UiEnabled 0
   ${EndIf}
@@ -333,7 +331,7 @@ FunctionEnd
 
 Function un.RemoveFiles
   !include "${UNINSTALL_FILES}"
-  !insertmacro RemoveInstalledFile "$INSTDIR\.solaris-install-root"
+  !insertmacro RemoveInstalledFile "$INSTDIR\.openweir-install-root"
 FunctionEnd
 
 Section "!un.${PRODUCT}" UninstallProgram
@@ -346,7 +344,7 @@ Section "!un.${PRODUCT}" UninstallProgram
   ${EndIf}
   InitPluginsDir
   File "/oname=$PLUGINSDIR\setup.ps1" "${SETUP_SCRIPT}"
-  ; The window's steps: close Solaris, remove the service, remove the files, and the data
+  ; The window's steps: close OpenWeir, remove the service, remove the files, and the data
   ; when it was chosen.
   !insertmacro UiStep 0
   !insertmacro UiStatus "$(ClosingUI)"
@@ -354,9 +352,9 @@ Section "!un.${PRODUCT}" UninstallProgram
   !insertmacro UiStep 1
   !insertmacro UiStatus "$(RemovingService)"
   !insertmacro Setup remove-service
-  ; Every user's "Open at sign-in" task (src/solaris/desktop/login.py).
+  ; Every user's "Open at sign-in" task (src/openweir/desktop/login.py).
   !insertmacro Setup remove-tasks
-  !insertmacro UnregisterScheme solaris
+  !insertmacro UnregisterScheme openweir
   !insertmacro UnregisterScheme clash
   !insertmacro UnregisterScheme mihomo
   !insertmacro UnregisterScheme clashmeta

@@ -10,7 +10,7 @@
 
 需要 Python 3.14、[uv](https://docs.astral.sh/uv/) 和 Go 1.26 以上。安装包在对应的系统上构建：
 
-- **macOS**：在 Apple Silicon 构建机上安装 Xcode、XcodeGen（`brew install xcodegen`）和 Rosetta 2。脚本分别用 arm64/x86_64 Python 编译，再合并；产物是双架构的 `build/app/Solaris.app`：
+- **macOS**：在 Apple Silicon 构建机上安装 Xcode、XcodeGen（`brew install xcodegen`）和 Rosetta 2。脚本分别用 arm64/x86_64 Python 编译，再合并；产物是双架构的 `build/app/OpenWeir.app`：
 
   ```bash
   uv run --with nuitka==4.2.2 python scripts/build_app.py --unsigned
@@ -19,7 +19,7 @@
   不带 `--unsigned` 时用钥匙串里的 Developer ID 证书和描述文件签名。不签名的 app 只能查看，不能激活系统扩展；签名
   但没有公证的 app 也不能激活。签名、公证和工程结构见 [apple/README.md](../apple/README.md)。
 - **Windows**：另需 Visual Studio 的 C++ 生成工具（MSVC）和 NSIS 3.08 以上。产物是
-  `build/windows/Solaris-<版本>-windows-x64-setup.exe`：
+  `build/windows/OpenWeir-<版本>-windows-x64-setup.exe`：
 
   ```bash
   uv run --with nuitka==4.2.2 python scripts/build_windows.py
@@ -62,7 +62,7 @@
 
 ```bash
 go -C src/core test -race -tags with_gvisor,with_naive -run '^TestFork' ./internal/engine
-go -C src/core run -tags with_gvisor,with_naive ./service -socket /tmp/solaris-dev.sock
+go -C src/core run -tags with_gvisor,with_naive ./service -socket /tmp/openweir-dev.sock
 ```
 
 Windows x64 / ARM64 原生配置测试使用 `with_gvisor,with_naive,with_purego`，测试进程的 PATH 需要包含同架构、锁定版本的 Cronet DLL
@@ -90,10 +90,10 @@ go -C src/core test ./...
 ```
 
 端到端测试让界面连真实的开发服务，经混合端口访问本机起的 HTTP 服务。默认跳过，这样运行（测试自己构建服务；
-`SOLARIS_E2E_SERVICE` 可指向已构建的服务，`SOLARIS_E2E_SCREENSHOTS` 可指向保存截图的目录）：
+`OPENWEIR_E2E_SERVICE` 可指向已构建的服务，`OPENWEIR_E2E_SCREENSHOTS` 可指向保存截图的目录）：
 
 ```bash
-SOLARIS_E2E=1 uv run pytest tests/e2e
+OPENWEIR_E2E=1 uv run pytest tests/e2e
 ```
 
 CI 还运行 `uv run ruff check .`、`uv run ruff format --check .`、`uv run pyright` 和 `go test -race ./...`。
@@ -112,14 +112,14 @@ CI 按改动范围选择任务，规则集中在 `scripts/ci_changes.py`。main 
 uv run python scripts/dev.py
 ```
 
-也可以分开启动：先运行开发服务，再让界面经 `SOLARIS_DEV_SOCKET` 连它（这时配置和设置在用户数据目录里）：
+也可以分开启动：先运行开发服务，再让界面经 `OPENWEIR_DEV_SOCKET` 连它（这时配置和设置在用户数据目录里）：
 
 ```bash
-go -C src/core run ./service -socket /tmp/solaris-dev.sock
+go -C src/core run ./service -socket /tmp/openweir-dev.sock
 ```
 
 ```bash
-SOLARIS_DEV_SOCKET=/tmp/solaris-dev.sock uv run solaris
+OPENWEIR_DEV_SOCKET=/tmp/openweir-dev.sock uv run openweir
 ```
 
 **预览**：用模拟宿主和示例数据预览界面，不需要服务。可以用 `--lang en|zh`、`--appearance light|dark` 指定语言和外观；
@@ -134,7 +134,7 @@ uv run python scripts/preview.py
 ## 生成的文件
 
 修改 `proto/` 后重新生成 Go 与 Python 的协议绑定，修改 [DESIGN.md](../DESIGN.md) 的 token 后重新生成 `Theme.qml`，
-改动界面文案后更新翻译目录（源文是中文，英文在 `src/solaris/translations/en.ts`）。用以下命令重新生成；本地可加 `--check`
+改动界面文案后更新翻译目录（源文是中文，英文在 `src/openweir/translations/en.ts`）。用以下命令重新生成；本地可加 `--check`
 检查是否一致。CI 的主题与翻译一致性由 pytest 检查，协议绑定在相关输入变化时单独检查：
 
 ```bash
@@ -143,6 +143,13 @@ uv run python scripts/gen_protocol.py
 
 ```bash
 uv run python scripts/gen_theme.py
+```
+
+产品标识（显示名、bundle id、服务名、URL scheme 等）只写在根目录的 `product.json`（D49）。修改后重新生成 Go 的
+`src/core/internal/product/product_gen.go`，测试会检查两者一致：
+
+```bash
+uv run python scripts/gen_product.py
 ```
 
 ```bash
@@ -189,7 +196,7 @@ uv run python scripts/gen_screenshots.py
 - [REALITY 参数](https://github.com/openweir/mihomo/blob/04e8cc02b0d9bedb161d5a32f54f24284d70a043/adapter/outbound/reality.go)与[握手实现](https://github.com/openweir/mihomo/blob/04e8cc02b0d9bedb161d5a32f54f24284d70a043/component/tls/reality.go)
 - [Snell 参数](https://github.com/openweir/mihomo/blob/04e8cc02b0d9bedb161d5a32f54f24284d70a043/adapter/outbound/snell.go)与[v6 传输](https://github.com/openweir/mihomo/blob/04e8cc02b0d9bedb161d5a32f54f24284d70a043/transport/snell/v6.go)
 - [Nowhere NW3 说明](https://github.com/openweir/mihomo/blob/04e8cc02b0d9bedb161d5a32f54f24284d70a043/docs/nowhere.md)
-- [Solaris 的内核集成与约束](architecture.md)
+- [OpenWeir 的内核集成与约束](architecture.md)
 
 ## 目录
 
@@ -197,7 +204,7 @@ uv run python scripts/gen_screenshots.py
 | --- | --- |
 | `proto/` | 控制协议 schema 与 protoc 版本锁 |
 | `src/core/` | Go 模块：`internal/` 是 engine、控制分发器、帧编解码等；`service/` 是 Windows 服务入口；`apple/` 编成 macOS 扩展用的 C archive |
-| `src/solaris/` | Python 界面：宿主客户端、models、viewmodels、QML |
+| `src/openweir/` | Python 界面：宿主客户端、models、viewmodels、QML |
 | `apple/` | macOS 管理库与系统扩展（XcodeGen 工程） |
 | `package/` | Nuitka 入口、图标、许可证文本、磁盘映像的背景、Windows 安装器 |
 | `scripts/` | 代码生成（协议、主题、翻译、图标、许可证）、构建与打包、开发工具 |

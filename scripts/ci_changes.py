@@ -101,7 +101,7 @@ def select(paths: Iterable[str]) -> Plan:
         elif path.startswith("docs/examples/"):
             jobs.add("go")
         elif (
-            path.startswith(("proto/", "src/core/internal/controlpb/", "src/solaris/protocol/"))
+            path.startswith(("proto/", "src/core/internal/controlpb/", "src/openweir/protocol/"))
             or path == "scripts/gen_protocol.py"
         ):
             jobs.update(CORE | {"python"})
@@ -125,9 +125,9 @@ def select(paths: Iterable[str]) -> Plan:
                 jobs.update(CORE)
         elif path.startswith("apple/"):
             jobs.update({"python", "apple"})
-        elif path.startswith("src/solaris/ui/fonts/"):
+        elif path.startswith("src/openweir/ui/fonts/"):
             jobs.update(UI | {"installer-ui"})
-        elif path.startswith("src/solaris/"):
+        elif path.startswith("src/openweir/"):
             jobs.update(UI)
         elif path == "tests/test_build_windows.py":
             jobs.update(WINDOWS)
@@ -223,7 +223,7 @@ def previous_success(head: str, root: Path = ROOT) -> str | None:
                 "Authorization": f"Bearer {token}",
                 "Accept": "application/vnd.github+json",
                 "X-GitHub-Api-Version": "2022-11-28",
-                "User-Agent": "Solaris-CI",
+                "User-Agent": "OpenWeir-CI",
             },
         )
         response = connection.getresponse()

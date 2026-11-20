@@ -1,19 +1,19 @@
-"""Assemble Solaris.app (docs/architecture.md §6.1, apple/README.md): the UI built by Nuitka in
-Contents/MacOS, SolarisManager.dylib in Contents/Frameworks and the system extension in
+"""Assemble OpenWeir.app (docs/architecture.md §6.1, apple/README.md): the UI built by Nuitka in
+Contents/MacOS, OpenWeirManager.dylib in Contents/Frameworks and the system extension in
 Contents/Library/SystemExtensions, then sign it with the Developer ID identity and verify.
 
     uv run --with nuitka==4.2.2 python scripts/build_app.py               # signed
     uv run --with nuitka==4.2.2 python scripts/build_app.py --unsigned    # ad hoc
 
 The native parts come from scripts/build_apple.py's steps, built for the same version and build
-number; the app lands in build/app/Solaris.app. Signing follows build_apple.py: the identity is
+number; the app lands in build/app/OpenWeir.app. Signing follows build_apple.py: the identity is
 the team's Developer ID Application certificate that both profiles authorize, Xcode has signed
 the dylib and the extension, and this script signs the UI's code from the inside out, then the
-app with apple/App/Solaris.entitlements and the Solaris Developer ID profile. Nothing here
+app with apple/App/OpenWeir.entitlements and the OpenWeir Developer ID profile. Nothing here
 installs, runs or notarizes the app: .github/workflows/release.yml notarizes, and the extension
 creates a utun, so it only runs on a separate test Mac.
 
-With SOLARIS_GOOGLE_CLIENT_ID and SOLARIS_GOOGLE_CLIENT_SECRET set, the app carries that Google
+With OPENWEIR_GOOGLE_CLIENT_ID and OPENWEIR_GOOGLE_CLIENT_SECRET set, the app carries that Google
 OAuth client and so Google Drive backup (google_client, docs/storage.md §4); without them it has
 none. scripts/build_windows.py does the same.
 """
@@ -39,26 +39,27 @@ ROOT = Path(__file__).resolve().parents[1]
 # Run as a script, Python puts scripts/ on the path rather than the root.
 sys.path.insert(0, str(ROOT))
 
-from scripts import build_apple, macos, symbols  # noqa: E402
-from scripts.build_apple import BuildError, Profile  # noqa: E402
-from solaris.models.backup_google import (  # noqa: E402
+from openweir import product  # noqa: E402
+from openweir.models.backup_google import (  # noqa: E402
     CLIENT_FILE_NAME,
     CLIENT_ID_ENV,
     CLIENT_SECRET_ENV,
     configured_client,
 )
+from scripts import build_apple, macos, symbols  # noqa: E402
+from scripts.build_apple import BuildError, Profile  # noqa: E402
 
 BUILD = ROOT / "build" / "app"
 ENTRY = ROOT / "package" / "entry.py"
 CORE = ROOT / "src" / "core"
 
-APP_NAME = "Solaris"
+APP_NAME = "OpenWeir"
 MINIMUM_MACOS = "26.0"  # Product floor (D28), independent of individual library targets.
-# Not "Solaris": the volume is case-insensitive, and Contents/MacOS/solaris holds the package's
+# Not "OpenWeir": the volume is case-insensitive, and Contents/MacOS/openweir holds the package's
 # data (ui/, translations/) where the compiled modules look for it.
-EXECUTABLE = "SolarisUI"
-URL_SCHEMES = ("solaris", "clash", "mihomo", "clashmeta")  # one-click import (D6, D45): links.py
-CORE_VERSION_KEY = "SolarisCoreVersion"  # read by solaris.host.extension.bundled_host
+EXECUTABLE = "OpenWeirUI"
+URL_SCHEMES = product.URL_SCHEMES  # one-click import (D6, D45): product.json
+CORE_VERSION_KEY = "OpenWeirCoreVersion"  # read by openweir.host.extension.bundled_host
 MIHOMO_MODULE = "github.com/metacubex/mihomo"
 NUITKA_VERSION = "4.2.2"
 
@@ -198,7 +199,7 @@ def core_version() -> str:
 
 def google_client(directory: Path) -> list[str]:
     """The Nuitka options that bundle the Google OAuth client the environment names, written
-    to ``directory`` and read by solaris.models.backup_google beside the package. Without one
+    to ``directory`` and read by openweir.models.backup_google beside the package. Without one
     the build has no Google Drive backup; half of one stops the build."""
     if not any(os.environ.get(name, "").strip() for name in (CLIENT_ID_ENV, CLIENT_SECRET_ENV)):
         print("build: no Google OAuth client in the environment, so no Google Drive backup")
@@ -211,7 +212,14 @@ def google_client(directory: Path) -> list[str]:
     path.write_text(
         json.dumps({"client_id": client.id, "client_secret": client.secret}), encoding="utf-8"
     )
-    return [f"--include-data-files={path}=solaris/{CLIENT_FILE_NAME}"]
+    return [f"--include-data-files={path}=openweir/{CLIENT_FILE_NAME}"]
+
+
+def product_file(directory: Path) -> list[str]:
+    """The Nuitka option that bundles product.json, with the release environment's signing
+    identities, beside the package, where openweir.product reads it."""
+    path = product.render(directory)
+    return [f"--include-data-files={path}=openweir/{product.FILE_NAME}"]
 
 
 def build_ui_slice(version: str, arch: str) -> Path:
@@ -240,12 +248,12 @@ def build_ui_slice(version: str, arch: str) -> Path:
         "--include-qt-plugins=qml",
         # The Nuitka plugin pulls in the QtWidgets binding for QtQuick; the UI never imports it.
         "--nofollow-import-to=PySide6.QtWidgets",
-        "--include-distribution-metadata=solaris",
+        "--include-distribution-metadata=openweir",
         f"--macos-app-name={APP_NAME}",
         f"--macos-signed-app-name={build_apple.APP_ID}",
         f"--macos-app-version={version}",
         f"--macos-app-macos-min-version={MINIMUM_MACOS}",
-        f"--macos-app-icon={ROOT / 'package' / 'icons' / 'solaris.icns'}",
+        f"--macos-app-icon={ROOT / 'package' / 'icons' / 'openweir.icns'}",
         f"--output-filename={EXECUTABLE}",
         f"--output-dir={output}",
         # ccache, when installed, must find the compiler under its bare name; skip it.
@@ -254,6 +262,7 @@ def build_ui_slice(version: str, arch: str) -> Path:
         *(f"--noinclude-dlls={pattern}" for pattern in EXCLUDED),
         *(f"--noinclude-data-files={pattern}" for pattern in EXCLUDED),
         *google_client(BUILD),
+        *product_file(BUILD),
         ENTRY,
     ]
     _run(command, env=environment)
@@ -322,7 +331,7 @@ def merge_ui(inputs: dict[str, Path]) -> Path:
 
 
 def assemble(ui: Path, dylib: Path, extension: Path, version: str, core: str, minimum: str) -> Path:
-    """Solaris.app from the Nuitka bundle, the manager and the extension. The app takes the
+    """OpenWeir.app from the Nuitka bundle, the manager and the extension. The app takes the
     extension's build number, and ``minimum`` as the oldest macOS it opens on."""
     app = BUILD / f"{APP_NAME}.app"
     if app.exists():
@@ -412,7 +421,7 @@ def check_ui(ui: Path, expected: tuple[str, ...] = macos.ARCHITECTURES) -> str:
         shown = ", ".join(names[:3]) + (f" and {len(names) - 3} more" if len(names) > 3 else "")
         print(f"warning: macOS {version} needed by {shown}")
     if minimum != MINIMUM_MACOS:
-        print(f"warning: Solaris.app needs macOS {minimum}, above {MINIMUM_MACOS}")
+        print(f"warning: OpenWeir.app needs macOS {minimum}, above {MINIMUM_MACOS}")
     return minimum
 
 
@@ -439,7 +448,14 @@ def sign(app: Path, identity: str, profile: Profile) -> None:
     for chunk in _chunks(nested):
         _run([*base, *chunk], stdout=subprocess.DEVNULL)
     shutil.copyfile(profile.path, contents / "embedded.provisionprofile")
-    _run([*base, "--entitlements", build_apple.APP_ENTITLEMENTS, app])
+    _run(
+        [
+            *base,
+            "--entitlements",
+            build_apple.render_entitlements(build_apple.APP_ENTITLEMENTS),
+            app,
+        ]
+    )
 
 
 def sign_ad_hoc(app: Path) -> None:
@@ -480,7 +496,7 @@ def verify(app: Path, identity: str, app_profile: Profile, tunnel_profile: Profi
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Assemble and sign Solaris.app.")
+    parser = argparse.ArgumentParser(description="Assemble and sign OpenWeir.app.")
     parser.add_argument(
         "--unsigned",
         action="store_true",
@@ -494,7 +510,7 @@ def main() -> None:
     parser.add_argument("--ui-arch", choices=macos.ARCHITECTURES, help=argparse.SUPPRESS)
     arguments = parser.parse_args()
     if sys.platform != "darwin":
-        sys.exit("build_app: Solaris.app is built on macOS")
+        sys.exit("build_app: OpenWeir.app is built on macOS")
     try:
         installed = importlib.metadata.version("nuitka")
     except importlib.metadata.PackageNotFoundError:
@@ -511,6 +527,7 @@ def main() -> None:
         identity = None
         profiles: tuple[Profile, Profile] | None = None
         if not arguments.unsigned:
+            product.require_signing(build_apple.PRODUCT, "appleTeamId")
             profiles = (
                 build_apple.find_profile(build_apple.APP_PROFILE),
                 build_apple.find_profile(build_apple.TUNNEL_PROFILE),

@@ -12,7 +12,7 @@ import pytest
 from PySide6.QtCore import Qt
 from pytestqt.qtbot import QtBot
 
-from solaris import crashes
+from openweir import crashes
 from tests.support.window import Loaded, kind
 
 
@@ -21,7 +21,7 @@ def probe(directory: Path, code: str) -> subprocess.CompletedProcess[str]:
         """
 import asyncio, os, sys, threading
 from pathlib import Path
-from solaris.crashes import Recorder, asyncio_exception
+from openweir.crashes import Recorder, asyncio_exception
 if sys.platform != "win32":
     import resource
     resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
@@ -143,17 +143,17 @@ def test_export_is_explicit_and_rejects_replaced_sources(tmp_path: Path) -> None
     assert not archive.with_suffix(".zip.part").exists()
 
 
-def test_native_collection_requires_solaris_identity(tmp_path: Path) -> None:
-    (tmp_path / "SolarisUI-1.ips").write_text(
-        json.dumps({"bundleID": "dev.tschen.solaris"}) + "\n{}"
+def test_native_collection_requires_openweir_identity(tmp_path: Path) -> None:
+    (tmp_path / "OpenWeirUI-1.ips").write_text(
+        json.dumps({"bundleID": "org.openweir.app"}) + "\n{}"
     )
-    (tmp_path / "SolarisUI-2.ips").write_text(json.dumps({"bundleID": "other.app"}) + "\n{}")
+    (tmp_path / "OpenWeirUI-2.ips").write_text(json.dumps({"bundleID": "other.app"}) + "\n{}")
     (tmp_path / "OtherApp-1.ips").write_text("do not read")
-    (tmp_path / "SolarisUI-3.crash").write_text("Identifier: dev.tschen.solaris\n")
+    (tmp_path / "OpenWeirUI-3.crash").write_text("Identifier: org.openweir.app\n")
     inventory = crashes.collect(tmp_path, sources=[(tmp_path, "macos")])
     assert {report.path.name for report in inventory.reports} == {
-        "SolarisUI-1.ips",
-        "SolarisUI-3.crash",
+        "OpenWeirUI-1.ips",
+        "OpenWeirUI-3.crash",
     }
 
 
@@ -176,7 +176,7 @@ def test_wer_retention_is_scoped_to_our_process(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(crashes, "MAX_BYTES", 5)
-    ours = tmp_path / "Solaris.exe.10.dmp"
+    ours = tmp_path / "OpenWeir.exe.10.dmp"
     ours.write_bytes(b"x" * 6)
     other = tmp_path / "Other.exe.10.dmp"
     other.write_bytes(b"x" * 10)
@@ -196,10 +196,10 @@ def test_another_launch_does_not_unlink_a_live_fatal_sink(tmp_path: Path) -> Non
 def test_quit_probe_does_not_create_user_data(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from solaris import app, bootstrap
+    from openweir import app, bootstrap
 
     directory = tmp_path / "never-created"
-    monkeypatch.setattr(sys, "argv", ["Solaris", "--quit"])
+    monkeypatch.setattr(sys, "argv", ["OpenWeir", "--quit"])
     monkeypatch.setattr(bootstrap, "default_data_dir", lambda: directory)
     monkeypatch.setattr(app, "main", lambda: 0)
     assert bootstrap.main() == 0

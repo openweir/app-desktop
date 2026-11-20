@@ -7,9 +7,9 @@ Unicode true
 ManifestDPIAware true
 RequestExecutionLevel user
 SetCompressor lzma
-Name "Solaris setup preview"
+Name "OpenWeir setup preview"
 OutFile "${OUTPUT_FILE}"
-InstallDir "$PROGRAMFILES64\Solaris"
+InstallDir "$PROGRAMFILES64\OpenWeir"
 Icon "${APP_ICON}"
 XPStyle on
 Page instfiles
@@ -18,7 +18,7 @@ LoadLanguageFile "${NSISDIR}\Contrib\Language files\SimpChinese.nlf"
 !include LogicLib.nsh
 !include FileFunc.nsh
 !include "${INSTALLER_UI_INCLUDE}"
-!define PRODUCT "Solaris"
+!define PRODUCT "OpenWeir"
 !include /CHARSET=UTF8 "${__FILEDIR__}\..\messages.nsh"
 Var Mode
 Var Theme
@@ -44,7 +44,7 @@ Function .onInit
     StrCpy $2 "0.9.4"
   ${EndIf}
   !insertmacro UiAssets
-  SolarisSetupUI::Begin "preview:$Mode" "$LANGUAGE" "${APP_VERSION}" "$INSTDIR" "$PLUGINSDIR" "$Theme" "${APP_ARCH}" "$2"
+  OpenWeirSetupUI::Begin "preview:$Mode" "$LANGUAGE" "${APP_VERSION}" "$INSTDIR" "$PLUGINSDIR" "$Theme" "${APP_ARCH}" "$2"
   Pop $Decision
   ${If} $Decision == "cancel"
     SetErrorLevel 1223
@@ -53,7 +53,7 @@ Function .onInit
     SetErrorLevel 1603
     Quit
   ${EndIf}
-  SolarisSetupUI::GetDirectory
+  OpenWeirSetupUI::GetDirectory
   Pop $INSTDIR
   StrCpy $UiEnabled 1
   SetSilent silent
@@ -67,7 +67,7 @@ FunctionEnd
     Sleep 2500
     ${If} $Outcome == "failure"
     ${AndIf} ${INDEX} == $FailAt
-      SolarisSetupUI::Finish "failure" "$Failure"
+      OpenWeirSetupUI::Finish "failure" "$Failure"
       Pop $0
       StrCpy $Failed 1
     ${EndIf}
@@ -82,7 +82,7 @@ Section
     !insertmacro UiLog "Preview mode: no application, service or user data was changed."
   ${EndIf}
   ${If} $Mode == "uninstall"
-    StrCpy $Failure "$(UninstallRemovalFailed) $INSTDIR\Solaris.exe"
+    StrCpy $Failure "$(UninstallRemovalFailed) $INSTDIR\OpenWeir.exe"
     StrCpy $FailAt 2
     !insertmacro PreviewStep 0 "$(ClosingUI)"
     !insertmacro PreviewStep 1 "$(RemovingService)"
@@ -104,7 +104,7 @@ Section
     !insertmacro PreviewStep 3 "$(StartingService)"
   ${EndIf}
   ${If} $Failed == 0
-    SolarisSetupUI::Finish "success" ""
+    OpenWeirSetupUI::Finish "success" ""
     Pop $0
   ${EndIf}
   ${If} $0 == "open"

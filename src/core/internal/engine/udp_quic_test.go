@@ -15,9 +15,9 @@ import (
 	"github.com/metacubex/quic-go"
 	"github.com/metacubex/tls"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/admission"
-	"github.com/Ember-Moth/Solaris/src/core/internal/controlpb"
-	"github.com/Ember-Moth/Solaris/src/core/internal/porttest"
+	"github.com/openweir/app-desktop/src/core/internal/admission"
+	"github.com/openweir/app-desktop/src/core/internal/controlpb"
+	"github.com/openweir/app-desktop/src/core/internal/porttest"
 )
 
 // quicPort is where the QUIC client believes its server is: a port the plan's sniffer reads
@@ -66,7 +66,7 @@ func quicEcho(t *testing.T, certificate, key string) netip.AddrPort {
 	}
 	server, err := quic.ListenAddr("127.0.0.1:0", &tls.Config{
 		Certificates: []tls.Certificate{pair},
-		NextProtos:   []string{"solaris-test"},
+		NextProtos:   []string{"openweir-test"},
 	}, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -149,7 +149,7 @@ func TestQUICThroughNode(t *testing.T) {
 			client, err := quic.Dial(ctx, conn, conn.target, &tls.Config{
 				ServerName:         nodeServerName,
 				InsecureSkipVerify: true,
-				NextProtos:         []string{"solaris-test"},
+				NextProtos:         []string{"openweir-test"},
 				CurvePreferences:   []tls.CurveID{tls.X25519MLKEM768, tls.X25519},
 			}, nil)
 			if err != nil {
@@ -160,7 +160,7 @@ func TestQUICThroughNode(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			message := strings.Repeat("QUIC through Solaris ", 1000)
+			message := strings.Repeat("QUIC through OpenWeir ", 1000)
 			if _, err := stream.Write([]byte(message)); err != nil {
 				t.Fatal(err)
 			}

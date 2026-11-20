@@ -12,15 +12,15 @@ from types import SimpleNamespace
 
 import pytest
 
-from solaris.desktop import associations
-from solaris.desktop.associations import (
+from openweir.desktop import associations
+from openweir.desktop.associations import (
     WindowsUserClasses,
     candidates,
     clear_stale,
     clear_stale_in_background,
     is_stale,
 )
-from solaris.desktop.links import SCHEMES
+from openweir.desktop.links import SCHEMES
 
 ENVIRON = {
     "LOCALAPPDATA": r"C:\Users\me\AppData\Local",
@@ -149,10 +149,12 @@ def test_whether_the_program_is_gone(command: str, stale: bool | None) -> None:
 
 
 def test_only_registrations_of_a_missing_program_go(caplog: pytest.LogCaptureFixture) -> None:
-    classes = FakeClasses({"solaris": r'"C:\Old\Solaris.exe" "%1"', "clash": GONE, "mihomo": VALID})
+    classes = FakeClasses(
+        {"openweir": r'"C:\Old\OpenWeir.exe" "%1"', "clash": GONE, "mihomo": VALID}
+    )
     with caplog.at_level(logging.INFO, logger=associations.__name__):
         cleared = clear_stale(classes, ENVIRON, exists)
-    assert cleared == classes.deleted == ["solaris", "clash"]
+    assert cleared == classes.deleted == ["openweir", "clash"]
     assert classes.asked == list(SCHEMES)
     assert classes.commands == {"mihomo": VALID}  # another client, still installed
     # What went and where it pointed, for the diagnosis.
@@ -184,7 +186,7 @@ def test_a_command_it_cannot_read_stays(caplog: pytest.LogCaptureFixture) -> Non
 def test_failures_leave_that_scheme_and_go_on(caplog: pytest.LogCaptureFixture) -> None:
     classes = FakeClasses(
         {
-            "solaris": PermissionError(13, "Access is denied"),
+            "openweir": PermissionError(13, "Access is denied"),
             "clash": GONE,
             "mihomo": r'"C:\Locked\Gone.exe" "%1"',
             "clashmeta": r'"C:\Tools\gone.exe" "%1"',
@@ -199,7 +201,7 @@ def test_failures_leave_that_scheme_and_go_on(caplog: pytest.LogCaptureFixture) 
 
     with caplog.at_level(logging.INFO, logger=associations.__name__):
         assert clear_stale(classes, ENVIRON, locked) == ["clashmeta"]
-    assert set(classes.commands) == {"solaris", "clash", "mihomo"}
+    assert set(classes.commands) == {"openweir", "clash", "mihomo"}
     # One line each: three could not be checked, one went.
     messages = [record.getMessage() for record in caplog.records]
     named = [scheme for message in messages for scheme in SCHEMES if f" {scheme}: " in message]
@@ -269,7 +271,7 @@ def test_the_registry_under_a_scratch_key() -> None:
     import winreg
 
     # Not a URL scheme (no "URL Protocol"), and a name no program uses.
-    scheme = f"solaris-test-{uuid.uuid4().hex}"
+    scheme = f"openweir-test-{uuid.uuid4().hex}"
     path = rf"{associations.CLASSES}\{scheme}"
     classes = WindowsUserClasses()
     try:

@@ -24,7 +24,7 @@ from typing import Any
 
 import yaml
 
-from solaris.host.base import (
+from openweir.host.base import (
     DELAY_TESTS,
     EXPORT_SHARE,
     LOG_LEVELS,
@@ -60,9 +60,9 @@ from solaris.host.base import (
     bundled_geo_categories,
     taken_over,
 )
-from solaris.models.mesh import MeshStore
-from solaris.models.plans import WARP, default_plan
-from solaris.models.profiles import (
+from openweir.models.mesh import MeshStore
+from openweir.models.plans import WARP, default_plan
+from openweir.models.profiles import (
     KIND_FILE,
     KIND_SUBSCRIPTION,
     Profile,
@@ -70,7 +70,7 @@ from solaris.models.profiles import (
     ProfileList,
     Usage,
 )
-from solaris.models.routing import (
+from openweir.models.routing import (
     DEFAULT_INFO_PATTERN,
     MODE_PROFILE,
     Plan,
@@ -78,8 +78,8 @@ from solaris.models.routing import (
     PlanRule,
     RoutingStore,
 )
-from solaris.models.store import ProfileStore
-from solaris.models.subscription import Download, EntityTag
+from openweir.models.store import ProfileStore
+from openweir.models.subscription import Download, EntityTag
 from tests.support.simulated_core import (
     VPNGATE_NAMES,
     check_config,
@@ -1197,7 +1197,7 @@ def seed_long_plan(store: ProfileStore) -> Plan:
     """A plan with a long name in each place the routing page shows one: its own, a custom
     group (LONG_PLAN_GROUP), the rules to it, a mesh network (LONG_MESH) and the WARP exit
     through the group. The plan is stored, not chosen."""
-    network = MeshNetwork("long-mesh", LONG_MESH, TailscaleSettings(hostname="solaris"), "g-long")
+    network = MeshNetwork("long-mesh", LONG_MESH, TailscaleSettings(hostname="openweir"), "g-long")
     MeshStore(store.database).put(network)
     plan = default_plan(name=LONG_PLAN)
     group = PlanGroup("g-long", "custom", "select", LONG_PLAN_GROUP, {"sources": ["sample-b"]})

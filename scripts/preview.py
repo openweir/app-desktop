@@ -1,9 +1,9 @@
 """Run the UI against the simulated host and sample profiles.
 
     uv run python scripts/preview.py             # the system's language
-    uv run python scripts/preview.py --lang en   # or zh; SOLARIS_LANG works too
+    uv run python scripts/preview.py --lang en   # or zh; OPENWEIR_LANG works too
     uv run python scripts/preview.py --appearance dark  # or light, system;
-                                                        # SOLARIS_APPEARANCE works too
+                                                        # OPENWEIR_APPEARANCE works too
     uv run python scripts/preview.py --crowd 2000  # a busy core: 2000 more connections
     uv run python scripts/preview.py --development  # the development service: neither TUN
                                                     # nor the system proxy
@@ -19,7 +19,7 @@ Profiles live in a temporary directory and links resolve to sample data, so the 
 touches neither the real profiles nor the network; updates come from a fake GitHub on a
 loopback port, whose installer passes a fake signature check. With --google, Google Drive is a
 fake Google on a loopback port too, whose browser consents at once, and its sign-in stays in
-memory. Without it, SOLARIS_GOOGLE_CLIENT_ID and SOLARIS_GOOGLE_CLIENT_SECRET sign in to the real
+memory. Without it, OPENWEIR_GOOGLE_CLIENT_ID and OPENWEIR_GOOGLE_CLIENT_SECRET sign in to the real
 Google (docs/maintenance.md §2.8). Source-tree only: the preview's test doubles never ship in
 the package.
 """
@@ -34,14 +34,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from solaris.app import main
-from solaris.host.base import TAKEOVER_NONE, TAKEOVER_SETTINGS, TAKEOVER_TUN
-from solaris.models.plans import default_plan
-from solaris.models.routing import MODE_PLAN, RoutingStore
-from solaris.models.store import ProfileStore
-from solaris.update.releases import ReleaseSource
-from solaris.update.updater import Updater
-from solaris.viewmodels.appearance import MODES
+from openweir.app import main
+from openweir.host.base import TAKEOVER_NONE, TAKEOVER_SETTINGS, TAKEOVER_TUN
+from openweir.models.plans import default_plan
+from openweir.models.routing import MODE_PLAN, RoutingStore
+from openweir.models.store import ProfileStore
+from openweir.update.releases import ReleaseSource
+from openweir.update.updater import Updater
+from openweir.viewmodels.appearance import MODES
 from tests.support.credentials import MemoryCredentials
 from tests.support.google import FakeGoogle
 from tests.support.releases import FakeVerifier, sample_github
@@ -81,7 +81,7 @@ if __name__ == "__main__":
     if google is not None:
         os.environ["no_proxy"] = "127.0.0.1"  # the fake is on a loopback port
     with (
-        tempfile.TemporaryDirectory(prefix="solaris-preview-") as directory,
+        tempfile.TemporaryDirectory(prefix="openweir-preview-") as directory,
         sample_github(newer=args.update) as github,
         contextlib.closing(google) if google else contextlib.nullcontext(),
     ):

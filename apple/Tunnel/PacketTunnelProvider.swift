@@ -8,9 +8,9 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
   /// Messages are dispatched off the provider's callbacks. The dispatcher serializes the methods
   /// that change state and lets queries run in parallel, so the queue is concurrent.
   private let messages = DispatchQueue(
-    label: "dev.tschen.solaris.tunnel.messages", attributes: .concurrent)
+    label: tunnelIdentifier + ".messages", attributes: .concurrent)
   /// Attaching in startTunnel and detaching in stopTunnel run here, in that order.
-  private let lifecycle = DispatchQueue(label: "dev.tschen.solaris.tunnel.lifecycle")
+  private let lifecycle = DispatchQueue(label: tunnelIdentifier + ".lifecycle")
   /// Set by stopTunnel, so that a start still waiting for its network settings does not
   /// attach afterwards. Read and written on `lifecycle` only.
   private var stopping = false
@@ -96,7 +96,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
   private static func coreHome() throws -> URL {
     try FileManager.default.url(
       for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true
-    ).appendingPathComponent("Solaris/core", isDirectory: true)
+    ).appendingPathComponent("OpenWeir/core", isDirectory: true)
   }
 }
 
@@ -106,4 +106,6 @@ struct TunnelError: LocalizedError {
   init(_ description: String) { errorDescription = description }
 }
 
-let logger = Logger(subsystem: "dev.tschen.solaris", category: "tunnel")
+// The extension's bundle id, <app bundle id>.tunnel, set from product.json by the build.
+let tunnelIdentifier = Bundle.main.bundleIdentifier ?? ""
+let logger = Logger(subsystem: String(tunnelIdentifier.dropLast(".tunnel".count)), category: "tunnel")

@@ -11,8 +11,8 @@ from pathlib import Path
 
 import pytest
 
-from solaris.desktop import elevation
-from solaris.host.base import HostError
+from openweir.desktop import elevation
+from openweir.host.base import HostError
 
 
 def test_take_over_needs_windows() -> None:
@@ -26,7 +26,7 @@ def test_take_over_needs_windows() -> None:
 
 def test_the_helper_is_the_service_beside_the_ui() -> None:
     assert elevation.service_executable() == Path(sys.executable).resolve().parent / (
-        "solaris-service.exe"
+        "openweir-service.exe"
     )
 
 

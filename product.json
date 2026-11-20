@@ -1,0 +1,17 @@
+{
+  "displayName": "OpenWeir",
+  "productId": "openweir",
+  "bundleId": "org.openweir.app",
+  "repository": "openweir/app-desktop",
+  "urlSchemes": ["openweir", "clash", "mihomo", "clashmeta"],
+  "windows": {
+    "serviceName": "OpenWeirService",
+    "uiExecutable": "OpenWeir.exe",
+    "serviceExecutable": "openweir-service.exe"
+  },
+  "signing": {
+    "appleTeamId": "",
+    "windowsSigner": "",
+    "windowsSignerEku": ""
+  }
+}

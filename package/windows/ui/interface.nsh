@@ -6,7 +6,7 @@ Var UiEnabled
 !macro UiAssets
   InitPluginsDir
   SetOutPath "$PLUGINSDIR"
-  File /oname=solaris.ico "${APP_ICON}"
+  File /oname=openweir.ico "${APP_ICON}"
   File /oname=Inter-Regular.ttf "${INSTALLER_FONTS}\inter\Inter-Regular.ttf"
   File /oname=Inter-Medium.ttf "${INSTALLER_FONTS}\inter\Inter-Medium.ttf"
   File /oname=Inter-SemiBold.ttf "${INSTALLER_FONTS}\inter\Inter-SemiBold.ttf"
@@ -21,7 +21,7 @@ Var UiEnabled
 ; version being updated, shown in the header; empty otherwise.
 !macro UiBegin MODE INSTALLED
   !insertmacro UiAssets
-  SolarisSetupUI::Begin "${MODE}" "$LANGUAGE" "${APP_VERSION}" "$INSTDIR" "$PLUGINSDIR" "auto" "${APP_ARCH}" "${INSTALLED}"
+  OpenWeirSetupUI::Begin "${MODE}" "$LANGUAGE" "${APP_VERSION}" "$INSTDIR" "$PLUGINSDIR" "auto" "${APP_ARCH}" "${INSTALLED}"
   Pop $0
   ${If} $0 == "cancel"
     SetErrorLevel 1223
@@ -32,7 +32,7 @@ Var UiEnabled
     SetErrorLevel 1603
     Quit
   ${EndIf}
-  SolarisSetupUI::GetDirectory
+  OpenWeirSetupUI::GetDirectory
   Pop $INSTDIR
   StrCpy $UiEnabled 1
   SetSilent silent
@@ -42,7 +42,7 @@ Var UiEnabled
 ; ones before it done and itself current. A failure marks the current step failed.
 !macro UiStep INDEX
   ${If} $UiEnabled == 1
-    SolarisSetupUI::Step "${INDEX}"
+    OpenWeirSetupUI::Step "${INDEX}"
   ${EndIf}
 !macroend
 
@@ -50,12 +50,12 @@ Var UiEnabled
 !macro UiStatus TEXT
   DetailPrint "${TEXT}"
   ${If} $UiEnabled == 1
-    SolarisSetupUI::Status "${TEXT}"
+    OpenWeirSetupUI::Status "${TEXT}"
   ${EndIf}
 !macroend
 
 !macro UiLog TEXT
   ${If} $UiEnabled == 1
-    SolarisSetupUI::Log "${TEXT}"
+    OpenWeirSetupUI::Log "${TEXT}"
   ${EndIf}
 !macroend

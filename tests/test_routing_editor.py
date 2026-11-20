@@ -13,12 +13,12 @@ from PySide6.QtCore import QObject, QUrl
 from PySide6.QtGui import QGuiApplication
 from pytestqt.qtbot import QtBot
 
-from solaris.models.routing import MODE_PLAN
-from solaris.models.store import ProfileStore
-from solaris.viewmodels.composition import ViewModels, compose
-from solaris.viewmodels.routing import RoutingViewModel
-from solaris.viewmodels.routing_groups import GroupEditor
-from solaris.viewmodels.routing_transfer import PlanTransfer
+from openweir.models.routing import MODE_PLAN
+from openweir.models.store import ProfileStore
+from openweir.viewmodels.composition import ViewModels, compose
+from openweir.viewmodels.routing import RoutingViewModel
+from openweir.viewmodels.routing_groups import GroupEditor
+from openweir.viewmodels.routing_transfer import PlanTransfer
 from tests.support.simulated import SimulatedFetcher, SimulatedHost, seed_profiles
 
 NOW = datetime(2026, 10, 29, 12).timestamp()

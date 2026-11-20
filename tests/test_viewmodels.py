@@ -8,12 +8,12 @@ import pytest
 from PySide6.QtCore import QObject
 from pytestqt.qtbot import QtBot
 
-from solaris.host.base import TAKEOVER_NONE, HostError, HostStatus, RunOptions
-from solaris.host.service import ServiceHost
-from solaris.host.transport import Streams
-from solaris.models.profiles import ProfileError
-from solaris.models.store import ProfileStore
-from solaris.viewmodels.composition import ViewModels, compose
+from openweir.host.base import TAKEOVER_NONE, HostError, HostStatus, RunOptions
+from openweir.host.service import ServiceHost
+from openweir.host.transport import Streams
+from openweir.models.profiles import ProfileError
+from openweir.models.store import ProfileStore
+from openweir.viewmodels.composition import ViewModels, compose
 from tests.support.simulated import SAMPLE_CONFIG, SimulatedFetcher, SimulatedHost, seed_profiles
 from tests.support.storage import has_config, has_override
 

@@ -3,7 +3,7 @@
     uv run python scripts/gen_dmg_background.py
 
 A plain neutral fill the size of the window in scripts/build_dmg.py, and a thin arrow from
-where Solaris.app sits to where the Applications shortcut sits; no text (DESIGN.md: neutral,
+where OpenWeir.app sits to where the Applications shortcut sits; no text (DESIGN.md: neutral,
 no marketing). Finder draws the icons' labels dark in light mode and white in dark mode on
 the same picture, so the fill is the mid grey that gives both about 4.6:1. dmgbuild combines
 the two files into one HiDPI TIFF. Both are committed, so a build needs no renderer; run this

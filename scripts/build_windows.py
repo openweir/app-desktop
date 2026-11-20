@@ -9,8 +9,8 @@ around the three.
 
 Everything lands in build/windows:
 
-    Solaris/                                  the install directory, as the installer lays it out
-    Solaris-<version>-windows-x64-setup.exe
+    OpenWeir/                                  the install directory, as the installer lays it out
+    OpenWeir-<version>-windows-x64-setup.exe
 
 Native Windows ARM64 builds use --arch arm64 and build/windows-arm64 instead.
 The GUI must be built with a Python interpreter of the selected architecture. There Nuitka scans
@@ -19,14 +19,14 @@ package/windows/nuitka_pefile.py, which gets the same result in a fraction of th
 only with the Nuitka it was written against.
 
 The installer is package/windows/installer.nsi, compiled by makensis (NSIS 3.08 or later)
-against Solaris/ and an uninstall list of exactly its files; package/windows/setup.ps1 is the
+against OpenWeir/ and an uninstall list of exactly its files; package/windows/setup.ps1 is the
 part that closes the UI and registers, stops and removes the service. wintun is not shipped on
 its own: sing-tun embeds wintun.dll in the service and loads it from memory.
 
 Only the release workflow signs, with --sign (Azure Artifact Signing, docs/decisions.md D42):
-the service links with SignedRelease, so that it accepts only a UI with Solaris's signature
+the service links with SignedRelease, so that it accepts only a UI with OpenWeir's signature
 (docs/architecture.md §5.3), and compiling the installer first has package/windows/sign.ps1
-sign the executables, DLLs and extension modules in Solaris/ that carry no publisher's
+sign the executables, DLLs and extension modules in OpenWeir/ that carry no publisher's
 signature, then the setup UI's plugin, then through makensis' !uninstfinalize and !finalize
 the uninstaller and the installer. The release workflow builds with --skip-installer --sign,
 signs in to Azure, then runs --installer-only --sign: the sign-in stays fresh. Without --sign
@@ -50,6 +50,7 @@ ROOT = Path(__file__).resolve().parents[1]
 # Run as a script, Python puts scripts/ on the path rather than the root.
 sys.path.insert(0, str(ROOT))
 
+from openweir import product  # noqa: E402
 from scripts import build_app, build_apple, build_installer_ui, cronet, fetch_geodata, symbols  # noqa: E402
 from scripts.build_apple import BuildError  # noqa: E402
 
@@ -58,27 +59,31 @@ PACKAGE = ROOT / "package" / "windows"
 ENTRY = ROOT / "package" / "entry.py"
 CORE = ROOT / "src" / "core"
 INSTALLER_SCRIPT = PACKAGE / "installer.nsi"
-ICON = ROOT / "package" / "icons" / "solaris.ico"  # scripts/gen_icons.py
+ICON = ROOT / "package" / "icons" / "openweir.ico"  # scripts/gen_icons.py
 SETUP_SCRIPT = PACKAGE / "setup.ps1"
 SIGN_SCRIPT = PACKAGE / "sign.ps1"
 # Nuitka's pefile dependency scan, which only the ARM64 build uses, without its repeated full loads.
 PEFILE_PLUGIN = PACKAGE / "nuitka_pefile.py"
-SIGNED_RELEASE_VARIABLE = "github.com/Ember-Moth/Solaris/src/core/internal/product.SignedRelease"
+PRODUCT_PACKAGE = "github.com/openweir/app-desktop/src/core/internal/product"
+SIGNED_RELEASE_VARIABLE = f"{PRODUCT_PACKAGE}.SignedRelease"
 
-APP_NAME = "Solaris"
+# product.json, with the release environment's Authenticode signer (OPENWEIR_WINDOWS_SIGNER and
+# OPENWEIR_WINDOWS_SIGNER_EKU).
+PRODUCT = product.load(product.SOURCE, os.environ)
+APP_NAME: str = PRODUCT["displayName"]
 # The only client the service accepts, from its own directory (src/core/internal/product).
-CLIENT = "Solaris.exe"
-SERVICE = "solaris-service.exe"
+CLIENT: str = PRODUCT["windows"]["uiExecutable"]
+SERVICE: str = PRODUCT["windows"]["serviceExecutable"]
 GEODATA = "geodata"  # beside the service, under mihomo's names
 # All four TUN stacks (D3); the version is what GetInfo reports.
 GO_TAGS = "with_gvisor,with_naive,with_purego"
-# The files an installed Solaris cannot do without; check() looks for each.
+# The files an installed OpenWeir cannot do without; check() looks for each.
 REQUIRED = (
     CLIENT,
     SERVICE,
     "libcronet.dll",
     "LICENSE",
-    "solaris/licenses/THIRD_PARTY_NOTICES.txt",
+    "openweir/licenses/THIRD_PARTY_NOTICES.txt",
     *(f"{GEODATA}/{name}" for name in build_apple.GEO_FILES),
 )
 PE_SUFFIXES = (".exe", ".dll", ".pyd")
@@ -129,7 +134,7 @@ def installer_name(version: str, arch: str = "x64") -> str:
 
 def build_service(version: str, arch: str = "x64", signed: bool = False) -> Path:
     """Native Windows service, with DWARF for retained crash symbols. Linked ``signed``, as a
-    release is, it accepts only a UI with Solaris's signature."""
+    release is, it accepts only a UI with OpenWeir's signature."""
     output = build_directory(arch) / "service" / SERVICE
     output.unlink(missing_ok=True)
     environment = os.environ | {
@@ -140,7 +145,11 @@ def build_service(version: str, arch: str = "x64", signed: bool = False) -> Path
     }
     variables = f"-X {build_apple.GO_VERSION_VARIABLE}={version}"
     if signed:
+        product.require_signing(PRODUCT, "windowsSigner", "windowsSignerEku")
+        signing = PRODUCT["signing"]
         variables += f" -X {SIGNED_RELEASE_VARIABLE}=true"
+        variables += f" -X '{PRODUCT_PACKAGE}.WindowsSigner={signing['windowsSigner']}'"
+        variables += f" -X '{PRODUCT_PACKAGE}.WindowsSignerEKU={signing['windowsSignerEku']}'"
     command: list[str | Path] = [
         "go",
         "-C",
@@ -196,6 +205,7 @@ def build_ui(version: str, arch: str = "x64") -> Path:
         *(f"--noinclude-dlls={pattern}" for pattern in excluded),
         *(f"--noinclude-data-files={pattern}" for pattern in excluded),
         *build_app.google_client(build),
+        *build_app.product_file(build),
         ENTRY,
     ]
     build_apple._run(command)
@@ -203,7 +213,7 @@ def build_ui(version: str, arch: str = "x64") -> Path:
 
 
 def assemble(ui: Path, service: Path, geodata: dict[str, Path], arch: str = "x64") -> Path:
-    """The install directory: the UI's standalone directory with the service beside Solaris.exe
+    """The install directory: the UI's standalone directory with the service beside OpenWeir.exe
     and the GEO data in geodata/."""
     directory = build_directory(arch) / APP_NAME
     if directory.exists():
@@ -328,6 +338,9 @@ def build_installer(
     installer = output / installer_name(version, arch)
     installer.unlink(missing_ok=True)
     definitions = {
+        "PRODUCT": APP_NAME,
+        "CLIENT": CLIENT,
+        "SERVICE_EXECUTABLE": SERVICE,
         "APP_DIRECTORY": directory,
         "APP_VERSION": version,
         "APP_ARCH": arch,
@@ -338,7 +351,7 @@ def build_installer(
         "REMOVE_FILES_INCLUDE": PACKAGE / "remove-files.nsh",
         "INSTALLER_UI_DIR": plugin.parent,
         "INSTALLER_UI_INCLUDE": PACKAGE / "ui" / "interface.nsh",
-        "INSTALLER_FONTS": ROOT / "src" / "solaris" / "ui" / "fonts",
+        "INSTALLER_FONTS": ROOT / "src" / "openweir" / "ui" / "fonts",
         "INSTALLER_LICENSE": ROOT / "LICENSE",
     }
     if signed:

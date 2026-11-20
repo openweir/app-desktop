@@ -15,10 +15,10 @@ from dataclasses import replace
 
 import pytest
 
+from openweir.models import plans
+from openweir.models.library import Routing
+from openweir.models.routing import Plan, PlanGroup, PlanRule
 from scripts.fetch_geodata import seed
-from solaris.models import plans
-from solaris.models.library import Routing
-from solaris.models.routing import Plan, PlanGroup, PlanRule
 from tests.e2e.app import App, Network
 from tests.e2e.servers import WebServer
 

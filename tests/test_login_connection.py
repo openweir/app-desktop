@@ -9,11 +9,11 @@ from typing import Any
 import pytest
 from pytestqt.qtbot import QtBot
 
-from solaris.desktop.login import LoginItemError, LoginItemStatus, UnavailableLoginItem
-from solaris.host.base import HostError, HostStatus, TunnelConfig
-from solaris.models.settings import DatabaseSettingsStore
-from solaris.models.store import ProfileStore
-from solaris.viewmodels.composition import ViewModels, compose
+from openweir.desktop.login import LoginItemError, LoginItemStatus, UnavailableLoginItem
+from openweir.host.base import HostError, HostStatus, TunnelConfig
+from openweir.models.settings import DatabaseSettingsStore
+from openweir.models.store import ProfileStore
+from openweir.viewmodels.composition import ViewModels, compose
 from tests.support.releases import offline_updater
 from tests.support.simulated import SimulatedFetcher, SimulatedHost, seed_profiles
 

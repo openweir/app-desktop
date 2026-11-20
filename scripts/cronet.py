@@ -27,7 +27,7 @@ def library(system: str, arch: str) -> NativeLibrary:
         ("windows", "amd64"),
         ("windows", "arm64"),
     ):
-        raise ValueError(f"unsupported Solaris native target: {system}/{arch}")
+        raise ValueError(f"unsupported OpenWeir native target: {system}/{arch}")
     module = MODULE + f"{system}_{arch}"
 
     def query(*arguments: str) -> dict[str, str]:

@@ -18,9 +18,9 @@ from typing import Any
 import pytest
 import yaml
 
+from openweir.desktop.links import SCHEMES
 from scripts import build_installer_ui, build_windows
 from scripts.build_apple import BuildError
-from solaris.desktop.links import SCHEMES
 
 
 def _pe(machine: int) -> bytes:
@@ -29,7 +29,7 @@ def _pe(machine: int) -> bytes:
 
 
 def _install_directory(root: Path, machine: int = build_windows.PE_MACHINE_AMD64) -> Path:
-    directory = root / "Solaris"
+    directory = root / "OpenWeir"
     for name in build_windows.REQUIRED:
         path = directory / name
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -132,7 +132,7 @@ def test_check_refuses_other_architectures(tmp_path: Path) -> None:
 
 def test_uninstall_list_removes_contents_before_their_directories(tmp_path: Path) -> None:
     lines = build_windows.uninstall_list(_install_directory(tmp_path)).splitlines()
-    assert '!insertmacro RemoveInstalledFile "$INSTDIR\\Solaris.exe"' in lines
+    assert '!insertmacro RemoveInstalledFile "$INSTDIR\\OpenWeir.exe"' in lines
     assert (
         '!insertmacro RemoveInstalledFile "$INSTDIR\\PySide6\\qml\\QtQuick\\price$$1.qml"' in lines
     )
@@ -154,8 +154,10 @@ def test_nsis_string() -> None:
 
 def test_installer_name() -> None:
     # docs/release.md §1, which the updater looks for.
-    assert build_windows.installer_name("0.2.0") == "Solaris-0.2.0-windows-x64-setup.exe"
-    assert build_windows.installer_name("0.2.0", "arm64") == "Solaris-0.2.0-windows-arm64-setup.exe"
+    assert build_windows.installer_name("0.2.0") == "OpenWeir-0.2.0-windows-x64-setup.exe"
+    assert (
+        build_windows.installer_name("0.2.0", "arm64") == "OpenWeir-0.2.0-windows-arm64-setup.exe"
+    )
     with pytest.raises(BuildError, match="unsupported Windows architecture"):
         build_windows.installer_name("0.2.0", "x86")
 
@@ -184,7 +186,7 @@ def test_installer_compiles(tmp_path: Path, arch: str) -> None:
     makensis = Path(shutil.which("makensis") or "")
     directory = _install_directory(tmp_path, build_windows.target(arch)[1])
     installer = build_windows.build_installer(directory, "0.2.0", makensis, tmp_path / "out", arch)
-    assert installer.name == f"Solaris-0.2.0-windows-{arch}-setup.exe"
+    assert installer.name == f"OpenWeir-0.2.0-windows-{arch}-setup.exe"
     assert installer.read_bytes()[:2] == b"MZ"
 
 
@@ -200,10 +202,10 @@ def build_harness(directory: Path) -> tuple[Path, Path]:
     module = payload / "google" / "_upb" / "_message.pyd"
     module.parent.mkdir(parents=True)
     module.write_bytes(b"old extension module")
-    (payload / "Solaris.exe").write_bytes(b"stand-in, never executed")
+    (payload / "OpenWeir.exe").write_bytes(b"stand-in, never executed")
     owned = directory / "remove-payload.nsh"
     owned.write_text(build_windows.uninstall_list(payload), encoding="utf-8-sig")
-    installed = directory / "Solaris test $folder"
+    installed = directory / "OpenWeir test $folder"
     installer = directory / "cleanup-fixture.exe"
     script = directory / "harness.nsi"
     source = r"""
@@ -224,7 +226,7 @@ LoadLanguageFile "${NSISDIR}\Contrib\Language files\English.nlf"
   !insertmacro Fail "Could not remove installed file: ${PATH}" 1603
 !macroend
 !include "@INCLUDE@"
-Name "Solaris cleanup test"
+Name "OpenWeir cleanup test"
 OutFile "@OUTPUT@"
 InstallDir "@INSTALLED@"
 Section
@@ -293,7 +295,7 @@ def test_removes_readonly_owned_files_and_preserves_unknown_files(tmp_path: Path
     try:
         assert uninstall(installed).returncode == 0
         assert not old.exists()
-        assert not (installed / "Solaris.exe").exists()
+        assert not (installed / "OpenWeir.exe").exists()
         assert extra.read_text(encoding="utf-8") == "keep me"
         assert extra.stat().st_file_attributes & stat.FILE_ATTRIBUTE_READONLY
     finally:
@@ -334,7 +336,7 @@ def test_locked_old_extension_fails_then_retry_cleans_it(tmp_path: Path) -> None
     assert uninstall(installed).returncode == 0
     assert not old.exists()
     # A previously removed file is harmless on retry.
-    assert not (installed / "Solaris.exe").exists()
+    assert not (installed / "OpenWeir.exe").exists()
 
 
 @pytest.mark.parametrize("signed", [False, True])
@@ -346,10 +348,17 @@ def test_a_signed_release_links_the_service_with_signed_release(
     monkeypatch.setattr(
         build_windows.build_apple, "_run", lambda command, **_: commands.append(command)
     )
+    # As the release environment sets them (D47).
+    signing = {"windowsSigner": "OpenWeir Ltd", "windowsSignerEku": "1.3.6.1.4.1.311.97.1"}
+    data = {**build_windows.PRODUCT, "signing": {**build_windows.PRODUCT["signing"], **signing}}
+    monkeypatch.setattr(build_windows, "PRODUCT", data)
     build_windows.build_service("1.2.3", "x64", signed)
     (ldflags,) = [str(part) for part in commands[0] if str(part).startswith("-ldflags=")]
     assert f"-X {build_windows.build_apple.GO_VERSION_VARIABLE}=1.2.3" in ldflags
     assert (f"-X {build_windows.SIGNED_RELEASE_VARIABLE}=true" in ldflags) is signed
+    package = build_windows.PRODUCT_PACKAGE
+    assert (f"-X '{package}.WindowsSigner=OpenWeir Ltd'" in ldflags) is signed
+    assert (f"-X '{package}.WindowsSignerEKU=1.3.6.1.4.1.311.97.1'" in ldflags) is signed
     assert build_windows.SIGNED_RELEASE_VARIABLE.endswith("/internal/product.SignedRelease")
 
 
@@ -359,7 +368,7 @@ def test_a_signed_installer_signs_its_plugin_and_finalizes(
 ) -> None:
     # The setup UI's plugin is signed before makensis packs it; the installer script gets the
     # signing script for !uninstfinalize and !finalize.
-    plugin = tmp_path / "ui" / "SolarisSetupUI.dll"
+    plugin = tmp_path / "ui" / "OpenWeirSetupUI.dll"
     commands: list[list[str]] = []
 
     def run(command: list[str | Path], **_: object) -> None:
@@ -514,14 +523,14 @@ def test_sign_script_checks_signer_and_usage(tmp_path: Path) -> None:
     status, output = _sign_script("-Check", str(unsigned), str(copied))
     assert status == 1, output
     assert "signed only in this machine's Catalog" in output
-    # Microsoft's signature is one Windows trusts, but not Solaris's.
+    # Microsoft's signature is one Windows trusts, but not OpenWeir's.
     programs = Path(os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)"))
     edge = programs / "Microsoft" / "Edge" / "Application" / "msedge.exe"
     if not edge.is_file():
         pytest.skip("no signed program to check")
     status, output = _sign_script("-Check", str(edge))
     assert status == 1, output
-    assert "signed by 'Microsoft Corporation', not 'Herta Network LLC'" in output
+    assert "signed by 'Microsoft Corporation', not 'OpenWeir'" in output
 
 
 def test_smoke_test_names_each_file_to_check_on_its_own() -> None:
@@ -552,7 +561,7 @@ def test_sign_script_checks_each_file_a_windows_powershell_script_names(tmp_path
 
 @ON_WINDOWS
 def test_sign_script_needs_the_release_signing_setup(tmp_path: Path) -> None:
-    program = tmp_path / "Solaris.exe"
+    program = tmp_path / "OpenWeir.exe"
     program.write_bytes(_pe(build_windows.PE_MACHINE_AMD64))
     environment = {
         key: value
@@ -564,7 +573,7 @@ def test_sign_script_needs_the_release_signing_setup(tmp_path: Path) -> None:
     assert "SIGNTOOL names no file" in output
     status, output = _sign_script("-Directory", str(tmp_path), env=environment)
     assert status != 0
-    assert "has no solaris-service.exe" in output
+    assert "has no openweir-service.exe" in output
 
 
 def _workflow(name: str) -> dict[str, Any]:
@@ -599,3 +608,14 @@ def test_only_the_release_workflow_signs() -> None:
     ci = (build_windows.ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     for signing in ("--sign", "-Signed", "id-token", "azure/login", "ARTIFACT_SIGNING"):
         assert signing not in ci
+
+
+def test_a_signed_service_needs_the_release_signer(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(build_windows, "BUILD", tmp_path)
+    monkeypatch.setattr(build_windows.build_apple, "_run", lambda command, **_: None)
+    empty = {**build_windows.PRODUCT, "signing": {"windowsSigner": "", "windowsSignerEku": ""}}
+    monkeypatch.setattr(build_windows, "PRODUCT", empty)
+    with pytest.raises(RuntimeError, match="OPENWEIR_WINDOWS_SIGNER"):
+        build_windows.build_service("1.2.3", "x64", True)

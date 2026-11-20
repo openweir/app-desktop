@@ -7,9 +7,9 @@ from pathlib import Path
 
 import pytest
 
-from solaris.host.base import HostError
-from solaris.models.profiles import ProfileError
-from solaris.models.routing import MODE_PLAN, MODE_PROFILE
+from openweir.host.base import HostError
+from openweir.models.profiles import ProfileError
+from openweir.models.routing import MODE_PLAN, MODE_PROFILE
 from tests.support.simulated import SAMPLE_CONFIG
 from tests.test_routing_library import NODES_ONLY, Scene, run
 

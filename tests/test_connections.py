@@ -9,8 +9,8 @@ from PySide6.QtCore import QModelIndex, QPersistentModelIndex
 from PySide6.QtTest import QAbstractItemModelTester
 from pytestqt.qtbot import QtBot
 
-from solaris.host.base import Connection, HostStatus
-from solaris.models.connections import (
+from openweir.host.base import Connection, HostStatus
+from openweir.models.connections import (
     ConnectionMonitor,
     TrackedConnection,
     address,
@@ -19,9 +19,9 @@ from solaris.models.connections import (
     process_name,
     protocol,
 )
-from solaris.viewmodels.common.async_runner import AsyncRunner
-from solaris.viewmodels.common.keyed_list import KeyedListModel
-from solaris.viewmodels.connections import ConnectionsViewModel
+from openweir.viewmodels.common.async_runner import AsyncRunner
+from openweir.viewmodels.common.keyed_list import KeyedListModel
+from openweir.viewmodels.connections import ConnectionsViewModel
 from tests.support.simulated import SimulatedHost
 
 NOW = 1_800_000_000.0  # a clock that stands still, so no connection opens or closes

@@ -1,17 +1,10 @@
-// Package product holds the identifiers that carry the product name, Solaris
-// (docs/decisions.md D1); src/solaris/product.py mirrors these values.
+// Package product holds the identifiers that carry the product name, OpenWeir
+// (docs/decisions.md D1). The names and signing identities come from product.json at the
+// repository root, through product_gen.go (scripts/gen_product.py); src/openweir/product.py
+// reads the same file.
 package product
 
 const (
-	// DisplayName also names the data directories (docs/architecture.md §5.1).
-	DisplayName = "Solaris"
-
-	ServiceName = "SolarisService"
-
-	// UIExecutable is the only client the Windows service accepts, from its own directory.
-	UIExecutable = "Solaris.exe"
-
-	PipeName = `\\.\pipe\ProtectedPrefix\Administrators\solaris`
 	// SYSTEM and Administrators get full access; interactive users may read and write.
 	PipeSDDL = "D:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;GRGW;;;IU)"
 
@@ -19,18 +12,7 @@ const (
 )
 
 // FrameMagic opens every frame on the Windows pipe.
-var FrameMagic = [4]byte{'S', 'L', 'R', 'S'}
-
-// WindowsSigner and WindowsSignerEKU name the Authenticode signer that a service linked with
-// SignedRelease requires of the UI (docs/architecture.md §5.3): the display name of the
-// certificate's subject, the organization Artifact Signing verified (decision D42), and an
-// extended key usage that Artifact Signing puts only in the certificates of Solaris's
-// certificate profile. src/solaris/update/signature.py and package/windows/sign.ps1 hold the
-// same values.
-const (
-	WindowsSigner    = "Herta Network LLC"
-	WindowsSignerEKU = "1.3.6.1.4.1.311.97.242074350.326480862.720558710.91084369"
-)
+var FrameMagic = [4]byte{'W', 'E', 'I', 'R'}
 
 // Version is set at link time with -ldflags "-X <module>/internal/product.Version=<version>".
 var Version = "dev"

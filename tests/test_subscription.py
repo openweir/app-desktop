@@ -1,4 +1,5 @@
 import asyncio
+import re
 import threading
 from collections.abc import Iterator
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -7,8 +8,8 @@ from typing import ClassVar
 
 import pytest
 
-from solaris.models.profiles import ProfileError, Usage
-from solaris.models.subscription import (
+from openweir.models.profiles import ProfileError, Usage
+from openweir.models.subscription import (
     USER_AGENT,
     UrlFetcher,
     decode_config,
@@ -114,6 +115,8 @@ def test_url_fetcher_downloads_with_usage(server: str) -> None:
     assert download.usage == Usage(1, 2, 10, 99)
     assert download.filename == "Local Sub"
     assert _Handler.agents[-1] == USER_AGENT
+    # OpenWeir panels serve their template to a leading OpenWeir/<version>; others match clash.meta
+    assert re.fullmatch(r"OpenWeir/\S+ \((Windows|macOS|Linux)\) clash\.meta", USER_AGENT)
 
 
 @pytest.mark.parametrize(

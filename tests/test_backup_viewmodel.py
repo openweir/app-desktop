@@ -24,18 +24,18 @@ from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuick import QQuickWindow
 from pytestqt.qtbot import QtBot
 
-from solaris.app import load_ui
-from solaris.host.extension import QUOTA_EXCEEDED, ManagerError
-from solaris.models.backup import device_name
-from solaris.models.backup_auto import BackupTargets
-from solaris.models.backup_google import TOKEN_KEY
-from solaris.models.backup_icloud import AVAILABLE, NO_ACCOUNT, ICloudProvider
-from solaris.models.routing import MODE_PLAN, PlanRule
-from solaris.models.store import ProfileStore
-from solaris.models.subscription import UrlFetcher
-from solaris.viewmodels import backup as backup_module
-from solaris.viewmodels.backup import BackupViewModel
-from solaris.viewmodels.composition import ViewModels, compose
+from openweir.app import load_ui
+from openweir.host.extension import QUOTA_EXCEEDED, ManagerError
+from openweir.models.backup import device_name
+from openweir.models.backup_auto import BackupTargets
+from openweir.models.backup_google import TOKEN_KEY
+from openweir.models.backup_icloud import AVAILABLE, NO_ACCOUNT, ICloudProvider
+from openweir.models.routing import MODE_PLAN, PlanRule
+from openweir.models.store import ProfileStore
+from openweir.models.subscription import UrlFetcher
+from openweir.viewmodels import backup as backup_module
+from openweir.viewmodels.backup import BackupViewModel
+from openweir.viewmodels.composition import ViewModels, compose
 from tests.support.credentials import MemoryCredentials
 from tests.support.google import FakeGoogle
 from tests.support.icloud import FakeICloud
@@ -224,7 +224,7 @@ def test_export_then_restore_on_an_empty_machine(
     first = Machine(tmp_path / "first", clock)
     machines.append(first)
     set_up(first, served, tmp_path)
-    backup = tmp_path / "solaris-backup.json"
+    backup = tmp_path / "openweir-backup.json"
     assert prop(first.backup, "exportStatus") == ""  # nothing to say before an export
     export(qtbot, first, backup)
     document = json.loads(backup.read_text(encoding="utf-8"))
@@ -363,7 +363,7 @@ def test_files_that_are_no_backup(qtbot: QtBot, machines: list[Machine], tmp_pat
     bad = tmp_path / "config.yaml"
     bad.write_text(SAMPLE_CONFIG, encoding="utf-8")
     for path, text in (
-        (bad, "无法恢复：这不是 Solaris 的备份文件"),
+        (bad, "无法恢复：这不是 OpenWeir 的备份文件"),
         (tmp_path / "missing.json", "无法恢复：No such file or directory"),
     ):
         machine.backup.openBackup(path.as_uri())

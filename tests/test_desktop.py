@@ -17,16 +17,16 @@ from PySide6.QtGui import QGuiApplication
 from PySide6.QtQuick import QQuickWindow
 from pytestqt.qtbot import QtBot
 
-from solaris.desktop import memory, session
-from solaris.desktop.dock import ACCESSORY, QT_NO_FOREGROUND_ENV, REGULAR, open_in_menu_bar
-from solaris.desktop.instance import (
+from openweir.desktop import memory, session
+from openweir.desktop.dock import ACCESSORY, QT_NO_FOREGROUND_ENV, REGULAR, open_in_menu_bar
+from openweir.desktop.instance import (
     CONNECT_TIMEOUT_MS,
     LOCK_NAME,
     SingleInstance,
     ask_to_quit,
     server_name,
 )
-from solaris.desktop.login import (
+from openweir.desktop.login import (
     ENABLED,
     NOT_FOUND,
     NOT_REGISTERED,
@@ -41,22 +41,22 @@ from solaris.desktop.login import (
     task_enabled,
     task_xml,
 )
-from solaris.desktop.titlebar import ObjC
-from solaris.desktop.tray import TRAY_DIR, tray_icon, tray_supported
-from solaris.host.base import HostError, HostStatus
-from solaris.host.service import ServiceHost
-from solaris.host.transport import Opener
-from solaris.models.settings import DatabaseSettingsStore
-from solaris.models.store import ProfileStore, open_database
-from solaris.protocol import control_pb2 as pb
-from solaris.viewmodels import desktop as desktop_view_model
-from solaris.viewmodels.composition import ViewModels, compose
-from solaris.viewmodels.desktop import DesktopViewModel
+from openweir.desktop.titlebar import ObjC
+from openweir.desktop.tray import TRAY_DIR, tray_icon, tray_supported
+from openweir.host.base import HostError, HostStatus
+from openweir.host.service import ServiceHost
+from openweir.host.transport import Opener
+from openweir.models.settings import DatabaseSettingsStore
+from openweir.models.store import ProfileStore, open_database
+from openweir.protocol import control_pb2 as pb
+from openweir.viewmodels import desktop as desktop_view_model
+from openweir.viewmodels.composition import ViewModels, compose
+from openweir.viewmodels.desktop import DesktopViewModel
 from tests.support.dock import ACTIVATE, RecordingApplication
 from tests.support.simulated import SimulatedFetcher, SimulatedHost, seed_profiles
 from tests.test_control_client import Answer, serve
 
-EXE = Path(r"C:\Program Files\Solaris\Solaris.exe")
+EXE = Path(r"C:\Program Files\OpenWeir\OpenWeir.exe")
 
 
 class FakeSchtasks:
@@ -89,7 +89,7 @@ class FakeSchtasks:
 def test_scheduled_task_round_trip() -> None:
     schtasks = FakeSchtasks()
     task = ScheduledTask(EXE, r"DESKTOP-1\ember", run=schtasks)
-    assert task.name == "Solaris (DESKTOP-1_ember)"
+    assert task.name == "OpenWeir (DESKTOP-1_ember)"
     assert task.status() == LoginItemStatus(enabled=False)
 
     assert task.set_enabled(True) == LoginItemStatus(enabled=True)
@@ -176,7 +176,7 @@ SECOND_UI = """
 import sys
 from pathlib import Path
 from PySide6.QtCore import QCoreApplication
-from solaris.desktop.instance import SingleInstance
+from openweir.desktop.instance import SingleInstance
 app = QCoreApplication(sys.argv)
 print("claiming", flush=True)
 sys.exit(1 if SingleInstance(Path(sys.argv[1])).claim() else 0)
@@ -216,7 +216,7 @@ QUITTER = """
 import sys
 from pathlib import Path
 from PySide6.QtCore import QCoreApplication
-from solaris.desktop.instance import ask_to_quit
+from openweir.desktop.instance import ask_to_quit
 app = QCoreApplication(sys.argv)
 sys.exit(0 if ask_to_quit(Path(sys.argv[1]), int(sys.argv[2])) else 1)
 """
@@ -266,7 +266,7 @@ import os
 import sys
 from pathlib import Path
 from PySide6.QtCore import QCoreApplication
-from solaris.desktop.instance import SingleInstance
+from openweir.desktop.instance import SingleInstance
 app = QCoreApplication(sys.argv)
 instance = SingleInstance(Path(sys.argv[1]))  # kept: QLockFile unlocks when collected
 assert instance.claim()
@@ -289,7 +289,7 @@ def test_quit_without_a_ui_returns_at_once(tmp_path: Path) -> None:
 
 def test_instances_are_per_user_and_directory(tmp_path: Path) -> None:
     name = server_name(tmp_path / "a", "ember")
-    assert name.startswith("solaris-")
+    assert name.startswith("openweir-")
     assert name == server_name(tmp_path / "a", "ember")
     assert name != server_name(tmp_path / "a", "other")
     assert name != server_name(tmp_path / "b", "ember")
@@ -348,7 +348,7 @@ def test_hidden_the_window_gives_back_its_memory(
 
 
 # -- macOS: the Dock while the window shows, the menu bar only while it hides -------------------
-def test_solaris_leaves_the_dock_while_the_window_hides(
+def test_openweir_leaves_the_dock_while_the_window_hides(
     qapp: QCoreApplication, tmp_path: Path
 ) -> None:
     settings = DatabaseSettingsStore(open_database(tmp_path))
@@ -357,7 +357,7 @@ def test_solaris_leaves_the_dock_while_the_window_hides(
         settings, tray_available=True, platform="darwin", application=application
     )
     desktop.start()
-    assert application.calls == []  # opened as usual: the window shows, Solaris in the Dock
+    assert application.calls == []  # opened as usual: the window shows, OpenWeir in the Dock
     desktop.setWindowShown(False)
     assert application.calls == [ACCESSORY]
     application.calls.clear()
@@ -366,7 +366,7 @@ def test_solaris_leaves_the_dock_while_the_window_hides(
     desktop.stop()
 
 
-def test_opened_at_login_solaris_is_in_the_menu_bar_only(
+def test_opened_at_login_openweir_is_in_the_menu_bar_only(
     qapp: QCoreApplication, tmp_path: Path
 ) -> None:
     settings = DatabaseSettingsStore(open_database(tmp_path))
@@ -384,7 +384,7 @@ def test_opened_at_login_solaris_is_in_the_menu_bar_only(
     desktop.stop()
 
 
-def test_opened_into_the_menu_bar_qt_does_not_activate_solaris() -> None:
+def test_opened_into_the_menu_bar_qt_does_not_activate_openweir() -> None:
     """Qt's own activation as it finishes launching would show the window (reopened)."""
     environ: dict[str, str] = {}
     open_in_menu_bar(environ, platform="win32")
@@ -397,7 +397,7 @@ def test_opened_into_the_menu_bar_qt_does_not_activate_solaris() -> None:
 def test_the_dock_stays_as_it_is(
     qapp: QCoreApplication, tmp_path: Path, platform: str, tray: bool
 ) -> None:
-    """Windows has no Dock. Without a tray hiding the window quits Solaris, which keeps its
+    """Windows has no Dock. Without a tray hiding the window quits OpenWeir, which keeps its
     Dock icon until it is gone."""
     settings = DatabaseSettingsStore(open_database(tmp_path))
     application = RecordingApplication()
@@ -459,7 +459,7 @@ def test_nsapplication_answers_what_the_dock_asks() -> None:
             assert answers(b"instancesRespondToSelector:", selector)
 
 
-# -- quitting Solaris (D41) ---------------------------------------------------------------------
+# -- quitting OpenWeir (D41) ---------------------------------------------------------------------
 class StoppingHost(SimulatedHost):
     """Counts the disconnects, and fails or holds them when told to."""
 

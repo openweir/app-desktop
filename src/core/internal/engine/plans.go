@@ -12,9 +12,9 @@ import (
 	"github.com/metacubex/mihomo/listener"
 	T "github.com/metacubex/mihomo/tunnel"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/admission"
-	"github.com/Ember-Moth/Solaris/src/core/internal/compose"
-	"github.com/Ember-Moth/Solaris/src/core/internal/controlpb"
+	"github.com/openweir/app-desktop/src/core/internal/admission"
+	"github.com/openweir/app-desktop/src/core/internal/compose"
+	"github.com/openweir/app-desktop/src/core/internal/controlpb"
 )
 
 // InspectSource describes a subscription for the UI; it needs no running core.

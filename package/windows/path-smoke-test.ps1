@@ -3,8 +3,8 @@
 param()
 $ErrorActionPreference = 'Stop'
 if ($env:GITHUB_ACTIONS -ne 'true') { throw 'Run only on a disposable GitHub Actions runner.' }
-$sandbox = Join-Path $env:SystemDrive ("Solaris Path Test " + [Guid]::NewGuid().ToString('N'))
-$pathFile = Join-Path $env:RUNNER_TEMP ("solaris-path-" + [Guid]::NewGuid().ToString('N') + '.txt')
+$sandbox = Join-Path $env:SystemDrive ("OpenWeir Path Test " + [Guid]::NewGuid().ToString('N'))
+$pathFile = Join-Path $env:RUNNER_TEMP ("openweir-path-" + [Guid]::NewGuid().ToString('N') + '.txt')
 $setup = Join-Path $PSScriptRoot 'setup.ps1'
 function Check-Path([string] $Path, [bool] $Allowed) {
     [IO.File]::WriteAllText($pathFile, $Path, [Text.Encoding]::Unicode)
@@ -21,7 +21,7 @@ try {
     if (-not $acl.AreAccessRulesProtected -or $acl.GetOwner([Security.Principal.SecurityIdentifier]).Value -ne 'S-1-5-32-544') {
         throw 'The custom directory was not created with its protected administrator ACL'
     }
-    foreach ($invalid in @('C:\', 'relative\Solaris', '\\localhost\C$\Solaris', 'C:\Solaris:stream', 'C:\Solaris.\Child', 'C:\Solaris\..\Other', 'C:\NUL\Solaris')) {
+    foreach ($invalid in @('C:\', 'relative\OpenWeir', '\\localhost\C$\OpenWeir', 'C:\OpenWeir:stream', 'C:\OpenWeir.\Child', 'C:\OpenWeir\..\Other', 'C:\NUL\OpenWeir')) {
         Check-Path $invalid $false
     }
     $occupied = Join-Path $sandbox 'Occupied'

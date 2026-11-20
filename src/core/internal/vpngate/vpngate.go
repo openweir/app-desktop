@@ -30,7 +30,7 @@ import (
 	ovpn "github.com/metacubex/mihomo/transport/openvpn"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/controlpb"
+	"github.com/openweir/app-desktop/src/core/internal/controlpb"
 )
 
 // API is the list in the form VPN Gate offers to "make your own VPN Gate client app".

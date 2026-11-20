@@ -3,9 +3,9 @@ package engine
 import (
 	C "github.com/metacubex/mihomo/constant"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/compose"
-	"github.com/Ember-Moth/Solaris/src/core/internal/controlpb"
-	"github.com/Ember-Moth/Solaris/src/core/internal/geodata"
+	"github.com/openweir/app-desktop/src/core/internal/compose"
+	"github.com/openweir/app-desktop/src/core/internal/controlpb"
+	"github.com/openweir/app-desktop/src/core/internal/geodata"
 )
 
 // ListGeoCategories reads the categories of the GEO data in the home directory, the

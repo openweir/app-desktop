@@ -1,9 +1,9 @@
-"""Make the macOS disk image (docs/release.md §1, apple/README.md) from a built Solaris.app.
+"""Make the macOS disk image (docs/release.md §1, apple/README.md) from a built OpenWeir.app.
 
     uv run --no-project --with dmgbuild==1.6.7 python scripts/build_dmg.py \\
-        build/app/Solaris.app build/release/Solaris-<version>-macos-universal.dmg
+        build/app/OpenWeir.app build/release/OpenWeir-<version>-macos-universal.dmg
 
-The mounted volume opens as one fixed Finder window without toolbar or sidebar: Solaris.app on
+The mounted volume opens as one fixed Finder window without toolbar or sidebar: OpenWeir.app on
 the left and a shortcut to /Applications on the right, large icons on a plain background with
 an arrow between them (package/dmg, drawn by scripts/gen_dmg_background.py from the layout
 here), and the app's icon as the volume's. dmgbuild writes the window's .DS_Store itself rather
@@ -34,8 +34,8 @@ from scripts import macos  # noqa: E402
 
 DMGBUILD_VERSION = "1.6.7"
 
-VOLUME_NAME = "Solaris"
-APP_NAME = "Solaris.app"
+VOLUME_NAME = "OpenWeir"
+APP_NAME = "OpenWeir.app"
 APPLICATIONS = "Applications"
 # The window in points, and where it opens. Finder's title bar takes about 30 points of the
 # height; the background is drawn to the whole size, so its bottom edge is what that hides.
@@ -47,7 +47,7 @@ TEXT_SIZE = 13
 # the middle of what shows, and the drag goes left to right.
 ICON_POSITIONS = {APP_NAME: (160, 155), APPLICATIONS: (440, 155)}
 BACKGROUND = ROOT / "package" / "dmg" / "background.png"  # dmgbuild adds background@2x.png
-VOLUME_ICON = ROOT / "package" / "icons" / "solaris.icns"  # scripts/gen_icons.py
+VOLUME_ICON = ROOT / "package" / "icons" / "openweir.icns"  # scripts/gen_icons.py
 FORMAT = "ULMO"
 # What the attached image must hold besides the app and the shortcut.
 HIDDEN = (".background.tiff", ".VolumeIcon.icns", ".DS_Store")
@@ -114,7 +114,7 @@ def _detach(mount: Path) -> None:
 
 def check(image: Path) -> None:
     _run(["hdiutil", "verify", "-quiet", image])
-    with tempfile.TemporaryDirectory(prefix="solaris-dmg-") as temporary:
+    with tempfile.TemporaryDirectory(prefix="openweir-dmg-") as temporary:
         mount = Path(temporary) / "volume"
         mount.mkdir()
         attach = ["hdiutil", "attach", "-readonly", "-nobrowse", "-noautoopen"]
@@ -149,7 +149,7 @@ def check(image: Path) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Make the macOS disk image.")
-    parser.add_argument("app", type=Path, help="the built Solaris.app")
+    parser.add_argument("app", type=Path, help="the built OpenWeir.app")
     parser.add_argument("image", type=Path, help="the disk image to write")
     arguments = parser.parse_args()
     if sys.platform != "darwin":

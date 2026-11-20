@@ -3,10 +3,10 @@
     uv run python scripts/qmllint.py  # exit 1 on any finding that qmllint_exemptions.toml
                                       # does not list, or on an exemption that matched nothing
 
-The ViewModels register themselves from Python as the Solaris module, so qmllint
+The ViewModels register themselves from Python as the OpenWeir module, so qmllint
 cannot read their types from a plugin. They are described for it instead, as pyside6-project
 does: pyside6-metaobjectdump reads the classes from the source and pyside6-qmltyperegistrar
-turns that into a .qmltypes file, in a temporary Solaris module on the import path.
+turns that into a .qmltypes file, in a temporary OpenWeir module on the import path.
 
 qmllint runs with its default categories. Every finding counts, info included; the few that
 cannot be fixed are listed one by one, with the reason, in qmllint_exemptions.toml. Findings
@@ -26,11 +26,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-PACKAGE = ROOT / "src" / "solaris"
+PACKAGE = ROOT / "src" / "openweir"
 UI = PACKAGE / "ui"
 VIEWMODELS = PACKAGE / "viewmodels"
 EXEMPTIONS = Path(__file__).with_name("qmllint_exemptions.toml")
-MODULE = "Solaris"
+MODULE = "OpenWeir"
 
 
 @dataclass(frozen=True)
@@ -77,7 +77,7 @@ def qt_metatypes() -> Path:
 
 
 def qml_sources() -> list[Path]:
-    """The Python files that register types in the Solaris module."""
+    """The Python files that register types in the OpenWeir module."""
     return sorted(
         path
         for path in VIEWMODELS.rglob("*.py")
@@ -86,7 +86,7 @@ def qml_sources() -> list[Path]:
 
 
 def describe_module(imports: Path) -> None:
-    """Write the Solaris module's qmldir and .qmltypes under ``imports``."""
+    """Write the OpenWeir module's qmldir and .qmltypes under ``imports``."""
     module = imports / MODULE
     module.mkdir(parents=True)
     metatypes = imports / "metatypes.json"
@@ -120,7 +120,7 @@ def qml_files() -> list[str]:
 
 def lint() -> list[Finding]:
     """Everything qmllint reports on the UI."""
-    with tempfile.TemporaryDirectory(prefix="solaris-qmllint-") as directory:
+    with tempfile.TemporaryDirectory(prefix="openweir-qmllint-") as directory:
         imports = Path(directory)
         describe_module(imports)
         command = [tool("pyside6-qmllint"), "--ignore-settings", "-I", str(imports)]

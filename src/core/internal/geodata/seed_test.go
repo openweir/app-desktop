@@ -67,7 +67,7 @@ func TestSeedCopiesOnlyWhatTheHomeLacks(t *testing.T) {
 func TestSeedCreatesTheHome(t *testing.T) {
 	bundled := t.TempDir()
 	want := writeBundledFiles(t, bundled)
-	home := filepath.Join(t.TempDir(), "Solaris", "core")
+	home := filepath.Join(t.TempDir(), "OpenWeir", "core")
 	if err := Seed(bundled, home); err != nil {
 		t.Fatal(err)
 	}

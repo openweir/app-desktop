@@ -1,14 +1,14 @@
-# The installer's and uninstaller's dealings with running Solaris (package/windows/installer.nsi,
+# The installer's and uninstaller's dealings with running OpenWeir (package/windows/installer.nsi,
 # docs/architecture.md section 9). They run it with Windows PowerShell 5.1, elevated, as
 #
 #     setup.ps1 -Operation <operation> -InstallDirectory <the install directory>
 #
-# close-ui         ask Solaris.exe to quit, then end every one still running from the install
+# close-ui         ask OpenWeir.exe to quit, then end every one still running from the install
 #                  directory, in any session; the tunnel runs in the service either way
-# stop-service     stop SolarisService if it is there, and wait for its process to exit
-# install-service  create SolarisService, or point it at this directory again; then start it
-# remove-service   stop and delete SolarisService
-# remove-tasks     delete every user's "Open at sign-in" task that starts this Solaris.exe
+# stop-service     stop OpenWeirService if it is there, and wait for its process to exit
+# install-service  create OpenWeirService, or point it at this directory again; then start it
+# remove-service   stop and delete OpenWeirService
+# remove-tasks     delete every user's "Open at sign-in" task that starts this OpenWeir.exe
 #
 # On failure it prints the reason, which the installer shows, and exits with 1. ASCII only:
 # Windows PowerShell reads a script without a byte order mark in the system's code page.
@@ -26,11 +26,11 @@ if ($InstallDirectoryFile) {
     $InstallDirectory = [IO.File]::ReadAllText($InstallDirectoryFile, [Text.Encoding]::Unicode)
 }
 
-$ServiceName = 'SolarisService'  # src/core/internal/product
-$Client = Join-Path $InstallDirectory 'Solaris.exe'
-$ServiceExecutable = Join-Path $InstallDirectory 'solaris-service.exe'
+$ServiceName = 'OpenWeirService'  # src/core/internal/product
+$Client = Join-Path $InstallDirectory 'OpenWeir.exe'
+$ServiceExecutable = Join-Path $InstallDirectory 'openweir-service.exe'
 $Timeout = [TimeSpan]::FromSeconds(60)
-# Solaris.exe --quit waits up to 10 seconds for the UI to go (src/solaris/desktop/instance.py);
+# OpenWeir.exe --quit waits up to 10 seconds for the UI to go (src/openweir/desktop/instance.py);
 # the UIs it cannot reach get a few seconds more before they are ended.
 $QuitTimeout = 15000
 $QuitGrace = 5000
@@ -66,32 +66,32 @@ function Wait-Exit([System.Diagnostics.Process[]] $Processes, [string] $What) {
     }
 }
 
-# Solaris.exe --quit reaches the UI of the user running the installer, which then quits and
+# OpenWeir.exe --quit reaches the UI of the user running the installer, which then quits and
 # leaves the tunnel to the service (D41); a UI of another user, or one that does not answer,
 # is ended after the grace period.
 function Close-UI {
     $processes = Get-ProcessFrom $Client
     if ($processes.Count -eq 0) { return }
-    Write-Output 'Asking Solaris.exe to quit'
+    Write-Output 'Asking OpenWeir.exe to quit'
     $quit = Start-Process -FilePath $Client -ArgumentList '--quit' -PassThru
     if (-not $quit.WaitForExit($QuitTimeout)) {
         Stop-Process -Id $quit.Id -Force
-        Wait-Exit @($quit) 'Solaris.exe --quit'
+        Wait-Exit @($quit) 'OpenWeir.exe --quit'
     }
     $deadline = [DateTime]::UtcNow.AddMilliseconds($QuitGrace)
     foreach ($process in $processes) {
         $left = [Math]::Max(0, [int](($deadline - [DateTime]::UtcNow).TotalMilliseconds))
         if ($process.WaitForExit($left)) {
-            Write-Output "Solaris.exe ($($process.Id)) quit"
+            Write-Output "OpenWeir.exe ($($process.Id)) quit"
         } else {
-            Write-Output "Ending Solaris.exe ($($process.Id))"
+            Write-Output "Ending OpenWeir.exe ($($process.Id))"
             Stop-Process -Id $process.Id -Force
         }
     }
-    Wait-Exit $processes 'Solaris.exe'
+    Wait-Exit $processes 'OpenWeir.exe'
 }
 
-function Stop-SolarisService {
+function Stop-OpenWeirService {
     $service = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
     if (-not $service) { return }
     if ($service.Status -eq 'StartPending') { $service.WaitForStatus('Running', $Timeout) }
@@ -101,7 +101,7 @@ function Stop-SolarisService {
         $service.WaitForStatus('Stopped', $Timeout)
     }
     # Stopped is reported as the service returns; its process may still hold the executable.
-    Wait-Exit (Get-ProcessFrom $ServiceExecutable) 'solaris-service.exe'
+    Wait-Exit (Get-ProcessFrom $ServiceExecutable) 'openweir-service.exe'
 }
 
 function Read-BinaryMachine([string] $Path) {
@@ -115,7 +115,7 @@ function Read-BinaryMachine([string] $Path) {
     } finally { $reader.Dispose() }
 }
 
-function Install-SolarisService {
+function Install-OpenWeirService {
     $machine = Read-BinaryMachine $ServiceExecutable
     if ($machine -notin @(0x8664, 0xAA64)) { throw 'The service is not an x64 or ARM64 executable.' }
     foreach ($required in @($Client, (Join-Path $InstallDirectory 'libcronet.dll'))) {
@@ -135,11 +135,11 @@ function Install-SolarisService {
     Set-CrashDumps
     $binary = "`"\`"$ServiceExecutable\`"`""
     if (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue) {
-        Invoke-Sc "config $ServiceName binPath= $binary type= own start= auto obj= LocalSystem DisplayName= Solaris"
+        Invoke-Sc "config $ServiceName binPath= $binary type= own start= auto obj= LocalSystem DisplayName= OpenWeir"
     } else {
-        Invoke-Sc "create $ServiceName binPath= $binary type= own start= auto obj= LocalSystem DisplayName= Solaris"
+        Invoke-Sc "create $ServiceName binPath= $binary type= own start= auto obj= LocalSystem DisplayName= OpenWeir"
     }
-    Invoke-Sc "description $ServiceName `"Keeps Solaris connected while its window is closed. Stopping it disconnects Solaris.`""
+    Invoke-Sc "description $ServiceName `"Keeps OpenWeir connected while its window is closed. Stopping it disconnects OpenWeir.`""
     # Restart after 5, 15 and 60 seconds (docs/architecture.md section 5.2), also when the
     # service stops with an error rather than crashing; a day without failures resets that.
     Invoke-Sc "failure $ServiceName reset= 86400 actions= restart/5000/restart/15000/restart/60000"
@@ -150,8 +150,8 @@ function Install-SolarisService {
     $service.WaitForStatus('Running', $Timeout)
 }
 
-function Remove-SolarisService {
-    Stop-SolarisService
+function Remove-OpenWeirService {
+    Stop-OpenWeirService
     Remove-CrashDumps
     if (-not (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue)) { return }
     Invoke-Sc "delete $ServiceName"
@@ -172,17 +172,17 @@ function Remove-SolarisService {
 $DumpRoot = 'HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps'
 function Set-CrashDumps {
     $folders = @{
-        'Solaris.exe' = '%LOCALAPPDATA%\Solaris\crashes\native'
-        'solaris-service.exe' = '%ProgramData%\Solaris\crashes\native'
+        'OpenWeir.exe' = '%LOCALAPPDATA%\OpenWeir\crashes\native'
+        'openweir-service.exe' = '%ProgramData%\OpenWeir\crashes\native'
     }
     foreach ($image in $folders.Keys) {
         $key = Join-Path $DumpRoot $image
         if (Test-Path -LiteralPath $key) {
             $existing = Get-ItemProperty -LiteralPath $key
-            if ($existing.SolarisInstallDirectory -ne $InstallDirectory) { continue }
+            if ($existing.OpenWeirInstallDirectory -ne $InstallDirectory) { continue }
         }
         $null = New-Item -Path $key -Force
-        $null = New-ItemProperty -LiteralPath $key -Name 'SolarisInstallDirectory' -Value $InstallDirectory -PropertyType String -Force
+        $null = New-ItemProperty -LiteralPath $key -Name 'OpenWeirInstallDirectory' -Value $InstallDirectory -PropertyType String -Force
         $null = New-ItemProperty -LiteralPath $key -Name 'DumpFolder' -Value $folders[$image] -PropertyType ExpandString -Force
         $null = New-ItemProperty -LiteralPath $key -Name 'DumpCount' -Value 5 -PropertyType DWord -Force
         $null = New-ItemProperty -LiteralPath $key -Name 'DumpType' -Value 1 -PropertyType DWord -Force
@@ -190,21 +190,21 @@ function Set-CrashDumps {
 }
 
 function Remove-CrashDumps {
-    foreach ($image in @('Solaris.exe', 'solaris-service.exe')) {
+    foreach ($image in @('OpenWeir.exe', 'openweir-service.exe')) {
         $key = Join-Path $DumpRoot $image
         if ((Test-Path -LiteralPath $key) -and
-            (Get-ItemProperty -LiteralPath $key).SolarisInstallDirectory -eq $InstallDirectory) {
+            (Get-ItemProperty -LiteralPath $key).OpenWeirInstallDirectory -eq $InstallDirectory) {
             Remove-Item -LiteralPath $key -Recurse
         }
     }
 }
 
-# src/solaris/desktop/login.py names each user's task "Solaris (<domain>_<user>)", in the root
-# folder, starting Solaris.exe with --background. Tasks of the same name that start another
+# src/openweir/desktop/login.py names each user's task "OpenWeir (<domain>_<user>)", in the root
+# folder, starting OpenWeir.exe with --background. Tasks of the same name that start another
 # program are not this installation's.
 function Remove-LoginTasks {
     $tasks = @(Get-ScheduledTask -TaskPath '\' -ErrorAction SilentlyContinue | Where-Object {
-            $_.TaskName -like 'Solaris (*)' -and
+            $_.TaskName -like 'OpenWeir (*)' -and
             @($_.Actions | Where-Object { "$($_.Execute)".Trim('"') -eq $Client }).Count -gt 0
         })
     foreach ($task in $tasks) {
@@ -220,7 +220,7 @@ function Prepare-InstallDirectory {
     # Every level is checked as written below, so '/' (another separator to Windows, and
     # what a silent /D= passes through unchanged) is refused with the other invalid
     # characters, and Windows must read the path exactly as it is written.
-    $invalid = 'Choose an absolute folder on a local fixed drive, such as D:\Solaris.'
+    $invalid = 'Choose an absolute folder on a local fixed drive, such as D:\OpenWeir.'
     if ($InstallDirectory -notmatch '^[A-Za-z]:\\[^\\]' -or $InstallDirectory.Substring(2) -match '[<>:"/|?*\x00-\x1f]') {
         throw $invalid
     }
@@ -275,7 +275,7 @@ function Prepare-InstallDirectory {
             if (($rule.PropagationFlags -band [Security.AccessControl.PropagationFlags]::InheritOnly) -and
                 (-not $Inside -or $rule.IdentityReference.Value -eq 'S-1-3-0')) { continue }
             if (([int64]$rule.FileSystemRights -band $danger) -ne 0) {
-                throw "Other users can modify this location. Choose a protected folder, such as C:\Program Files\Solaris: $Path"
+                throw "Other users can modify this location. Choose a protected folder, such as C:\Program Files\OpenWeir: $Path"
             }
         }
     }
@@ -291,17 +291,17 @@ function Prepare-InstallDirectory {
         Assert-Protected $current $false ($level -eq $parts.Count - 1)
     }
     if ($current -ne $full) { throw $invalid }
-    $key = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Solaris'
+    $key = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\OpenWeir'
     $installed = (Get-ItemProperty -LiteralPath $key -ErrorAction SilentlyContinue).InstallLocation
-    $marker = Join-Path $full '.solaris-install-root'
+    $marker = Join-Path $full '.openweir-install-root'
     $items = @(Get-ChildItem -LiteralPath $full -Force)
     if ($items.Count -and $installed -ne $full) {
         # Reject unrelated folders before traversing their contents. Check the
         # marker itself before reading it so a link cannot redirect that read.
-        if (-not [IO.File]::Exists($marker)) { throw 'Choose an empty folder or the existing Solaris installation folder.' }
+        if (-not [IO.File]::Exists($marker)) { throw 'Choose an empty folder or the existing OpenWeir installation folder.' }
         Assert-Protected $marker
-        if ([IO.File]::ReadAllText($marker).Trim() -ne 'Solaris installation directory v1') {
-            throw 'Choose an empty folder or the existing Solaris installation folder.'
+        if ([IO.File]::ReadAllText($marker).Trim() -ne 'OpenWeir installation directory v1') {
+            throw 'Choose an empty folder or the existing OpenWeir installation folder.'
         }
     }
     # Refuse unsafe content before close-ui or the old uninstaller can execute it.
@@ -313,7 +313,7 @@ function Prepare-InstallDirectory {
             if ($item.PSIsContainer) { $pending.Push($item.FullName) }
         }
     }
-    [IO.File]::WriteAllText($marker, 'Solaris installation directory v1')
+    [IO.File]::WriteAllText($marker, 'OpenWeir installation directory v1')
     Write-Output "Install folder verified: $full"
 }
 
@@ -321,9 +321,9 @@ try {
     switch ($Operation) {
         'prepare-directory' { Prepare-InstallDirectory }
         'close-ui' { Close-UI }
-        'stop-service' { Stop-SolarisService }
-        'install-service' { Install-SolarisService }
-        'remove-service' { Remove-SolarisService }
+        'stop-service' { Stop-OpenWeirService }
+        'install-service' { Install-OpenWeirService }
+        'remove-service' { Remove-OpenWeirService }
         'remove-tasks' { Remove-LoginTasks }
     }
 } catch {

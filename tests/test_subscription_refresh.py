@@ -10,11 +10,11 @@ from threading import Event, Thread
 import pytest
 from pytestqt.qtbot import QtBot
 
-from solaris.host.base import HostError
-from solaris.models.library import ProfileLibrary
-from solaris.models.profiles import ProfileError, Usage
-from solaris.models.store import ProfileStore
-from solaris.models.subscription import UrlFetcher
+from openweir.host.base import HostError
+from openweir.models.library import ProfileLibrary
+from openweir.models.profiles import ProfileError, Usage
+from openweir.models.store import ProfileStore
+from openweir.models.subscription import UrlFetcher
 from tests.support.simulated import SAMPLE_CONFIG, SimulatedHost
 from tests.support.window import Loaded, kind
 

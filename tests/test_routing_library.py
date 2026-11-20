@@ -10,19 +10,19 @@ from typing import Any
 
 import pytest
 
-from solaris.host.base import HostError, TunnelConfig
-from solaris.models import plans
-from solaris.models.library import ProfileLibrary
-from solaris.models.profiles import ProfileError
-from solaris.models.routing import (
+from openweir.host.base import HostError, TunnelConfig
+from openweir.models import plans
+from openweir.models.library import ProfileLibrary
+from openweir.models.profiles import ProfileError
+from openweir.models.routing import (
     DEFAULT_INFO_PATTERN,
     MODE_PLAN,
     MODE_PROFILE,
     PlanRule,
     RoutingStore,
 )
-from solaris.models.settings import Settings
-from solaris.models.store import ProfileStore
+from openweir.models.settings import Settings
+from openweir.models.store import ProfileStore
 from tests.support.simulated import SAMPLE_CONFIG, SimulatedFetcher, SimulatedHost, seed_profiles
 
 NOW = 1_800_000_000.0

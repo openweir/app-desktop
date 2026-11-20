@@ -3,7 +3,7 @@ package control
 import (
 	"context"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/controlpb"
+	"github.com/openweir/app-desktop/src/core/internal/controlpb"
 )
 
 // Kept separate from the base Engine interface for protocol-vector engines which do

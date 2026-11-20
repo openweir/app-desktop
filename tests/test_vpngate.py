@@ -4,11 +4,11 @@ and the list as the state table keeps it."""
 from dataclasses import replace
 from pathlib import Path
 
-from solaris.host.base import VpnGateServer
-from solaris.models import plans, vpngate
-from solaris.models.database import read_state
-from solaris.models.store import ProfileStore
-from solaris.models.vpngate import ServerList, pick
+from openweir.host.base import VpnGateServer
+from openweir.models import plans, vpngate
+from openweir.models.database import read_state
+from openweir.models.store import ProfileStore
+from openweir.models.vpngate import ServerList, pick
 from tests.support.simulated import VPNGATE_SERVERS
 
 NOW = 1_800_000_000.0

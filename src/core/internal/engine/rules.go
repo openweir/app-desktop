@@ -4,7 +4,7 @@ import (
 	"github.com/metacubex/mihomo/config"
 	"github.com/metacubex/mihomo/tunnel/statistic"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/compose"
+	"github.com/openweir/app-desktop/src/core/internal/compose"
 )
 
 // ruleEntries ties the rules of a composed configuration to the plan's rule entries, so

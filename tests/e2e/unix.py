@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import sys
 
-from solaris.host.transport import Opener
+from openweir.host.transport import Opener
 
 if sys.platform == "win32":
 
@@ -13,6 +13,6 @@ if sys.platform == "win32":
         raise NotImplementedError(f"no Unix socket on Windows: {path}")
 
 else:
-    from solaris.host.transport import unix_opener
+    from openweir.host.transport import unix_opener
 
 __all__ = ["unix_opener"]

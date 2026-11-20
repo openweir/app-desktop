@@ -222,23 +222,23 @@ proxies:
 
 ```text
 应用 → mihomo 规则 → "Tor 出口"（socks5 出站，127.0.0.1:P1，随机账号密码）
-     → arti（界面进程，solaris_tor）→ arti 的 TCP 连接
+     → arti（界面进程，openweir_tor）→ arti 的 TCP 连接
      → mihomo 的 tor-upstream 入站（127.0.0.1:P2，随机账号密码，proxy 固定为经由组）
      → 代理节点 → Tor 入口 → 中继 → Tor 出口 → 网站
 ```
 
 - arti-client 没有"上游代理"配置，但运行时可以替换 TCP 连接的实现（tor-rtcompat 的 `with_tcp_provider`）。
-  `solaris_tor` 的实现只做一件事：对 P2 发 SOCKS5 CONNECT。arti 不解析 DNS，也不用 UDP，所以它
+  `openweir_tor` 的实现只做一件事：对 P2 发 SOCKS5 CONNECT。arti 不解析 DNS，也不用 UDP，所以它
   **没有任何直连流量**；要有测试守住这一点。
 - `tor-upstream` 入站用 mihomo listeners 的 `proxy:` 固定到经由组，不经过规则，所以不会绕回 Tor 出口。
 - 两个端口都只监听回环地址，都要求随机生成的账号密码（RFC 1929）。随机值每次界面启动重新生成。
   Windows 上同一台机器的其他用户也能连回环端口，所以账号密码是必需的。
 - Tor 只能传 TCP。UDP 连接（例如 QUIC）必须失败，让应用回落到 TCP。mihomo 匹配规则时，遇到不支持 UDP 的出站会
   **跳过这条规则、继续往下匹配**（`tunnel.match`），UDP 会落到后面的规则，经普通代理出去。所以"Tor 出口"的
-  socks5 出站写 `udp: true`，由 `solaris_tor` 的 SOCKS5 服务对 UDP ASSOCIATE 回复"不支持的命令"，连接在 Tor
+  socks5 出站写 `udp: true`，由 `openweir_tor` 的 SOCKS5 服务对 UDP ASSOCIATE 回复"不支持的命令"，连接在 Tor
   出口这里失败，不再往下匹配。
 
-### 4.2 `solaris_tor` 模块
+### 4.2 `openweir_tor` 模块
 
 arti 用 pyo3 做成 Python 扩展模块，在界面进程里运行（D23）。不放进 Go 内核，原因是：
 
@@ -275,7 +275,7 @@ GPL-3.0）。接口很小：
   3. 应用成功后，界面启动 arti。
 
   arti 连上 Tor 网络前，经 Tor 的连接会失败。P2 被占用时内核返回 `apply_failed`，界面换一个端口再试一次。
-- **界面进程结束**：退出 Solaris 时隧道先断开（D41）。界面崩溃或被结束而隧道还在时，arti 随界面进程结束，经 Tor
+- **界面进程结束**：退出 OpenWeir 时隧道先断开（D41）。界面崩溃或被结束而隧道还在时，arti 随界面进程结束，经 Tor
   的连接被拒绝。这是失败即断开，不会退回直连或普通代理。关闭窗口默认留在托盘，界面进程仍在，不受影响。
 - **重新打开界面**：隧道还在运行时，界面重新生成端口和账号密码，Reload 一次后启动 arti。
 - **macOS**：系统扩展里的 mihomo 连界面进程的回环端口，界面进程连扩展里 mihomo 的回环端口。回环流量不进隧道，
@@ -576,5 +576,5 @@ proxy-groups:
 4. 结束界面进程（隧道仍在）后，同一规则的连接被拒绝；
 5. 抓包确认 arti 没有直连流量。
 
-同时实测 `solaris_tor` 的体积、界面进程增加的内存、经节点首次连上 Tor 网络的时间、按目标主机隔离线路的开销，以及
+同时实测 `openweir_tor` 的体积、界面进程增加的内存、经节点首次连上 Tor 网络的时间、按目标主机隔离线路的开销，以及
 macOS 上系统扩展与界面进程互连回环端口（包括开启 `includeAllNetworks` 时）。

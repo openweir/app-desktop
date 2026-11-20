@@ -19,7 +19,7 @@ const (
 )
 
 var namePattern = regexp.MustCompile(`^go-[0-9]+-[1-9][0-9]*\.log$`)
-var nativePattern = regexp.MustCompile(`(?i)^solaris-service\.exe\.[0-9]+\.dmp$`)
+var nativePattern = regexp.MustCompile(`(?i)^openweir-service\.exe\.[0-9]+\.dmp$`)
 
 // Open installs the one runtime crash sink. The caller must only call it once per
 // process and close it on normal shutdown. No header is written, so a zero-length

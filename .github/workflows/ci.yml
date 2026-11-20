@@ -145,7 +145,7 @@ jobs:
         if: runner.os == 'Windows'
         env:
           QT_QPA_PLATFORM: offscreen
-          SOLARIS_NUITKA_TESTS: "1"
+          OPENWEIR_NUITKA_TESTS: "1"
         run: uv run --frozen --with nuitka==4.2.2 pytest -q tests/test_nuitka_pefile.py
 
   # The UI against the real development service (docs/architecture.md §11): no TUN, only
@@ -178,12 +178,12 @@ jobs:
       - name: GEO data and its category list
         run: uv run python scripts/fetch_geodata.py --check
       - name: Build the development service
-        run: go -C src/core build -o "$RUNNER_TEMP/solaris-service" ./service
+        run: go -C src/core build -o "$RUNNER_TEMP/openweir-service" ./service
       - name: End-to-end tests
         env:
           QT_QPA_PLATFORM: offscreen
-          SOLARIS_E2E: "1"
-          SOLARIS_E2E_SERVICE: ${{ runner.temp }}/solaris-service
+          OPENWEIR_E2E: "1"
+          OPENWEIR_E2E_SERVICE: ${{ runner.temp }}/openweir-service
         run: uv run pytest -q tests/e2e
 
   go:
@@ -245,7 +245,7 @@ jobs:
           done
       - name: macOS extension archive
         if: runner.os == 'macOS'
-        run: go build -buildmode=c-archive -o "$RUNNER_TEMP/libsolaris.a" ./apple
+        run: go build -buildmode=c-archive -o "$RUNNER_TEMP/libopenweir.a" ./apple
 
   # The universal macOS app and system extension (apple/README.md), signed ad hoc;
   # Developer ID signing and notarization belong to the release workflow.
@@ -286,13 +286,13 @@ jobs:
       - name: Disk image
         run: |
           uv run --no-project --with dmgbuild==1.6.7 python scripts/build_dmg.py \
-            build/app/Solaris.app "$RUNNER_TEMP/Solaris-universal.dmg"
+            build/app/OpenWeir.app "$RUNNER_TEMP/OpenWeir-universal.dmg"
 
       - name: Retain universal disk image
         uses: actions/upload-artifact@v7
         with:
           name: macos-universal-${{ github.sha }}
-          path: ${{ runner.temp }}/Solaris-universal.dmg
+          path: ${{ runner.temp }}/OpenWeir-universal.dmg
           compression-level: 0
           if-no-files-found: error
           retention-days: 7
@@ -305,9 +305,9 @@ jobs:
         env:
           QT_FORCE_STDERR_LOGGING: "1"  # Qt's messages, a qFatal's reason among them
         run: |
-          ui=build/app/Solaris.app/Contents/MacOS/SolarisUI
-          data="$HOME/Library/Application Support/Solaris"
-          output="$RUNNER_TEMP/solaris-ui"
+          ui=build/app/OpenWeir.app/Contents/MacOS/OpenWeirUI
+          data="$HOME/Library/Application Support/OpenWeir"
+          output="$RUNNER_TEMP/openweir-ui"
           mkdir -p "$output"
           cat > "$RUNNER_TEMP/has-window.swift" <<'SWIFT'
           import CoreGraphics
@@ -327,7 +327,7 @@ jobs:
           fail() {
             echo "::error::$1"
             [[ -d "$data/crashes" ]] && cp -R "$data/crashes" "$output/"
-            find "$HOME/Library/Logs/DiagnosticReports" -name 'SolarisUI*' -exec cp {} "$output/" \; 2> /dev/null || true
+            find "$HOME/Library/Logs/DiagnosticReports" -name 'OpenWeirUI*' -exec cp {} "$output/" \; 2> /dev/null || true
             for log in "$output"/*.err "$output"/crashes/ui-*.log; do
               [[ -s "$log" ]] || continue
               echo "::group::$log"
@@ -356,7 +356,7 @@ jobs:
             echo "The $arch UI ($pid) opened its window"
             if ! "$ui" --quit; then
               kill "$pid" 2> /dev/null || true
-              fail "SolarisUI --quit did not reach the $arch UI"
+              fail "OpenWeirUI --quit did not reach the $arch UI"
             fi
             for _ in $(seq 30); do
               alive "$pid" || break
@@ -380,7 +380,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: macos-ui-${{ github.sha }}
-          path: ${{ runner.temp }}/solaris-ui/
+          path: ${{ runner.temp }}/openweir-ui/
           if-no-files-found: ignore
           retention-days: 14
 
@@ -415,16 +415,16 @@ jobs:
         run: uv run --frozen python scripts/build_installer_ui.py --preview --arch ${{ matrix.arch }}
       - name: Exercise installer UI and capture screenshots
         shell: powershell
-        run: ./package/windows/ui-smoke-test.ps1 -Preview build/installer-ui/Solaris-setup-preview.exe -Output build/installer-ui/screenshots -Architecture ${{ matrix.arch }}
+        run: ./package/windows/ui-smoke-test.ps1 -Preview build/installer-ui/OpenWeir-setup-preview.exe -Output build/installer-ui/screenshots -Architecture ${{ matrix.arch }}
       - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: installer-ui-${{ matrix.arch }}-${{ github.sha }}
           path: |
             build/installer-ui/screenshots/
-            build/installer-ui/SolarisSetupUI.dll
-            build/installer-ui/SolarisSetupUI.pdb
-            build/installer-ui/Solaris-setup-preview.exe
+            build/installer-ui/OpenWeirSetupUI.dll
+            build/installer-ui/OpenWeirSetupUI.pdb
+            build/installer-ui/OpenWeir-setup-preview.exe
           if-no-files-found: ignore
           retention-days: 14
 
@@ -479,20 +479,20 @@ jobs:
         run: uv run --frozen --with nuitka==4.2.2 python scripts/build_windows.py --arch ${{ matrix.arch }}
       - name: Install, upgrade and uninstall
         shell: powershell
-        run: ./package/windows/smoke-test.ps1 -Installer (Get-Item ${{ matrix.build }}/Solaris-*-windows-${{ matrix.arch }}-setup.exe).FullName
+        run: ./package/windows/smoke-test.ps1 -Installer (Get-Item ${{ matrix.build }}/OpenWeir-*-windows-${{ matrix.arch }}-setup.exe).FullName
       # The UI's output from each start, and the crash directory of one that died starting.
       - name: Keep the UI's output and crash logs
         if: failure()
         uses: actions/upload-artifact@v7
         with:
           name: windows-ui-${{ matrix.arch }}-${{ github.sha }}
-          path: ${{ runner.temp }}/solaris-ui/
+          path: ${{ runner.temp }}/openweir-ui/
           if-no-files-found: ignore
           retention-days: 14
       - uses: actions/upload-artifact@v7
         with:
           name: windows-installer-${{ matrix.arch }}-${{ github.sha }}
-          path: ${{ matrix.build }}/Solaris-*-windows-${{ matrix.arch }}-setup.exe
+          path: ${{ matrix.build }}/OpenWeir-*-windows-${{ matrix.arch }}-setup.exe
           if-no-files-found: error
           compression-level: 0
           retention-days: 1
@@ -590,21 +590,21 @@ jobs:
             sudo ip netns exec md-tun curl -fsS --max-time 1 http://10.201.0.1:8080/ && break
             sleep 0.2
           done
-          sudo env SOLARIS_TUN_TEST=1 \
-            SOLARIS_TUN_TARGET=http://10.201.0.1:8080/ \
-            SOLARIS_TUN_UDP_TARGET=10.201.0.1:8081 \
-            SOLARIS_TUN_OUTBOUND=md-veth0 \
-            SOLARIS_TUN_STACKS="${{ matrix.stacks }}" \
+          sudo env OPENWEIR_TUN_TEST=1 \
+            OPENWEIR_TUN_TARGET=http://10.201.0.1:8080/ \
+            OPENWEIR_TUN_UDP_TARGET=10.201.0.1:8081 \
+            OPENWEIR_TUN_OUTBOUND=md-veth0 \
+            OPENWEIR_TUN_STACKS="${{ matrix.stacks }}" \
             ip netns exec md-tun "$RUNNER_TEMP/engine-tun.test" -test.run '^TestOwnedTUN$' -test.v -test.count=1
       # fd mode as the macOS extension runs it: the test creates the TUN and its route, hands
       # the descriptor to the engine, and mihomo's own dials leave through md-veth0.
       - name: fd mode in md-tun
         run: |
-          sudo env SOLARIS_TUN_TEST=1 \
-            SOLARIS_TUN_TARGET=http://10.201.0.1:8080/ \
-            SOLARIS_TUN_UDP_TARGET=10.201.0.1:8081 \
-            SOLARIS_TUN_OUTBOUND=md-veth0 \
-            SOLARIS_TUN_STACKS="${{ matrix.stacks }}" \
+          sudo env OPENWEIR_TUN_TEST=1 \
+            OPENWEIR_TUN_TARGET=http://10.201.0.1:8080/ \
+            OPENWEIR_TUN_UDP_TARGET=10.201.0.1:8081 \
+            OPENWEIR_TUN_OUTBOUND=md-veth0 \
+            OPENWEIR_TUN_STACKS="${{ matrix.stacks }}" \
             ip netns exec md-tun "$RUNNER_TEMP/engine-tun.test" -test.run '^TestFDTUN$' -test.v -test.count=1
       # systemd-resolved serves the runner, outside the namespaces, yet takes interface
       # indexes from inside them over D-Bus: sing-tun's resolvectl calls for mdtun0 land on

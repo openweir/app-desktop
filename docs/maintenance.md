@@ -57,10 +57,10 @@ CI 覆盖构建、安装器界面、文件清理和架构迁移。发布验收�
 - Tor 出口（D23，[exits.md](exits.md) 第 4 节）：只有设计。
 
 Windows 代码签名（D42）已接上：发布工作流经 GitHub OIDC 登录 Azure，用 Artifact Signing 给 Windows 安装包和它装的程序
-签名，服务和更新器核对签名者 `Herta Network LLC` 及证书配置文件的 EKU（[release.md](release.md) 第 1.1、3 节）。Azure 一侧：
+签名，服务和更新器核对签名者 `OpenWeir` 及证书配置文件的 EKU（[release.md](release.md) 第 1.1、3 节）。Azure 一侧：
 签名账户 `hertanetworksigning`（`https://eus.codesigning.azure.net/`）、Public Trust 证书配置文件 `hertanetwork-public`、
-用户分配的托管标识 `id-solaris-release`，它的联合凭据只认 `release` 环境（subject 用 GitHub 的固定编号格式
-`repo:Ember-Moth@177856324/Solaris@1438281339:environment:release`），只在这个证书配置文件上有「Artifact Signing Certificate
+用户分配的托管标识 `id-openweir-release`，它的联合凭据只认 `release` 环境（subject 用 GitHub 的固定编号格式
+`repo:Ember-Moth@177856324/OpenWeir@1438281339:environment:release`），只在这个证书配置文件上有「Artifact Signing Certificate
 Profile Signer」角色。仓库改名、转移或换 Environment 时要同步改联合凭据，否则登录失败。证书配置文件的 EKU 只要配置文件
 不重建就不变；重建或换配置文件时，`product.WindowsSignerEKU`、`signature.WINDOWS_SIGNER_EKU` 和 `sign.ps1` 要一起改，
 而且已装的版本只认旧的 EKU，要先发一个同时接受新旧两个的版本。
@@ -72,12 +72,12 @@ Profile Signer」角色。仓库改名、转移或换 Environment 时要同步�
 - 崩溃处理变更需覆盖 Python 异常、原生中止、Go panic，以及正常退出、取消、存储不可写和清理边界。
 - Windows 的 WER 配置、卸载清理、实际转储和符号化在测试机上检查；已有自定义 WER 键不得被覆盖。
 - UI 日志在用户数据目录 `crashes/`。Windows Go 日志在
-  `%ProgramData%\Solaris\users\<当前进程 SID>\crashes`，由原有 ACL 允许本人读取；服务的启动日志与
-  原生转储在 `%ProgramData%\Solaris\crashes`，仅 SYSTEM/管理员可访问。
-- macOS Go 日志在扩展进程实际的 Application Support `Solaris/core/crashes`；系统扩展以系统身份运行时
+  `%ProgramData%\OpenWeir\users\<当前进程 SID>\crashes`，由原有 ACL 允许本人读取；服务的启动日志与
+  原生转储在 `%ProgramData%\OpenWeir\crashes`，仅 SYSTEM/管理员可访问。
+- macOS Go 日志在扩展进程实际的 Application Support `OpenWeir/core/crashes`；系统扩展以系统身份运行时
   不能拿普通用户的 App Group 容器路径替代。管理员从该容器提取 `go-*.log`，或从
-  `/Library/Logs/DiagnosticReports` 选择标识 `dev.tschen.solaris.tunnel` 的报告；应用自动导出只读当前用户
-  `~/Library/Logs/DiagnosticReports` 中的 Solaris 报告。不会为读日志启用隧道、提权或放宽 ACL。
+  `/Library/Logs/DiagnosticReports` 选择标识 `org.openweir.app.tunnel` 的报告；应用自动导出只读当前用户
+  `~/Library/Logs/DiagnosticReports` 中的 OpenWeir 报告。不会为读日志启用隧道、提权或放宽 ACL。
 - 「清除」只清除 UI 异常日志；OS 报告由系统维护，服务日志由服务清理。专用日志 30 天、20 份、64 MiB，
   WER 每进程 5 份；限额在启动/维护时执行，崩溃写入可能暂时超出。原始导出最多 20 份、64 MiB、单份32 MiB。
 - 符号位于发布的独立 symbols artifact（90 天），按提交与 Mach-O UUID / Windows 二进制 SHA-256 匹配；
@@ -95,7 +95,7 @@ Profile Signer」角色。仓库改名、转移或换 Environment 时要同步�
 | 自己的 Tailscale、ZeroTier 或 EasyTier 网络 | 2.7 |
 
 2.1 到 2.4 要建 TUN、激活系统扩展或改系统代理，只在测试机上做（5.1 节）。2.5 到 2.7 用开发服务做，不建 TUN：
-`uv run python scripts/dev.py --data ~/solaris-dev`，经混合端口访问。脚本按发布版本的标签 `with_gvisor` 构建开发服务，
+`uv run python scripts/dev.py --data ~/openweir-dev`，经混合端口访问。脚本按发布版本的标签 `with_gvisor` 构建开发服务，
 不带它 mihomo 会拒绝 Tailscale 出站。
 
 ### 2.1 Windows
@@ -111,29 +111,29 @@ Profile Signer」角色。仓库改名、转移或换 Environment 时要同步�
 同时核对：
 
 - 签名（D42）：在测试机上对下载的安装包运行 `Get-AuthenticodeSignature`，或在文件属性的「数字签名」页查看：状态
-  `Valid`，签名者 `Herta Network LLC`，带时间戳。装好后 `C:\Program Files\Solaris` 里的 `Solaris.exe`、
-  `solaris-service.exe`、`uninstall.exe` 同样，其他 exe、dll、pyd 是 Solaris 或原发布者（Microsoft、Python Software
+  `Valid`，签名者 `OpenWeir`，带时间戳。装好后 `C:\Program Files\OpenWeir` 里的 `OpenWeir.exe`、
+  `openweir-service.exe`、`uninstall.exe` 同样，其他 exe、dll、pyd 是 OpenWeir 或原发布者（Microsoft、Python Software
   Foundation、The Qt Company）的有效签名；有 Windows SDK 时 `signtool verify /pa /v <文件>` 通过。`service.log` 里
   `service started` 一行是 `signed=true`，界面能连上服务，没有 `rejected control client … pipe client is signed by`；
-- 安装器的 UAC 提示显示经验证的发布者 `Herta Network LLC`（不再是"未知"），接管辅助进程 `solaris-service.exe` 的同意提示
+- 安装器的 UAC 提示显示经验证的发布者 `OpenWeir`（不再是"未知"），接管辅助进程 `openweir-service.exe` 的同意提示
   也是；SmartScreen 的提示与 README 写的一致：证书新，下载量少时仍可能提示"Windows 已保护你的电脑"，发布者一栏是
-  `Herta Network LLC`；
+  `OpenWeir`；
 - 认领：用第二个用户打开界面，属主的隧道在运行时它看到"其他用户正在使用"；隧道停了以后它能认领，服务经辅助进程
   重启；
 - 注销属主时隧道停止，再登录后恢复；开机后先登录的其他用户不走属主的隧道（D5）；
 - 管理员接管（D5b）。准备一个标准用户和一个管理员（UAC 保持默认），标准用户是属主，开着"系统代理"连接：
   1. 用快速切换用户登录管理员，打开界面：概览页标题栏写"其他用户正在使用 · 另一位用户已连接"，右侧有"接管"。
      再登录一个标准用户，他看到的是"……对方断开后才能在这里连接"，没有"接管"；
-  2. 管理员点"接管"：确认框默认聚焦"取消"。确认后弹出 UAC 的同意提示（程序 `solaris-service.exe`，经验证的发布者
-     `Herta Network LLC`），不要求密码。选"否"：什么都不变，也不报错；
+  2. 管理员点"接管"：确认框默认聚焦"取消"。确认后弹出 UAC 的同意提示（程序 `openweir-service.exe`，经验证的发布者
+     `OpenWeir`），不要求密码。选"否"：什么都不变，也不报错；
   3. 再点一次，在 UAC 里选"是"：服务重启，管理员的概览页变成"未连接"，可以连接；`service.log` 里有
      `an administrator took over the tunnel`，`owner.json` 是管理员的 SID；
   4. 切回原属主：他的系统代理已写回原来的设置，浏览器不再经代理；管理员连接后他的界面写"其他用户正在使用"；
      管理员断开后他能再连接，他的隧道不会自己恢复；
-  5. 在管理员的普通（不提权）命令提示符里运行 `"C:\Program Files\Solaris\solaris-service.exe" -take-over`：退出码
+  5. 在管理员的普通（不提权）命令提示符里运行 `"C:\Program Files\OpenWeir\openweir-service.exe" -take-over`：退出码
      非 0，`service.log` 里是 `rejected control client` 和"without an administrator's rights"，隧道不受影响；
 - 系统代理：开着"系统代理"连接后浏览器经代理；断开、注销、停止服务时写回原来的设置；
-- `C:\ProgramData\Solaris` 和 `users\<SID>` 的 ACL；复制到别处的 `Solaris.exe` 连不上服务；
+- `C:\ProgramData\OpenWeir` 和 `users\<SID>` 的 ACL；复制到别处的 `OpenWeir.exe` 连不上服务；
 - wintun、strict-route，设置页"TUN 协议栈"的四种栈都能连上并转发流量，包括默认的 `mips`（D3）；
 - 升级后隧道按 `was_running` 恢复；
 - 界面：浅色与深色、125% / 150% 缩放；自绘顶部区域的窗口按钮、拖动、双击最大化、贴靠布局；只用键盘走完各页；用
@@ -145,7 +145,7 @@ Profile Signer」角色。仓库改名、转移或换 Environment 时要同步�
 
 同时核对：
 
-- **Gatekeeper**：用浏览器从 GitHub 下载发布工作流产出的 dmg（这样会带上隔离标记），打开映像，把 Solaris 拖进
+- **Gatekeeper**：用浏览器从 GitHub 下载发布工作流产出的 dmg（这样会带上隔离标记），打开映像，把 OpenWeir 拖进
   "应用程序"后第一次打开，系统只应显示"从互联网下载"的普通确认，不应拒绝打开（发布工作流里 Gatekeeper 的检查只报
   警告，见第 3 节）；
 - 激活时的批准与 VPN 配置的允许；系统要求重启时的提示；
@@ -164,7 +164,7 @@ iCloud 在受支持的 macOS 签名安装版中提供快照备份与恢复。验
 重建容器或调整 schema 时，在 CloudKit Console 中维护定义。Production 环境不能由应用自动建 schema，所以 record type
 先在 Development 里建好，再部署：
 
-1. 打开 [CloudKit Console](https://icloud.developer.apple.com)，选 container `iCloud.dev.tschen.solaris`，进
+1. 打开 [CloudKit Console](https://icloud.developer.apple.com)，选 container `iCloud.org.openweir.app`，进
    Development 环境的 Schema → Record Types，新建 `Snapshot`，加两个字段：`info`（String）、`snapshot`（Asset）。
 2. 同一 record type 的 Indexes 里给 `recordName` 加一个 Queryable 索引（列出快照的查询要用；不加会报
    "Field 'recordName' is not marked queryable"）。
@@ -179,7 +179,7 @@ iCloud 在受支持的 macOS 签名安装版中提供快照备份与恢复。验
    Database，`Snapshot`）里有一条记录。
 2. 改一个设置或导入一份订阅，约 35 秒后多一条记录；什么都不改时不再多。"立即备份"每次都多一条；超过 10 条后
    最旧的被删掉。
-3. 另一台 Mac（或删掉 `~/Library/Application Support/Solaris` 后）打开开关：不上传空数据；"从云端恢复…"列出快照，
+3. 另一台 Mac（或删掉 `~/Library/Application Support/OpenWeir` 后）打开开关：不上传空数据；"从云端恢复…"列出快照，
    恢复后订阅、方案、覆写、设置都回来，订阅重新下载并通过校验。
 4. "更多"→"删除云端备份"后 Console 里记录全部消失，iCloud 一行写"尚未备份"。
 5. 断网后"立即备份"：写"上次备份失败：无法连接，稍后会再试"；联网后一小时内（或下次启动）自动补上。
@@ -231,7 +231,7 @@ exits.md 第 9 节的待实测项。
   比较返回的 IP；连接页看每条连接走的是哪台服务器。
 - 第 3 项：在代理页的"VPN Gate 出口"组里看哪台服务器分到了 `ifconfig.me`，用本机防火墙或把那台的 IP 加一条
   `IP-CIDR,<IP>/32,REJECT` 覆写让它连不上；两分钟内对话框里它被换掉，`ifconfig.me` 换了 IP，其他网站不变。
-- 第 4 项：换一个新的数据目录（`--data ~/solaris-dev2`），新建一个只含"拒绝"的自建组，把经由设成它再打开出口：列表
+- 第 4 项：换一个新的数据目录（`--data ~/openweir-dev2`），新建一个只含"拒绝"的自建组，把经由设成它再打开出口：列表
   取不到，对话框写出原因，规则行显示"不可用，已拒绝连接"，同一条命令失败。关掉出口时也一样。
 
 同时记下 exits.md 第 9 节的待实测项。
@@ -251,7 +251,7 @@ exits.md 第 9 节的待实测项。
 3. ZeroTier：添加网络 ID → 行上显示本机 ID、"等待授权" → 在 my.zerotier.com 授权 → "在线"，地址是分配的地址
    → 添加 IP 段规则后能访问网络里的设备。
 4. EasyTier：两台机器，同网络名称、密钥，开发服务这边写对端的 `tcp://` 地址 → "在线"、1 台设备 → 能访问对端。
-   用 `lsof -i -P | grep solaris` 确认开发服务没有监听 EasyTier 端口。
+   用 `lsof -i -P | grep openweir` 确认开发服务没有监听 EasyTier 端口。
 5. 改一条规则（触发重新加载），经 Tailscale 的 SSH 会话不断；删除网络后它的规则拒绝连接，内核 home 下
    `mesh/<id>` 不见了。
 6. 导出备份，确认文件里有网络、没有任何密钥；在另一台机器恢复后网络出现，Tailscale 要求重新登录。
@@ -263,19 +263,19 @@ exits.md 第 9 节的待实测项。
 设计见 [storage.md](storage.md) 第 4 节。先在 Google Cloud 建 OAuth 客户端（一次）：
 
 1. 用打算作为应用所有者的 Google 账户打开 [Google Cloud Console](https://console.cloud.google.com)，新建一个项目
-   （如 `Solaris`）。
+   （如 `OpenWeir`）。
 2. "API 和服务" → "库"，搜索 Google Drive API，启用。
 3. "Google Auth Platform"（旧称"OAuth 同意屏幕"）→ 开始配置：
-   - 品牌：应用名称 `Solaris`，用户支持邮箱、开发者联系邮箱；
+   - 品牌：应用名称 `OpenWeir`，用户支持邮箱、开发者联系邮箱；
    - 受众群体：用户类型选"外部"（External）；
    - 数据访问：添加范围 `https://www.googleapis.com/auth/drive.appdata`，它在"非敏感范围"一栏，不要加别的范围；
    - 受众群体 → 发布状态：点"发布应用"，改成"正式版"（In production）。测试状态下只有列出的测试用户能登录，他们
      的授权 7 天后失效，自动备份会随之停下。
-4. "客户端" → 创建客户端，应用类型选"桌面应用"（Desktop app），名称如 `Solaris desktop`。记下客户端 ID
+4. "客户端" → 创建客户端，应用类型选"桌面应用"（Desktop app），名称如 `OpenWeir desktop`。记下客户端 ID
    （`….apps.googleusercontent.com`）和客户端密钥（`GOCSPX-…`）。桌面应用不用登记重定向 URI，Google 接受
    `http://127.0.0.1` 上的任意端口。
 5. GitHub 仓库 → Settings → Environments → `release` → Environment secrets，添加两个机密：
-   `SOLARIS_GOOGLE_CLIENT_ID`（客户端 ID）、`SOLARIS_GOOGLE_CLIENT_SECRET`（客户端密钥）。两个都不进仓库。
+   `OPENWEIR_GOOGLE_CLIENT_ID`（客户端 ID）、`OPENWEIR_GOOGLE_CLIENT_SECRET`（客户端密钥）。两个都不进仓库。
 
 审核：`drive.appdata` 是非敏感范围，发布为正式版不需要 Google 的应用审核，也没有用户数上限。不做品牌审核时，Google
 的授权页不显示应用的名称和图标；要显示，需要经过验证的自有域名上的主页和隐私政策，在"品牌"里填好后提交品牌审核。
@@ -286,11 +286,11 @@ exits.md 第 9 节的待实测项。
 
 1. 设置页"备份与同步"有 Google Drive 一行，写"未登录"。不带这两个机密构建的安装包没有这一行。
 2. "登录…"在浏览器里打开 Google 的授权页，只请求"查看、创建和删除其自身在 Google 云端硬盘中的配置数据"一项；
-   允许后浏览器显示"已登录 Google Drive，可以关闭这个页面，回到 Solaris。"，这一行写"<邮箱> · 上次备份：刚刚 · 成功"。
+   允许后浏览器显示"已登录 Google Drive，可以关闭这个页面，回到 OpenWeir。"，这一行写"<邮箱> · 上次备份：刚刚 · 成功"。
    在授权页拒绝时写"无法登录：没有获得授权"；关掉标签页后点"取消"，回到"未登录"。
-3. 令牌只在系统凭据库里：macOS"钥匙串访问"里有服务 `Solaris`、账户 `google-drive` 的一项，Windows 凭据管理器里
-   有对应的普通凭据；`solaris.db`、导出的备份文件和诊断信息 zip 里都搜不到它。
-4. drive.google.com → 设置 → 管理应用，Solaris 有"隐藏的应用数据"；云端硬盘里看不到快照文件。
+3. 令牌只在系统凭据库里：macOS"钥匙串访问"里有服务 `OpenWeir`、账户 `google-drive` 的一项，Windows 凭据管理器里
+   有对应的普通凭据；`openweir.db`、导出的备份文件和诊断信息 zip 里都搜不到它。
+4. drive.google.com → 设置 → 管理应用，OpenWeir 有"隐藏的应用数据"；云端硬盘里看不到快照文件。
 5. 改一个设置，约 35 秒后多一份快照（"从云端恢复…"列表多一行）；什么都不改时不再多。"立即备份"每次都多一份；
    超过 10 份后最旧的被删掉。
 6. 另一台机器（或换一个数据目录）用同一个账户登录：不上传空数据；"从云端恢复…"列出快照，右侧写 Google Drive，
@@ -299,8 +299,8 @@ exits.md 第 9 节的待实测项。
 8. 断网后"立即备份"：写"上次备份失败：无法连接，稍后会再试"；联网后一小时内（或下次启动）自动补上。设了系统代理
    时，请求经代理发出（看代理的日志）。
 9. "更多"→"退出登录"：这一行写"未登录"，凭据库里的那一项不见了；Google 账户的"第三方应用和服务"里不再有
-   Solaris；云端的快照还在（重新登录后能列出）。第 6 项的另一台机器在下次上传时写"<邮箱> · 需要重新登录"。
-10. 在 Google 账户的"第三方应用和服务"里移除 Solaris：下次上传时这一行写"<邮箱> · 需要重新登录"，之后不再尝试；
+   OpenWeir；云端的快照还在（重新登录后能列出）。第 6 项的另一台机器在下次上传时写"<邮箱> · 需要重新登录"。
+10. 在 Google 账户的"第三方应用和服务"里移除 OpenWeir：下次上传时这一行写"<邮箱> · 需要重新登录"，之后不再尝试；
     重新登录后立即备份一次。
 11. 账户的存储空间满时，失败原因是"储存空间已满"。
 
@@ -310,7 +310,7 @@ exits.md 第 9 节的待实测项。
 - WARP 注册使用第三方接口，服务方变动或限流可能导致失败；失败时拒绝连接，不切换到未经选择的出口。
 - Tor 出口尚未实现，见 1.4 节。
 - Windows 安装包的签名刚开始还没有 SmartScreen 信誉，最初的一些版本下载后仍可能看到 SmartScreen 的提示（发布者
-  一栏是 `Herta Network LLC`），直到微软积累了足够的下载和安装数据。
+  一栏是 `OpenWeir`），直到微软积累了足够的下载和安装数据。
 
 版本相关的问题和修复记录保留在 Issue、提交与发布说明中。
 
@@ -328,11 +328,11 @@ exits.md 第 9 节的待实测项。
    Windows 两个任务的日志里核对：「Signing tools」两个 NuGet 包的 SHA-256 对上，`dotnet --list-runtimes` 有 10.x 的
    `Microsoft.NETCore.App`（ARM64 上是 `C:\Program Files\dotnet\x64` 下的 x64 版）；「Sign in to Azure」没有选订阅，
    「Signing token」只打印到期时间；「Sign and build the installer」里 `sign.ps1` 列出保留了谁的签名、签了多少个文件，
-   signtool 每个文件 `Successfully signed`，`Solaris.exe`、`solaris-service.exe`、安装界面插件、卸载器和安装器各有一段
-   `signtool verify /pa /v`：`Issued to: Herta Network LLC`、签发者是微软的 CA（`Microsoft ID Verified …`）、`The signature is
+   signtool 每个文件 `Successfully signed`，`OpenWeir.exe`、`openweir-service.exe`、安装界面插件、卸载器和安装器各有一段
+   `signtool verify /pa /v`：`Issued to: OpenWeir`、签发者是微软的 CA（`Microsoft ID Verified …`）、`The signature is
    timestamped`、`Successfully verified`；「Check the signatures」的证书 `Subject` 是
-   `CN=Herta Network LLC, O=Herta Network LLC, L=Sheridan, S=Wyoming, C=US`，`EnhancedKeyUsageList` 里有代码签名和
-   `1.3.6.1.4.1.311.97.242074350.326480862.720558710.91084369`，时间戳证书是微软的；「Install, upgrade and uninstall」
+   `CN=OpenWeir, O=OpenWeir, L=Sheridan, S=Wyoming, C=US`，`EnhancedKeyUsageList` 里有代码签名和
+   `1.3.6.1.4.1.311.97.0`，时间戳证书是微软的；「Install, upgrade and uninstall」
    以 `-Signed` 通过（签名、`signed=true`、界面没被拒）。下载 artifact 后在测试机上按 2.1 节核对签名。
 3. **打标签**：`v<版本>`，必须与 `pyproject.toml` 的版本一致。
 
@@ -344,20 +344,20 @@ exits.md 第 9 节的待实测项。
    写 `SHA256SUMS`，把这四个文件放进一个**草稿** Release（不上传源代码包，D43）。同一个标签已有 Release 时这一步失败，
    要先删掉旧的草稿再重新运行。标签发布后不删除，也不移到别的提交：它就是这个版本的源代码。
 
-   同时在 `openweir/mihomo` 上给这个版本 `replace` 固定的提交打 `solaris-v<版本>`（5.4 节），以后变基强推 `Alpha`
+   同时在 `openweir/mihomo` 上给这个版本 `replace` 固定的提交打 `openweir-v<版本>`（5.4 节），以后变基强推 `Alpha`
    时它仍然取得到：
 
    ```bash
-   git tag -a solaris-v1.0.0 <提交> -m "mihomo source pinned by Solaris v1.0.0" && git push origin solaris-v1.0.0
+   git tag -a openweir-v1.0.0 <提交> -m "mihomo source pinned by OpenWeir v1.0.0" && git push origin openweir-v1.0.0
    ```
 4. **草稿**：从草稿下载三个安装包，在测试机上再装一遍；在"更新内容"下写这个版本的变化，删掉模板里的注释行。
 5. **发布**，二选一：
-   - **正式发布**，保留"Set as the latest release"：已安装的 Solaris 检查更新时会提示这个版本；
+   - **正式发布**，保留"Set as the latest release"：已安装的 OpenWeir 检查更新时会提示这个版本；
    - **预发布**，勾"Set as a pre-release"：检查更新不会提示它（界面只看 `releases/latest`，它跳过草稿和预发布），
      只能从 Releases 页面手动下载。
 
 检查更新提示的版本：`releases/latest` 的标签去掉 `v` 后是三段数字，并且比当前版本新；Release 里有本机平台的安装包
-和 `SHA256SUMS`。下载后核对 SHA-256；macOS 还核对签名、公证和 Team ID；Windows 还核对签名、签名者 `Herta Network LLC`
+和 `SHA256SUMS`。下载后核对 SHA-256；macOS 还核对签名、公证和 Team ID；Windows 还核对签名、签名者 `OpenWeir`
 和证书配置文件的 EKU（D42）。1.0.0 没有签名者，只核对 SHA-256，照常接受签了名的安装包。界面从不静默安装，用户确认后才打开安装包。
 
 每个候选版本核对公证与系统启动检查、浅深色下的磁盘映像、当前版本提示，以及从上一版本检查、下载、校验和安装的完整路径。
@@ -368,13 +368,13 @@ exits.md 第 9 节的待实测项。
 ### 5.1 本机开发不改动本机网络
 
 开发机就是日常使用的机器：不创建 TUN，不设置系统代理，不修改路由和 DNS，不激活系统扩展、不运行组装好的
-`Solaris.app`，也不在本机真实注册登录项或计划任务。界面用模拟宿主（`scripts/preview.py`）或无 TUN 的开发服务
+`OpenWeir.app`，也不在本机真实注册登录项或计划任务。界面用模拟宿主（`scripts/preview.py`）或无 TUN 的开发服务
 （`scripts/dev.py`）调试，经混合端口验证流量；需要 TUN 的测试放在 CI 的网络命名空间或测试机里做
 （[architecture.md](architecture.md) §11）。
 
 ### 5.2 改动的做法
 
-- **协议**：先改 `proto/solaris/protocol/control.proto`，运行 `scripts/gen_protocol.py`；在同一个提交里同步修改 Go
+- **协议**：先改 `proto/openweir/protocol/control.proto`，运行 `scripts/gen_protocol.py`；在同一个提交里同步修改 Go
   分发器、Python `ServiceHost` 和模拟宿主，并用共享样本（`testdata/`）守住两端一致。UI 与服务、扩展总是一起发布，
   协议版本不一致时直接拒绝，不做兼容（[architecture.md](architecture.md) §4.1）。
 - **内核的拼装、读订阅、预览和转换**：改了以后运行 `go -C src/core test ./internal/compose -run TestVectors -update`
@@ -382,7 +382,7 @@ exits.md 第 9 节的待实测项。
   界面的测试才不会依赖内核不再给的回答。
 - **视觉**：先改 [DESIGN.md](../DESIGN.md)，再运行 `scripts/gen_theme.py` 生成 `Theme.qml`。改动涉及文档截图里的页面时，
   运行 `scripts/gen_screenshots.py` 更新 `docs/images/`（[development.md](development.md#生成的文件)）。
-- **文案**：中文是源语言；改动文案后运行 `scripts/gen_i18n.py`，并在 `src/solaris/translations/en.ts` 里补齐英文。
+- **文案**：中文是源语言；改动文案后运行 `scripts/gen_i18n.py`，并在 `src/openweir/translations/en.ts` 里补齐英文。
   文案保持中立、简短（DESIGN.md 的 Typography 一节）。
 - **决策**：新的设计决策在 [decisions.md](decisions.md) 的最后一条之后接着编号；已有的编号不变，代码注释引用它们。
 - **文档**：用户说明只保留功能、操作和必要限制；技术文档记录现行设计与维护步骤。临时调试结论、测试次数和
@@ -393,10 +393,10 @@ exits.md 第 9 节的待实测项。
 
 1.0.0 起，用户机器上已经存着数据，改动必须让旧数据能继续用：
 
-- **数据库表结构**：改表就在 `src/solaris/models/database.py` 的 `MIGRATIONS` 末尾追加一个迁移，`SCHEMA_VERSION`
+- **数据库表结构**：改表就在 `src/openweir/models/database.py` 的 `MIGRATIONS` 末尾追加一个迁移，`SCHEMA_VERSION`
   随之加一；已经发布的迁移不再修改。每个迁移都要有测试：用上一个版本的表结构和数据建库，打开后数据完整
   （[storage.md](storage.md) 第 2 节）。
-- **存下的格式要让后来的版本能读**：数据库里的设置和记录、备份快照（`solaris-backup`，版本 1）、方案 JSON（版本 1，
+- **存下的格式要让后来的版本能读**：数据库里的设置和记录、备份快照（`openweir-backup`，版本 1）、方案 JSON（版本 1，
   [routing.md](routing.md) §8.5）、Windows 服务 home 里的 `profile.json`、`state.json` 和 `owner.json`。只加有默认值的
   字段；不得不改格式时升版本号，并保留读旧版本的代码。旧版本的应用遇到新格式时：数据库改名放到一边
   （`.bad`）、换一个空库，快照拒绝恢复（`newer_backup`）。
@@ -405,7 +405,7 @@ exits.md 第 9 节的待实测项。
 
 - **mihomo 增强版**：固定到 openweir/mihomo `Alpha` 分支（D44）的明确提交（`src/core/go.mod` 的 `replace`），不使用浮动
   分支作为构建输入。发布过的版本固定的提交是那个版本对应的源代码（D43），不要让它们从 `openweir/mihomo` 上消失：
-  每个发布版本在 fork 上有一个 annotated tag `solaris-v<版本>` 指向它固定的提交（第 4 节第 3 步）。随上游 `Alpha`
+  每个发布版本在 fork 上有一个 annotated tag `openweir-v<版本>` 指向它固定的提交（第 4 节第 3 步）。随上游 `Alpha`
   变基后要强推 `Alpha`，强推前先确认当前固定的提交已经有这样的 tag，强推用 `--force-with-lease`；`Meta` 分支（1.0.0
   的提交）不动。界面显示的内核版本是 replace 伪版本去掉时间戳和哈希（[ui.md](ui.md)），伪版本的基准是 fork 上最近的
   上游发布 tag，所以 fork 只同步到已包含的上游发布的前一个：包含 v1.19.34 时同步 v1.19.33，伪版本是
@@ -415,7 +415,7 @@ exits.md 第 9 节的待实测项。
   函数、类型和常量，升级时这几处也要核对。升级前跑完整测试，并按 [architecture.md](architecture.md) §3.3 逐条复核
   安全要求和 3.4 节的发布构建标签。
 - **GEO 数据**的版本和 SHA-256 钉在 `scripts/fetch_geodata.py` 里；改了之后用 `--categories` 重新生成附带的分类名
-  清单（`src/solaris/host/geo_categories.py`），CI 用 `--check` 核对。
+  清单（`src/openweir/host/geo_categories.py`），CI 用 `--check` 核对。
 - **macOS** 的产品最低版本固定为 26（D28）；构建器同时检查 PySide6 等依赖的实际 Mach-O 版本要求，只能提高该底线。**Nuitka** 的版本是 `scripts/build_app.py` 的 `NUITKA_VERSION`，CI 和
   发布工作流里的 `--with nuitka==` 要一起改。4.3.4 构建的 Windows 界面在冒烟测试里启动即退出（退出码 3，即
   `abort()`），原因未查明，所以仍用 4.2.2；再试新版本时，失败的 `windows-installer` 任务会上传界面的输出和崩溃目录

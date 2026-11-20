@@ -1,5 +1,5 @@
 """MacExtensionHost over a stand-in manager, and ManagerLibrary over a stand-in dylib built
-from SolarisManager.h. Nothing here touches NetworkExtension."""
+from OpenWeirManager.h. Nothing here touches NetworkExtension."""
 
 import asyncio
 import ctypes
@@ -15,21 +15,21 @@ from pathlib import Path
 
 import pytest
 
-from solaris import __version__
-from solaris.host import extension
-from solaris.host.base import HostError, HostInfo, HostStatus, RunOptions, TunnelConfig
-from solaris.host.extension import (
+from openweir import __version__
+from openweir.host import extension
+from openweir.host.base import HostError, HostInfo, HostStatus, RunOptions, TunnelConfig
+from openweir.host.extension import (
     MacExtensionHost,
     ManagerError,
     ManagerLibrary,
     TunnelDownError,
     bundled_host,
 )
-from solaris.models import backup_icloud
-from solaris.protocol import control_pb2
+from openweir.models import backup_icloud
+from openweir.protocol import control_pb2
 
 pb = control_pb2
-HEADER = Path(__file__).resolve().parents[1] / "apple" / "Manager" / "SolarisManager.h"
+HEADER = Path(__file__).resolve().parents[1] / "apple" / "Manager" / "OpenWeirManager.h"
 
 type Answer = Callable[[pb.Request], pb.Response]
 
@@ -89,7 +89,7 @@ class FakeManager:
     def send(self, request: bytes, timeout: float) -> bytes:
         self._record("send")
         if self.tunnel not in (extension.TUNNEL_CONNECTED, extension.TUNNEL_REASSERTING):
-            raise ManagerError(extension.NOT_CONNECTED, "The Solaris tunnel is not connected")
+            raise ManagerError(extension.NOT_CONNECTED, "The OpenWeir tunnel is not connected")
         decoded = pb.Request.FromString(request)
         self.requests.append(decoded)
         response = self.answer(decoded)
@@ -471,7 +471,7 @@ def test_subscriptions_start_again_after_the_tunnel_went_down() -> None:
 
 def test_result_codes_match_the_header() -> None:
     header = HEADER.read_text()
-    declared = dict(re.findall(r"^\s*SOLARIS_(\w+) = (\d+),", header, re.MULTILINE))
+    declared = dict(re.findall(r"^\s*OPENWEIR_(\w+) = (\d+),", header, re.MULTILINE))
     for name, value in declared.items():
         module = backup_icloud if name.startswith("ICLOUD_") else extension
         python = name.removeprefix("MANAGER_").removeprefix("ICLOUD_")
@@ -483,10 +483,10 @@ FAKE_MANAGER_C = r"""
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "SolarisManager.h"
+#include "OpenWeirManager.h"
 
 static int outstanding;
-static SolarisManagerResult next_result;
+static OpenWeirManagerResult next_result;
 static double last_timeout;
 static int last_include_all_networks = -1;
 
@@ -495,63 +495,63 @@ static void *allocate(size_t size) {
   return malloc(size ? size : 1);
 }
 
-static SolarisManagerResult finish(char **error) {
-  SolarisManagerResult result = next_result;
-  next_result = SOLARIS_MANAGER_OK;
+static OpenWeirManagerResult finish(char **error) {
+  OpenWeirManagerResult result = next_result;
+  next_result = OPENWEIR_MANAGER_OK;
   *error = NULL;
-  if (result != SOLARIS_MANAGER_OK) {
+  if (result != OPENWEIR_MANAGER_OK) {
     *error = allocate(32);
     snprintf(*error, 32, "fake failure %d", (int)result);
   }
   return result;
 }
 
-void fake_fail_next(SolarisManagerResult result) { next_result = result; }
+void fake_fail_next(OpenWeirManagerResult result) { next_result = result; }
 int fake_outstanding(void) { return outstanding; }
 double fake_last_timeout(void) { return last_timeout; }
 int fake_last_include_all_networks(void) { return last_include_all_networks; }
 
-SolarisManagerResult solaris_manager_activate(double timeout_seconds, char **error) {
+OpenWeirManagerResult openweir_manager_activate(double timeout_seconds, char **error) {
   last_timeout = timeout_seconds;
   return finish(error);
 }
 
-SolarisManagerResult solaris_manager_deactivate(double timeout_seconds, char **error) {
+OpenWeirManagerResult openweir_manager_deactivate(double timeout_seconds, char **error) {
   last_timeout = timeout_seconds;
   return finish(error);
 }
 
-SolarisManagerResult solaris_manager_configure(bool include_all_networks, char **error) {
+OpenWeirManagerResult openweir_manager_configure(bool include_all_networks, char **error) {
   last_include_all_networks = include_all_networks;
   return finish(error);
 }
 
-SolarisManagerResult solaris_manager_start(double timeout_seconds, bool include_all_networks,
+OpenWeirManagerResult openweir_manager_start(double timeout_seconds, bool include_all_networks,
                                            char **error) {
   last_timeout = timeout_seconds;
   last_include_all_networks = include_all_networks;
   return finish(error);
 }
 
-SolarisManagerResult solaris_manager_stop(double timeout_seconds, char **error) {
+OpenWeirManagerResult openweir_manager_stop(double timeout_seconds, char **error) {
   last_timeout = timeout_seconds;
   return finish(error);
 }
 
-SolarisManagerResult solaris_manager_status(SolarisTunnelStatus *status, char **error) {
-  *status = SOLARIS_TUNNEL_REASSERTING;
+OpenWeirManagerResult openweir_manager_status(OpenWeirTunnelStatus *status, char **error) {
+  *status = OPENWEIR_TUNNEL_REASSERTING;
   return finish(error);
 }
 
 // Answers with the request reversed.
-SolarisManagerResult solaris_manager_send(const uint8_t *request, size_t request_length,
+OpenWeirManagerResult openweir_manager_send(const uint8_t *request, size_t request_length,
                                           double timeout_seconds, uint8_t **response,
                                           size_t *response_length, char **error) {
   last_timeout = timeout_seconds;
   *response = NULL;
   *response_length = 0;
-  SolarisManagerResult result = finish(error);
-  if (result != SOLARIS_MANAGER_OK) return result;
+  OpenWeirManagerResult result = finish(error);
+  if (result != OPENWEIR_MANAGER_OK) return result;
   uint8_t *reply = allocate(request_length);
   for (size_t i = 0; i < request_length; i++) reply[request_length - 1 - i] = request[i];
   *response = reply;
@@ -559,10 +559,10 @@ SolarisManagerResult solaris_manager_send(const uint8_t *request, size_t request
   return result;
 }
 
-SolarisManagerResult solaris_manager_icloud_status(double timeout_seconds,
-                                                   SolarisICloudStatus *status, char **error) {
+OpenWeirManagerResult openweir_manager_icloud_status(double timeout_seconds,
+                                                   OpenWeirICloudStatus *status, char **error) {
   last_timeout = timeout_seconds;
-  *status = SOLARIS_ICLOUD_NO_ACCOUNT;
+  *status = OPENWEIR_ICLOUD_NO_ACCOUNT;
   return finish(error);
 }
 
@@ -574,7 +574,7 @@ static size_t saved_length;
 
 const char *fake_saved_info(void) { return saved_info; }
 
-SolarisManagerResult solaris_manager_icloud_save(const char *name, const char *info,
+OpenWeirManagerResult openweir_manager_icloud_save(const char *name, const char *info,
                                                  const uint8_t *snapshot, size_t snapshot_length,
                                                  double timeout_seconds, char **error) {
   last_timeout = timeout_seconds;
@@ -585,41 +585,41 @@ SolarisManagerResult solaris_manager_icloud_save(const char *name, const char *i
   return finish(error);
 }
 
-SolarisManagerResult solaris_manager_icloud_list(double timeout_seconds, char **list,
+OpenWeirManagerResult openweir_manager_icloud_list(double timeout_seconds, char **list,
                                                  char **error) {
   last_timeout = timeout_seconds;
   *list = NULL;
-  SolarisManagerResult result = finish(error);
-  if (result != SOLARIS_MANAGER_OK) return result;
+  OpenWeirManagerResult result = finish(error);
+  if (result != OPENWEIR_MANAGER_OK) return result;
   *list = allocate(512);
   snprintf(*list, 512, "[{\"name\":\"%s\",\"info\":\"%zu bytes\"}]", saved_name,
            saved_length);
   return result;
 }
 
-SolarisManagerResult solaris_manager_icloud_download(const char *name, double timeout_seconds,
+OpenWeirManagerResult openweir_manager_icloud_download(const char *name, double timeout_seconds,
                                                      uint8_t **snapshot, size_t *snapshot_length,
                                                      char **error) {
   last_timeout = timeout_seconds;
   *snapshot = NULL;
   *snapshot_length = 0;
-  if (saved_name[0] == 0 || strcmp(name, saved_name) != 0) next_result = SOLARIS_MANAGER_NOT_FOUND;
-  SolarisManagerResult result = finish(error);
-  if (result != SOLARIS_MANAGER_OK) return result;
+  if (saved_name[0] == 0 || strcmp(name, saved_name) != 0) next_result = OPENWEIR_MANAGER_NOT_FOUND;
+  OpenWeirManagerResult result = finish(error);
+  if (result != OPENWEIR_MANAGER_OK) return result;
   *snapshot = allocate(saved_length);
   memcpy(*snapshot, saved, saved_length);
   *snapshot_length = saved_length;
   return result;
 }
 
-SolarisManagerResult solaris_manager_icloud_delete(const char *name, double timeout_seconds,
+OpenWeirManagerResult openweir_manager_icloud_delete(const char *name, double timeout_seconds,
                                                    char **error) {
   last_timeout = timeout_seconds;
   if (strcmp(name, saved_name) == 0) saved_name[0] = 0;
   return finish(error);
 }
 
-void solaris_manager_free(void *pointer) {
+void openweir_manager_free(void *pointer) {
   if (pointer == NULL) return;
   outstanding--;
   free(pointer);
@@ -633,7 +633,7 @@ def fake_library(tmp_path: Path) -> Path:
         pytest.skip("builds a stand-in dylib with Apple's clang")
     source = tmp_path / "fake.c"
     source.write_text(FAKE_MANAGER_C)
-    library = tmp_path / "SolarisManager.dylib"
+    library = tmp_path / "OpenWeirManager.dylib"
     command = ["xcrun", "clang", "-dynamiclib", "-I", str(HEADER.parent), str(source)]
     subprocess.run([*command, "-o", str(library)], check=True)
     return library
@@ -678,17 +678,17 @@ def test_manager_library_calls_icloud_and_releases_every_buffer(fake_library: Pa
 
     assert manager.icloud_status(15.0) == backup_icloud.NO_ACCOUNT
     assert fake.fake_last_timeout() == 15.0
-    manager.icloud_save("solaris-backup-a", '{"device": "笔记本"}', b"\x00snap\xff", 120.0)
+    manager.icloud_save("openweir-backup-a", '{"device": "笔记本"}', b"\x00snap\xff", 120.0)
     assert (fake.fake_last_timeout(), fake.fake_saved_info().decode()) == (
         120.0,
         '{"device": "笔记本"}',
     )
-    assert manager.icloud_list(60.0) == '[{"name":"solaris-backup-a","info":"6 bytes"}]'
-    assert manager.icloud_download("solaris-backup-a", 30.0) == b"\x00snap\xff"
-    manager.icloud_delete("solaris-backup-a", 30.0)
+    assert manager.icloud_list(60.0) == '[{"name":"openweir-backup-a","info":"6 bytes"}]'
+    assert manager.icloud_download("openweir-backup-a", 30.0) == b"\x00snap\xff"
+    manager.icloud_delete("openweir-backup-a", 30.0)
     for call in (
-        lambda: manager.icloud_download("solaris-backup-a", 1.0),
-        lambda: manager.icloud_download("solaris-backup-b", 1.0),
+        lambda: manager.icloud_download("openweir-backup-a", 1.0),
+        lambda: manager.icloud_download("openweir-backup-b", 1.0),
     ):
         with pytest.raises(ManagerError) as raised:
             call()
@@ -707,7 +707,7 @@ def test_manager_library_calls_icloud_and_releases_every_buffer(fake_library: Pa
 def test_bundled_provider_needs_the_manager_in_the_bundle(
     fake_library: Path, tmp_path: Path
 ) -> None:
-    executable = tmp_path / "Solaris.app" / "Contents" / "MacOS" / "SolarisUI"
+    executable = tmp_path / "OpenWeir.app" / "Contents" / "MacOS" / "OpenWeirUI"
     executable.parent.mkdir(parents=True)
     executable.touch()
     assert backup_icloud.bundled_provider(executable) is None
@@ -722,15 +722,15 @@ def test_bundled_provider_needs_the_manager_in_the_bundle(
 
 
 def test_bundled_host_needs_the_manager_in_the_bundle(fake_library: Path, tmp_path: Path) -> None:
-    contents = tmp_path / "Solaris.app" / "Contents"
-    executable = contents / "MacOS" / "Solaris"
+    contents = tmp_path / "OpenWeir.app" / "Contents"
+    executable = contents / "MacOS" / "OpenWeir"
     executable.parent.mkdir(parents=True)
     executable.touch()
     assert bundled_host(executable) is None
 
     (contents / "Frameworks").mkdir()
     shutil.copy(fake_library, contents / "Frameworks" / extension.LIBRARY_NAME)
-    info = {"CFBundleIdentifier": "dev.tschen.solaris", extension.CORE_VERSION_KEY: "v1.19.33"}
+    info = {"CFBundleIdentifier": "org.openweir.app", extension.CORE_VERSION_KEY: "v1.19.33"}
     (contents / "Info.plist").write_bytes(plistlib.dumps(info))
     host = bundled_host(executable)
     assert host is not None

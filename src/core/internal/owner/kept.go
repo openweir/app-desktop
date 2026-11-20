@@ -10,8 +10,8 @@ import (
 
 	"google.golang.org/protobuf/encoding/protojson"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/controlpb"
-	"github.com/Ember-Moth/Solaris/src/core/internal/sysproxy"
+	"github.com/openweir/app-desktop/src/core/internal/controlpb"
+	"github.com/openweir/app-desktop/src/core/internal/sysproxy"
 )
 
 // What the service keeps in the owner's home besides mihomo's own files (§5.1). Only SYSTEM

@@ -5,7 +5,7 @@ from typing import cast
 
 import pytest
 
-from solaris.host.base import (
+from openweir.host.base import (
     Composition,
     EasyTierSettings,
     HostError,
@@ -18,11 +18,11 @@ from solaris.host.base import (
     TunnelConfig,
     ZeroTierSettings,
 )
-from solaris.host.client import ControlClient
-from solaris.host.service import ServiceHost
-from solaris.host.transport import Opener, Streams
-from solaris.protocol import control_pb2
-from solaris.protocol.frame import KIND_REQUEST, KIND_RESPONSE, encode, read_frame
+from openweir.host.client import ControlClient
+from openweir.host.service import ServiceHost
+from openweir.host.transport import Opener, Streams
+from openweir.protocol import control_pb2
+from openweir.protocol.frame import KIND_REQUEST, KIND_RESPONSE, encode, read_frame
 
 type Answer = Callable[[control_pb2.Request], Awaitable[control_pb2.Response | None]]
 
@@ -320,7 +320,7 @@ def test_an_unanswered_request_keeps_the_shared_connection(
 ) -> None:
     """A request the service leaves unanswered (core_unresponsive, a delay test at its limit)
     times out alone: requests in flight beside it on the shared connection still finish."""
-    monkeypatch.setattr("solaris.host.service.CLAIM_TIMEOUT_S", 0.2)
+    monkeypatch.setattr("openweir.host.service.CLAIM_TIMEOUT_S", 0.2)
     pb = control_pb2
 
     async def scenario() -> None:
@@ -610,7 +610,7 @@ def test_service_host_claims_before_acting_but_not_to_read(
     stopped core; anything else claims it, waits out the restart a new owner needs, and
     goes again."""
     pb = control_pb2
-    monkeypatch.setattr("solaris.host.service.CLAIM_RETRY_S", 0.01)
+    monkeypatch.setattr("openweir.host.service.CLAIM_RETRY_S", 0.01)
     claims = 0
     seen: list[str] = []
 
@@ -677,7 +677,7 @@ def test_service_host_leaves_another_users_tunnel_alone() -> None:
 def test_service_host_takes_over_through_the_helper(monkeypatch: pytest.MonkeyPatch) -> None:
     """The UI never asks for a take-over itself: the elevated helper does (D5b), and the UI
     claims the service once it restarted for this user."""
-    monkeypatch.setattr("solaris.host.service.CLAIM_RETRY_S", 0.01)
+    monkeypatch.setattr("openweir.host.service.CLAIM_RETRY_S", 0.01)
     pb = control_pb2
     taken_over = False
     claims: list[bool] = []
@@ -720,8 +720,8 @@ def test_service_host_takes_over_through_the_helper(monkeypatch: pytest.MonkeyPa
 def test_service_host_gives_up_on_a_restart_that_does_not_end(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr("solaris.host.service.CLAIM_RETRY_S", 0.01)
-    monkeypatch.setattr("solaris.host.service.CLAIM_TIMEOUT_S", 0.1)
+    monkeypatch.setattr("openweir.host.service.CLAIM_RETRY_S", 0.01)
+    monkeypatch.setattr("openweir.host.service.CLAIM_TIMEOUT_S", 0.1)
 
     async def answer(_: control_pb2.Request) -> control_pb2.Response:
         return _not_ours("service_restarting")

@@ -1,4 +1,4 @@
-"""A stand-in for the iCloud calls of SolarisManager.dylib (models/backup_icloud.py ICloud): the
+"""A stand-in for the iCloud calls of OpenWeirManager.dylib (models/backup_icloud.py ICloud): the
 records in a dict, the account and the failures as a test sets them, and the threads it was
 called on."""
 
@@ -7,8 +7,8 @@ from __future__ import annotations
 import json
 import threading
 
-from solaris.host.extension import FAILED, NOT_FOUND, NOT_SIGNED_IN, ManagerError
-from solaris.models.backup_icloud import AVAILABLE, UNSUPPORTED
+from openweir.host.extension import FAILED, NOT_FOUND, NOT_SIGNED_IN, ManagerError
+from openweir.models.backup_icloud import AVAILABLE, UNSUPPORTED
 
 
 class FakeICloud:
@@ -34,7 +34,7 @@ class FakeICloud:
     def _account(self) -> None:
         """As CloudKit answers a build without the entitlements, or a signed-out system."""
         if self.status == UNSUPPORTED:
-            raise ManagerError(FAILED, "This build of Solaris is not signed for iCloud")
+            raise ManagerError(FAILED, "This build of OpenWeir is not signed for iCloud")
         if self.status != AVAILABLE:
             raise ManagerError(NOT_SIGNED_IN, "Could not reach iCloud: not authenticated")
 

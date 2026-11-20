@@ -34,17 +34,17 @@ from PySide6.QtQml import QQmlApplicationEngine  # noqa: E402
 from PySide6.QtQuick import QQuickItem, QQuickWindow  # noqa: E402
 from PySide6.QtTest import QTest  # noqa: E402
 
-from solaris.app import load_ui  # noqa: E402
-from solaris.desktop.login import LoginItemStatus  # noqa: E402
-from solaris.host.base import TAKEOVER_TUN  # noqa: E402
-from solaris.i18n import Translations  # noqa: E402
-from solaris.models.backup_icloud import ICloudProvider  # noqa: E402
-from solaris.models.plans import default_plan  # noqa: E402
-from solaris.models.routing import MODE_PLAN, MODE_PROFILE, RoutingStore  # noqa: E402
-from solaris.models.store import ProfileStore  # noqa: E402
-from solaris.product import DISPLAY_NAME  # noqa: E402
-from solaris.viewmodels.appearance import Appearance  # noqa: E402
-from solaris.viewmodels.composition import ViewModels, compose  # noqa: E402
+from openweir.app import load_ui  # noqa: E402
+from openweir.desktop.login import LoginItemStatus  # noqa: E402
+from openweir.host.base import TAKEOVER_TUN  # noqa: E402
+from openweir.i18n import Translations  # noqa: E402
+from openweir.models.backup_icloud import ICloudProvider  # noqa: E402
+from openweir.models.plans import default_plan  # noqa: E402
+from openweir.models.routing import MODE_PLAN, MODE_PROFILE, RoutingStore  # noqa: E402
+from openweir.models.store import ProfileStore  # noqa: E402
+from openweir.product import DISPLAY_NAME  # noqa: E402
+from openweir.viewmodels.appearance import Appearance  # noqa: E402
+from openweir.viewmodels.composition import ViewModels, compose  # noqa: E402
 from tests.support.appearance import SystemColorScheme  # noqa: E402
 from tests.support.credentials import MemoryCredentials  # noqa: E402
 from tests.support.icloud import FakeICloud  # noqa: E402
@@ -213,7 +213,7 @@ def capture(output: Path, appearance: str, names: Iterable[str]) -> list[Path]:
     translations.apply("zh")
     clock = WarpClock()
     saved = []
-    with tempfile.TemporaryDirectory(prefix="solaris-screenshots-") as directory:
+    with tempfile.TemporaryDirectory(prefix="openweir-screenshots-") as directory:
         store = ProfileStore(Path(directory))
         view_models, engine = _load(store, appearance, clock)
         try:

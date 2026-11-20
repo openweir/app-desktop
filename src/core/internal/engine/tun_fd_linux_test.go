@@ -5,7 +5,7 @@ package engine
 // The fd-mode test plays the macOS extension on Linux: it creates a TUN, gives it the
 // network admission.FDNetwork names, routes the target into it and hands the descriptor
 // to an engine in fd mode. Like the owned-TUN test it compiles only with -tags tuntest,
-// runs only with SOLARIS_TUN_TEST=1 and refuses the host's namespace (tun_linux_test.go).
+// runs only with OPENWEIR_TUN_TEST=1 and refuses the host's namespace (tun_linux_test.go).
 
 import (
 	"context"
@@ -25,25 +25,25 @@ import (
 	"github.com/metacubex/mihomo/listener"
 	"golang.org/x/sys/unix"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/admission"
-	"github.com/Ember-Moth/Solaris/src/core/internal/controlpb"
+	"github.com/openweir/app-desktop/src/core/internal/admission"
+	"github.com/openweir/app-desktop/src/core/internal/controlpb"
 )
 
 const fdDevice = "mdfd0"
 
 func TestFDTUN(t *testing.T) {
-	if os.Getenv("SOLARIS_TUN_TEST") != "1" {
-		t.Skip("set SOLARIS_TUN_TEST=1 and run inside a network namespace")
+	if os.Getenv("OPENWEIR_TUN_TEST") != "1" {
+		t.Skip("set OPENWEIR_TUN_TEST=1 and run inside a network namespace")
 	}
 	requireIsolatedNamespace(t)
-	target := os.Getenv("SOLARIS_TUN_TARGET")
-	outbound := os.Getenv("SOLARIS_TUN_OUTBOUND")
+	target := os.Getenv("OPENWEIR_TUN_TARGET")
+	outbound := os.Getenv("OPENWEIR_TUN_OUTBOUND")
 	if target == "" || outbound == "" {
-		t.Fatal("SOLARIS_TUN_TARGET names the HTTP server outside the namespace, SOLARIS_TUN_OUTBOUND the link to it")
+		t.Fatal("OPENWEIR_TUN_TARGET names the HTTP server outside the namespace, OPENWEIR_TUN_OUTBOUND the link to it")
 	}
 	// The UDP echo server is on the HTTP server's host, which hostTUNDevice routes into the TUN.
 	udp := udpTarget(t)
-	stacks := strings.Split(os.Getenv("SOLARIS_TUN_STACKS"), ",")
+	stacks := strings.Split(os.Getenv("OPENWEIR_TUN_STACKS"), ",")
 	if stacks[0] == "" {
 		stacks = []string{"system"}
 	}

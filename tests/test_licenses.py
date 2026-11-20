@@ -9,6 +9,8 @@ import re
 from importlib.metadata import distribution
 from pathlib import Path
 
+from openweir import licenses
+from openweir.fonts import BUNDLED
 from scripts.gen_licenses import (
     CPYTHON_INPUT,
     QT_DOCS_ONLY,
@@ -19,8 +21,6 @@ from scripts.gen_licenses import (
     font_version,
     qt_license,
 )
-from solaris import licenses
-from solaris.fonts import BUNDLED
 
 ROOT = Path(__file__).resolve().parents[1]
 GO_MOD = ROOT / "src" / "core" / "go.mod"
@@ -124,7 +124,7 @@ def test_qt_components_have_their_texts() -> None:
 
 def test_fonts_match_the_bundled_files() -> None:
     fonts = {c.name: c for c in licenses.load() if c.kind == "font"}
-    directory = ROOT / "src" / "solaris" / "ui" / "fonts"
+    directory = ROOT / "src" / "openweir" / "ui" / "fonts"
     assert set(fonts) == {family for _, family in BUNDLED}
     for relative, family in BUNDLED:
         assert fonts[family].version == font_version(directory / relative)
@@ -136,7 +136,7 @@ def test_classify_by_title_before_sentences() -> None:
     assert classify(gpl) == "GPL-3.0-only"  # it names the LGPL further down
     lgpl = (ROOT / "package" / "licenses" / "LGPL-3.0-only.txt").read_text("utf-8")
     assert classify(lgpl) == "LGPL-3.0-only"
-    ofl = (ROOT / "src" / "solaris" / "ui" / "fonts" / "inter" / "OFL.txt").read_text("utf-8")
+    ofl = (ROOT / "src" / "openweir" / "ui" / "fonts" / "inter" / "OFL.txt").read_text("utf-8")
     assert classify(ofl) == "OFL-1.1"  # it opens like the MIT license
     notice = (
         "This program is free software: you can redistribute it and/or modify it under the "

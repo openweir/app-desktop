@@ -10,7 +10,7 @@
 - **存储内容**：配置（订阅和本地文件，以及是否加入节点池）、覆写（全局一份，每个配置各一份）、分流方式与分流方案
   （策略组和规则，见 [routing.md](routing.md)）、应用内添加的组网网络、设置。
 - **不在本文范围内**：
-  - Windows 服务在 `C:\ProgramData\Solaris\` 下保存的运行副本（architecture.md §5.1），它只用于开机恢复；
+  - Windows 服务在 `C:\ProgramData\OpenWeir\` 下保存的运行副本（architecture.md §5.1），它只用于开机恢复；
   - mihomo 自己的 provider 缓存和 `cache.db`；
   - 链式出口的 WARP 账户（系统凭据库）、VPN Gate 服务器列表（`state` 表）和 Tor 数据目录，都只在本机，不进备份
     （[exits.md](exits.md) 第 8 节）；
@@ -19,7 +19,7 @@
 
 ## 2. 本地数据库
 
-- **位置**：用户数据目录下的 `solaris.db`。macOS 为 `~/Library/Application Support/Solaris/`，Windows 为 `%LOCALAPPDATA%\Solaris\`。
+- **位置**：用户数据目录下的 `openweir.db`。macOS 为 `~/Library/Application Support/OpenWeir/`，Windows 为 `%LOCALAPPDATA%\OpenWeir\`。
 - **实现**：使用标准库 `sqlite3`，开启 WAL 模式。schema 版本记在 `PRAGMA user_version` 里，启动时按版本依次迁移。
 - **写入**：每次写入都在一个事务里完成。界面是单实例，所以同一时间只有一个进程打开数据库。
 - **主键**：配置、方案、规则条目、组网网络和备份目标用 UUID 作主键；覆写、设置和本机状态以 `scope`、`key` 这样的
@@ -75,7 +75,7 @@ D13 定下的方式是**备份与恢复**，不做多设备双向同步：
 
 **快照内容**：一个 UTF-8 的 JSON 文档（`models/backup.py`），包含以下字段：
 
-- `format`（固定为 `"solaris-backup"`）、`version`（目前为 1）、`created_at`（Unix 秒）、`device`（设备名，取主机名并去掉
+- `format`（固定为 `"openweir-backup"`）、`version`（目前为 1）、`created_at`（Unix 秒）、`device`（设备名，取主机名并去掉
   `.local`）、`app_version`；
 - `profiles`：配置列表，按列表顺序。每条有 `id`、`name`、`kind`、`url`、`path`、`auto_update_hours`、`in_pool`、
   `position`、`created_at`、`updated_at`。订阅只存链接和更新设置，不存下载到的内容；本地文件配置另有
@@ -186,7 +186,7 @@ macOS 上可以和 iCloud 同时开启，各自上传、各自保留快照。实
 - **网络请求**：用标准库 `urllib` 调 token、revoke 端点和 Drive v3 的 files、about 接口，不引入 Google SDK。所有请求
   都在界面进程里、以当前用户身份发出，跟随系统代理设置，和订阅下载一样。每个请求在自己的 daemon 线程上执行，超时
   60 秒，进行中的请求不拖住退出。
-- **快照**：每份快照是 appDataFolder 里的一个文件，名字与目录提供方相同（`solaris-backup-<UTC 时间>-<摘要前 12 位>.json`），
+- **快照**：每份快照是 appDataFolder 里的一个文件，名字与目录提供方相同（`openweir-backup-<UTC 时间>-<摘要前 12 位>.json`），
   以 multipart 上传。`SnapshotInfo`（时间、设备名、版本、配置和方案的份数）放在文件的 `appProperties` 里，列出时只取
   `id`、`name`、`size`、`appProperties`，不下载快照；Drive 每个属性的键和值合计最多 124 字节，设备名过长时按字符
   截断。列出时逐页读取，只认这样命名、属性读得出来的文件。条目的 id 是 Drive 的文件 id；下载用 `alt=media`，删除
@@ -200,9 +200,9 @@ macOS 上可以和 iCloud 同时开启，各自上传、各自保留快照。实
   的令牌，授权可以在 Google 账户的"第三方应用和服务"里移除。
 - **换账户**：目标"需要重新登录"时，用另一个 Google 账户登录，新目标换掉原来的（连同它的摘要），并立即备份一次。
 - **OAuth 客户端**：Google Cloud 项目里一个"桌面应用"类型的客户端。它的 ID 和 secret 不进仓库：
-  - 从源码运行时读环境变量 `SOLARIS_GOOGLE_CLIENT_ID`、`SOLARIS_GOOGLE_CLIENT_SECRET`，两个都要有；
+  - 从源码运行时读环境变量 `OPENWEIR_GOOGLE_CLIENT_ID`、`OPENWEIR_GOOGLE_CLIENT_SECRET`，两个都要有；
   - 打包时 `scripts/build_app.py`、`scripts/build_windows.py` 读同样的环境变量，写成 `build/<平台>/google_client.json`，
-    由 Nuitka 放到包旁边的 `solaris/google_client.json`。只设了一个时构建失败；都没设时照常构建，只是没有 Google
+    由 Nuitka 放到包旁边的 `openweir/google_client.json`。只设了一个时构建失败；都没设时照常构建，只是没有 Google
     Drive；
   - 发布工作流从 `release` Environment 的同名机密传给两个构建 job（[release.md](release.md) 1.1 节）。
 
@@ -221,10 +221,10 @@ macOS 上可以和 iCloud 同时开启，各自上传、各自保留快照。实
   新账户的私有数据库。
 - **依赖条件**：需要 Developer ID 签名、iCloud（CloudKit）entitlement、container（`iCloud.<bundle id>`）以及对应的
   provisioning profile，因此需使用带相应授权的 macOS 签名安装版；container 是
-  `iCloud.dev.tschen.solaris`，环境是 Production（Developer ID 只能用它），签名的细节见
+  `iCloud.org.openweir.app`，环境是 Production（Developer ID 只能用它），签名的细节见
   [apple/README.md](../apple/README.md)「iCloud 备份」。CloudKit schema 的部署维护要求，以及后续版本的真实账户回归清单，
   见 [maintenance.md](maintenance.md) 2.3 节。
-- **管理库**（`apple/Manager/CloudBackup.swift`）：`solaris_manager_icloud_status`、`_save`、`_list`、`_download`、
+- **管理库**（`apple/Manager/CloudBackup.swift`）：`openweir_manager_icloud_status`、`_save`、`_list`、`_download`、
   `_delete` 五个函数，和其他函数一样阻塞到完成或超时，在后台线程调用。每份快照是默认 zone 里一条 `Snapshot` 类型的
   记录：记录名由 Python 给出，快照内容放在 `CKAsset`（字段 `snapshot`），`SnapshotInfo` 和大小作为 JSON 放在
   字符串字段 `info` 里，列出时只取 `info`，不下载快照。保存用 `.allKeys`，同名记录直接覆盖。CloudKit 的错误映射成
@@ -249,7 +249,7 @@ macOS 上可以和 iCloud 同时开启，各自上传、各自保留快照。实
   appDataFolder、一个目录），所以列出的都是本应用的快照。
 - Google Drive 的实现见第 4 节，CloudKit 的见第 5 节。另有两个不访问云服务的实现：
   - `MemoryProvider`：快照放在内存里，测试用；可以模拟退出登录和失败；
-  - `DirectoryProvider`：快照存成目录里的文件，`solaris-backup-<UTC 时间>-<摘要前 12 位>.json`，原子写入。只列出
+  - `DirectoryProvider`：快照存成目录里的文件，`openweir-backup-<UTC 时间>-<摘要前 12 位>.json`，原子写入。只列出
     这样命名、能读成快照的文件，别的文件不碰；id 只接受这种文件名，到不了目录之外。
 - 可以同时开启多个备份目标，每个目标各自上传、各自保留快照；macOS 上可以同时用 iCloud 和 Google Drive。
 - 设置页"备份与同步"分组：导出到文件、从文件恢复；macOS 上有 iCloud 一行（开关、上次备份的时间和结果、删除云端

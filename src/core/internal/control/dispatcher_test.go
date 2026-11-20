@@ -10,13 +10,13 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/admission"
-	"github.com/Ember-Moth/Solaris/src/core/internal/controlpb"
-	"github.com/Ember-Moth/Solaris/src/core/internal/engine"
-	"github.com/Ember-Moth/Solaris/src/core/internal/geodata/geodatatest"
-	"github.com/Ember-Moth/Solaris/src/core/internal/peer"
-	"github.com/Ember-Moth/Solaris/src/core/internal/porttest"
-	"github.com/Ember-Moth/Solaris/src/core/internal/product"
+	"github.com/openweir/app-desktop/src/core/internal/admission"
+	"github.com/openweir/app-desktop/src/core/internal/controlpb"
+	"github.com/openweir/app-desktop/src/core/internal/engine"
+	"github.com/openweir/app-desktop/src/core/internal/geodata/geodatatest"
+	"github.com/openweir/app-desktop/src/core/internal/peer"
+	"github.com/openweir/app-desktop/src/core/internal/porttest"
+	"github.com/openweir/app-desktop/src/core/internal/product"
 )
 
 // core is the one mihomo engine this test process may open, in development mode.

@@ -81,9 +81,9 @@
 
 ## 2. 配置存储
 
-界面的本地数据（配置、覆写、设置、分流方案）存在用户数据目录下的 SQLite 数据库 `solaris.db` 里。用户数据
-目录在 Windows 上是 `%LOCALAPPDATA%\Solaris\`，在 macOS 上是 `~/Library/Application Support/Solaris/`，
-`Solaris` 取自 `product.py` 的 `DISPLAY_NAME`。数据库的整体设计和云备份见 [storage.md](storage.md)。代码分布：
+界面的本地数据（配置、覆写、设置、分流方案）存在用户数据目录下的 SQLite 数据库 `openweir.db` 里。用户数据
+目录在 Windows 上是 `%LOCALAPPDATA%\OpenWeir\`，在 macOS 上是 `~/Library/Application Support/OpenWeir/`，
+`OpenWeir` 取自 `product.py` 的 `DISPLAY_NAME`。数据库的整体设计和云备份见 [storage.md](storage.md)。代码分布：
 
 - `models/database.py`：连接、表结构、迁移；
 - `models/store.py`：配置和覆写（`ProfileStore`），以及打开数据库的 `open_database`；
@@ -148,12 +148,12 @@
   [maintenance.md](maintenance.md) 第 5 节，存下来的格式（配置、备份快照、方案 JSON）同样要让以后的版本读得懂
   （storage.md 第 2 节）。
 - 文件打不开（不是数据库，或已损坏），或者版本比本程序认识的还新（降级的情况），就把它连同 `-wal`、`-shm`
-  改名为 `solaris.db.<时间戳>.bad` 保留，再新建一个空库。
+  改名为 `openweir.db.<时间戳>.bad` 保留，再新建一个空库。
 
 ## 3. 订阅与切换
 
 - **下载**在用户上下文中进行（urllib，在工作线程里执行），跟随系统代理设置。User-Agent 为
-  `solaris/<版本> clash.meta`，让订阅服务返回 Clash YAML。只接受 http 和 https；超过一个请求帧能装下的
+  `openweir/<版本> clash.meta`，让订阅服务返回 Clash YAML。只接受 http 和 https；超过一个请求帧能装下的
   大小（16 MiB 减 1 MiB）即拒绝。`Content-Disposition` 里的文件名作为默认名称。
 - 首次导入时，手填名称优先于 `Profile-Title`（文本或 `base64:` UTF-8）、文件名和主机名。勾选自动更新并留空间隔时采用 `Profile-Update-Interval` 建议的正整数小时，无有效建议用 12 小时。以后刷新保留已保存的名称和间隔。
 - 「编辑信息…」按需显示服务端的 `Profile-Web-Page-Url` 和 `Support-Url`，仅在用户点击时打开 HTTP(S) 页面。
@@ -225,7 +225,7 @@ UI 只保存和传递覆写原文，解析与合并在内核里做；模拟宿�
 
 界面提供简体中文和英文（决策 D12），用 Qt Linguist 工具链；英文文案的风格以 DESIGN.md 为准。
 
-- **源语言是简体中文**：源码里的文案就是中文界面，`src/solaris/translations/en.ts` 是唯一的译文。
+- **源语言是简体中文**：源码里的文案就是中文界面，`src/openweir/translations/en.ts` 是唯一的译文。
   中文界面不加载翻译，测试里的中文断言就是界面上的文字。
 - **标记文案**：
   - QML 用 `qsTr()`，参数写 `%1` 再 `.arg()`；
@@ -244,7 +244,7 @@ UI 只保存和传递覆写原文，解析与合并在内核里做；模拟宿�
 - **语言选择**（`i18n.resolve_language`）按顺序取第一个有效值：
   1. 设置页的选择（设置项 `language`，见第 8 节；`system` 表示跟随系统）。`app.main(language=…)`
      和 `scripts/preview.py --lang` 在启动时优先于它；
-  2. 环境变量 `SOLARIS_LANG=zh|en`，用于预览和测试，`scripts/preview.py --lang en` 等价；
+  2. 环境变量 `OPENWEIR_LANG=zh|en`，用于预览和测试，`scripts/preview.py --lang en` 等价；
   3. 系统的首选界面语言（`i18n.system_ui_languages()` 的第一项）：`zh` 开头（`zh-Hans-CN`、`zh-Hans`、
      `zh-CN`、`zh-Hant-TW` 等）用中文，其他一律用英文。
 
@@ -256,19 +256,19 @@ UI 只保存和传递覆写原文，解析与合并在内核里做；模拟宿�
   得到的是 `C`，跟随系统就成了英文。所以 macOS 上 `i18n` 和 Qt 自己的后端一样直接问 CoreFoundation：
   语言列表用 `CFLocaleCopyPreferredLanguages`（用户在系统设置里排的顺序，不受应用本地化影响），locale 用
   `CFLocaleCopyCurrent`（语言按 Info.plist 的 `CFBundleLocalizations`，即 en、zh-Hans 匹配）。从终端运行时
-  `LANG` 同样不影响语言选择，要临时换语言用 `SOLARIS_LANG`。
+  `LANG` 同样不影响语言选择，要临时换语言用 `OPENWEIR_LANG`。
 - **安装**：`app.py` 在创建 ViewModel 和加载 QML 之前调用 `i18n.Translations.apply()`，安装 `QTranslator` 并
   设置 `QLocale.setDefault`。
 - **运行中切换**：设置页改了语言后，`app.switch_language` 再调用一次 `apply()`，然后
   `QQmlEngine.retranslate()` 重算 QML 里的 `qsTr`，`ViewModels.retranslate()` 让每个 ViewModel 重新发出文本
   属性的通知。`pages`、`modeOptions`、`sortOptions` 和设置页的选项各有自己的通知信号，而不挂在每秒触发的
   `changed` 上，否则分段控件和菜单会每秒重建。已经显示出来的错误提示保持切换前的语言，直到下一次刷新或操作。
-- **流程**：改动文案后运行 `scripts/gen_i18n.py`。`pyside6-lupdate` 扫描 `src/solaris` 下的 QML 和
+- **流程**：改动文案后运行 `scripts/gen_i18n.py`。`pyside6-lupdate` 扫描 `src/openweir` 下的 QML 和
   Python 并更新 `.ts`（不记录行号，移动代码不会改动目录），`pyside6-lrelease` 再编译出 `.qm`。新条目在 `.ts`
   里翻译（手改或用 `pyside6-linguist`），然后再运行一次。`--check` 和 `tests/test_i18n.py` 检查：`.ts`
   覆盖当前源码；英文没有未完成的条目，占位符与源文一致；`.qm` 与 `.ts` 一致。
 - **`.qm` 提交进仓库**（与 Theme.qml 一样），从源码运行和预览不需要额外步骤。Nuitka 打包时，
-  `package/entry.py` 里的 `nuitka-project` 选项把 `translations/*.qm` 复制到 `solaris/translations/`，
+  `package/entry.py` 里的 `nuitka-project` 选项把 `translations/*.qm` 复制到 `openweir/translations/`，
   `i18n.py` 按包内路径加载；找不到 `.qm` 时启动报错，而不是静默显示中文。
 - **Qt 自带的文案**：输入框和编辑框的右键菜单是本项目的 `EditMenu`（DESIGN.md「右键菜单」），文案在 `en.ts` 里，
   与其他界面文案一样翻译；Basic 样式自带的那份菜单（`TextEditingContextMenu`）不会出现，也就不需要 Qt 的目录。
@@ -284,7 +284,7 @@ UI 只保存和传递覆写原文，解析与合并在内核里做；模拟宿�
 - **主题**：DESIGN.md 的 `colors` 是浅色值，`colors.dark` 是同名角色的深色值。`scripts/gen_theme.py` 把每个
   角色生成为一个绑定，如 `primary: dark ? "#6495FF" : "#1F5EFF"`；`Theme.dark` 取自注入的外观对象。外观变化时
   所有绑定随之重算，界面立即重绘，不需要重启或重新加载 QML。
-- **外观对象** `viewmodels/appearance.py` 的 `Appearance`，在 QML 里是 `Solaris` 模块的类型：
+- **外观对象** `viewmodels/appearance.py` 的 `Appearance`，在 QML 里是 `OpenWeir` 模块的类型：
 
   | 成员 | 说明 |
   | --- | --- |
@@ -302,7 +302,7 @@ UI 只保存和传递覆写原文，解析与合并在内核里做；模拟宿�
   所以无论改动来自设置页还是备份恢复，外观都立即跟上。
 - **启动时的模式**（`resolve_mode`）按顺序取第一个有效值：
   1. `app.main(appearance=…)` 的参数，然后是设置项 `appearance`（`system` 视为未指定）；
-  2. 环境变量 `SOLARIS_APPEARANCE=system|light|dark`，用于预览和测试，
+  2. 环境变量 `OPENWEIR_APPEARANCE=system|light|dark`，用于预览和测试，
      `scripts/preview.py --appearance dark` 等价；
   3. `system`。
 - **Qt 控件的调色板**：Basic 样式里本项目没有重绘的部分（滚动条、Qt 自带的工具提示、文字选区的默认值）读窗口的
@@ -332,7 +332,7 @@ UI 只保存和传递覆写原文，解析与合并在内核里做；模拟宿�
   PySide 未暴露 Qt 的文字体系回退接口，使用 `QFont.insertSubstitutions` 为 Inter 与 JetBrains Mono
   指定 Noto Sans SC、Noto Sans Symbols 2 的有序补充字体；Emoji 使用 `setApplicationEmojiFontFamilies`。
   来源、文件大小和 SHA-256 固定在 `ui/fonts/sources.json`，离线随包分发，各带 `OFL.txt`；
-  `package/entry.py` 将整个目录复制到两端的 `solaris/ui/fonts/`。注册失败记入诊断日志，系统字体仅用于缺字或资源异常兜底。
+  `package/entry.py` 将整个目录复制到两端的 `openweir/ui/fonts/`。注册失败记入诊断日志，系统字体仅用于缺字或资源异常兜底。
   SIL OFL 1.1 字体与本项目的 GPL-3.0 代码分别遵循各自许可。
 - **Unicode**：完整规则见 DESIGN.md「Unicode 与文本编码」。配置读入严格使用 `utf-8-sig`，文本导出使用
   UTF-8 无 BOM 与 LF；原文、名称引用、凭据不做 Unicode 规范化。Qt 的省略与编辑使用字素边界，不能用
@@ -424,7 +424,7 @@ UI 只保存和传递覆写原文，解析与合并在内核里做；模拟宿�
 | --- | --- | --- | --- | --- |
 | `language` | `system`、`zh`、`en` | `system` | 同步 | 界面语言（第 5 节） |
 | `appearance` | `system`、`light`、`dark` | `system` | 同步 | 外观；主题按它取色 |
-| `close_action` | `tray`、`quit` | `tray` | 本机 | 关闭主窗口时留在托盘，隧道继续运行；还是退出 Solaris，先断开隧道（D41） |
+| `close_action` | `tray`、`quit` | `tray` | 本机 | 关闭主窗口时留在托盘，隧道继续运行；还是退出 OpenWeir，先断开隧道（D41） |
 | `launch_at_login` | 布尔 | `false` | 本机 | 登录时打开界面；Windows 同时自动连接。以系统里的登录项为准，界面每次读到系统的状态就写回这里 |
 | `tun` | 布尔 | `true` | 本机 | 设置页「接管方式」的 TUN 开关：连接时是否开启 TUN。macOS 上总是开启，不看这一项 |
 | `system_proxy` | 布尔 | `true` | 本机 | 设置页「接管方式」的系统代理开关：连接时是否设置系统代理。只有 Windows 服务设置系统代理 |
@@ -455,13 +455,13 @@ UI 只保存和传递覆写原文，解析与合并在内核里做；模拟宿�
     关闭发送真正的 Stop，即使此刻内核已经临时停止，也会取消服务的恢复意图。failed 时开关关闭、标题写「恢复连接失败」，
     行内写网络未恢复、内核未响应或普通恢复失败的原因，允许再次连接；成功或主动断开后清除恢复提示。
   - **macOS 扩展停用**：安装版的设置页在右列「启动」之后显示「系统扩展」，普通用户权限下经管理库发起操作。
-    「停用…」先确认：断开连接、移除 Solaris 的 VPN 配置，保留本机数据。`SystemExtensionViewModel` 的动作经
+    「停用…」先确认：断开连接、移除 OpenWeir 的 VPN 配置，保留本机数据。`SystemExtensionViewModel` 的动作经
     `library.tunnel.deactivate_extension()` 与配置更新、连接共用模型锁；`MacExtensionHost` 再串行原生启停与维护操作。
     排队、原生调用与回调都计入期限。进行中禁用连接，结束后概览等待新的状态快照，旧快照不会把开关短暂改回开启。
     系统待处理、取消、失败、完成分别呈现，完成后下次连接重新激活；Windows 和开发服务不显示这个入口。
   - **macOS 网络扩展指引**：连接返回 `extension_needs_approval` 时，概览写「等待授权」，连接行写「允许网络扩展后继续连接」
     并提供「安装指引…」。主窗口显示、切回概览，打开 `ExtensionSetupDialog`，托盘连接也走同一条路径。
-    指引列出「系统设置 › 通用 › 登录项与扩展」以及「网络扩展」信息按钮、Solaris 开关，提供「打开系统设置」和
+    指引列出「系统设置 › 通用 › 登录项与扩展」以及「网络扩展」信息按钮、OpenWeir 开关，提供「打开系统设置」和
     「继续连接」。「打开系统设置」复用 `SMAppService.openSystemSettingsLoginItems()`，只打开设置，不注册登录项；
     无法打开时保留手动路径。位置参照 [Apple 使用手册](https://support.apple.com/guide/mac-help/mtusr003/mac)。
     关闭指引不自动重试，连接行保留入口；用户继续时才重试，未授权就继续显示指引，成功后关闭并清除提示。
@@ -532,8 +532,8 @@ UI 只保存和传递覆写原文，解析与合并在内核里做；模拟宿�
 - **托盘**用 `Qt.labs.platform` 的 `SystemTrayIcon`（`ui/components/TrayIcon.qml`）。它在 macOS 和 Windows 上
   有 Qt 平台插件的原生实现，`QGuiApplication` 就够，不必为 `QSystemTrayIcon` 引入 Qt Widgets 和
   `QApplication`。没有原生托盘的平台（Linux、测试用的 offscreen）上 Labs Platform 会要求 Qt Widgets，所以
-  只在 `cocoa` 和 `windows` 上创建托盘，其余平台关闭窗口即退出 Solaris。
-  - 菜单：连接状态（不可点）、连接或断开、出站模式子菜单、打开主窗口、「退出 Solaris」（退出前断开期间不可点）。
+  只在 `cocoa` 和 `windows` 上创建托盘，其余平台关闭窗口即退出 OpenWeir。
+  - 菜单：连接状态（不可点）、连接或断开、出站模式子菜单、打开主窗口、「退出 OpenWeir」（退出前断开期间不可点）。
     这是系统原生菜单，外观跟随平台，不按 DESIGN.md 的窗口内菜单绘制。
   - 图标在 `ui/tray/`，是侧栏标记的线条图形，未连接时调成 45% 不透明度。macOS 用模板图（只看 alpha，由菜单栏
     着色）；Windows 按任务栏主题（注册表 `SystemUsesLightTheme`，Qt 报告的是应用主题，不是任务栏的）选深色或
@@ -566,17 +566,17 @@ UI 只保存和传递覆写原文，解析与合并在内核里做；模拟宿�
   - 其他平台（如测试用的 offscreen）只有布局，不做平台调用。`tests/test_titlebar.py` 在两种样式下检查布局、
     读屏名称、Tab 顺序和双击，并用替身检查 Windows 的命中测试和消息处理；系统实际怎么响应只能在 Windows 上看。
 - **关闭窗口**：`tray`（默认）时隐藏窗口，界面留在托盘，隧道继续运行；托盘菜单的「打开主窗口」恢复窗口，Windows
-  上点托盘图标也可以。`quit` 时先隐藏窗口，再像下面一样退出 Solaris。设置页这一行的说明随选项变：「隧道继续运行」
+  上点托盘图标也可以。`quit` 时先隐藏窗口，再像下面一样退出 OpenWeir。设置页这一行的说明随选项变：「隧道继续运行」
   或「先断开连接，再退出」。
-  - macOS 上窗口隐藏时 Solaris 只留在菜单栏：`desktop/dock.py` 经 Objective-C 运行时把 `NSApp` 的激活策略设为
-    Accessory，Dock 和 ⌘Tab 里都没有它。窗口无论从哪里显示（菜单栏的「打开主窗口」、再次打开 Solaris、单实例
+  - macOS 上窗口隐藏时 OpenWeir 只留在菜单栏：`desktop/dock.py` 经 Objective-C 运行时把 `NSApp` 的激活策略设为
+    Accessory，Dock 和 ⌘Tab 里都没有它。窗口无论从哪里显示（菜单栏的「打开主窗口」、再次打开 OpenWeir、单实例
     转发、一键导入链接、「未能断开连接」对话框、系统扩展的授权引导），都先设回 Regular，再调用 `activate`
     激活应用；只显示窗口的话，顶部菜单栏仍是原来前台应用的。
   - 策略只跟着窗口的 `visible` 走：Main.qml 在 `visible` 变化时调用 `DesktopViewModel.setWindowShown`，不在各个
     入口分别处理。最小化的窗口仍算显示，留在 Dock 里。关闭动作为 `quit` 时，断开期间 Dock 图标随窗口一起隐藏，
     断开失败时随对话框回来。没有托盘时不切换（关闭窗口就退出）；其他平台和测试用的 offscreen 不做平台调用，
     `tests/test_desktop.py`、`tests/test_app.py` 用替身记录调用。
-  - 再次打开 Solaris（如从访达或「启动台」）时，系统发来 reopen，Qt 把它和其他激活一样报告为应用激活，窗口隐藏时
+  - 再次打开 OpenWeir（如从访达或「启动台」）时，系统发来 reopen，Qt 把它和其他激活一样报告为应用激活，窗口隐藏时
     就显示出来（`DesktopViewModel.reopened`）。
   - 带 `--background` 启动时（登录时打开，macOS 的登录项不带它），`DesktopViewModel.start` 在进入事件循环前
     切到 Accessory。Qt 在启动收尾时会请求激活应用，Accessory 应用会被允许，而 Qt 把这次激活也报告为应用激活，
@@ -613,10 +613,10 @@ UI 只保存和传递覆写原文，解析与合并在内核里做；模拟宿�
       10 ms 左右。多次显示隐藏后停在 160 MB 左右，多出的是 malloc 没还给系统的空闲页，活对象各轮之间不增长。
       Windows 没有实测。
       `tests/test_hidden_window.py` 检查卸下、还原和隐藏期间的对话框与链接。
-- **退出 Solaris**（D41）：托盘菜单的「退出 Solaris」、macOS 的 ⌘Q 和 Dock 的「退出」、关闭动作为 `quit` 时关闭
+- **退出 OpenWeir**（D41）：托盘菜单的「退出 OpenWeir」、macOS 的 ⌘Q 和 Dock 的「退出」、关闭动作为 `quit` 时关闭
   窗口，都调用 `DesktopViewModel.quit`。它先经 `OverviewViewModel.disconnect_to_quit` 断开本用户的隧道：发的是与
   「断开」相同的 `Stop`，服务据此清除 `was_running`、取消睡眠唤醒恢复（architecture.md §5.2），概览页的开关照常显示
-  正在断开；隧道断开后才离开事件循环。macOS 上窗口隐藏时没有 Dock 图标和菜单，退出入口是菜单栏的「退出 Solaris」；
+  正在断开；隧道断开后才离开事件循环。macOS 上窗口隐藏时没有 Dock 图标和菜单，退出入口是菜单栏的「退出 OpenWeir」；
   窗口显示时 ⌘Q 和 Dock 的「退出」照旧。
   - 不需要断开时直接退出：上一次刷新显示隧道已停止且没有在恢复，或隧道属于别的用户（D5b，不是本用户可以断开的），
     或刷新得到 `service_unavailable`（服务没在运行，也就没有隧道）。还没刷新过、刷新因别的原因失败时照样发 `Stop`。
@@ -631,24 +631,24 @@ UI 只保存和传递覆写原文，解析与合并在内核里做；模拟宿�
     `kAEQuitReason`；其他平台上 `Quit` 事件只来自系统（Windows 的 `WM_ENDSESSION`），托盘的退出不经过它。
     离开事件循环用 `exit`，不用 `quit`：macOS 上 `quit` 会经 `terminate:` 再变成一个 `Quit` 事件。
   - 应用内更新的下载和校验在界面进程里，退出时随之取消，不拖住退出。Windows 安装器用 `--quit` 关闭界面，不断开，
-    升级后服务按 `was_running` 恢复隧道（architecture.md 第 9 节）；macOS 的磁盘映像由用户自己退出 Solaris（照常
+    升级后服务按 `was_running` 恢复隧道（architecture.md 第 9 节）；macOS 的磁盘映像由用户自己退出 OpenWeir（照常
     断开），替换后手动连接。
   - 界面崩溃或被结束时没有机会断开，隧道仍由服务或系统扩展维持（architecture.md §1）。
 - **单实例**：第一个界面在用户数据目录持有 `ui.lock`（`QLockFile`，进程不在了的锁视为过期），并以
-  `solaris-<用户名和数据目录的哈希>` 为名监听 `QLocalServer`（只允许同一用户连接）。后来的界面拿不到
+  `openweir-<用户名和数据目录的哈希>` 为名监听 `QLocalServer`（只允许同一用户连接）。后来的界面拿不到
   锁，就连上这个名字发一行 `activate`，然后退出；第一个界面收到后显示并激活窗口。后来的界面是带着一键导入
   链接启动的（Windows 上链接是命令行参数），就改发 `open <链接>`，第一个界面显示窗口并预填导入表单
   （release.md 第 7 节）；一行超过 16 KiB 的消息被丢弃。Windows 上后来的界面先调用
   `AllowSetForegroundWindow`，让第一个界面能把窗口带到前台。由锁而不是由服务端名字来判断，是因为 macOS 上
   崩溃的界面会留下 socket 文件，而且两个同时启动的界面拿锁时只有一个能成功。
-- **`--quit`**：`Solaris.exe --quit`（macOS 上是 `Solaris.app/Contents/MacOS/Solaris --quit`）不启动界面，只请
+- **`--quit`**：`OpenWeir.exe --quit`（macOS 上是 `OpenWeir.app/Contents/MacOS/OpenWeir --quit`）不启动界面，只请
   正在运行的界面退出：拿不到锁时发一行 `quit`，第一个界面收到后不断开隧道，直接离开事件循环（D41）；
   然后每 100 毫秒试一次锁，拿到（界面已关闭数据库并放开锁，或进程已经不在）就放开并以 0 退出，10 秒还拿不到
   以 1 退出。没有界面在运行时立即以 0 退出，不创建任何文件。它只能请到同一用户、同一数据目录的界面。Windows
   安装器和卸载器用它关闭界面（architecture.md 第 9 节）。
 - **备份与同步**：设置页左栏的一个分组，由 `viewmodels/backup.py` 的 `BackupViewModel` 提供（storage.md 第 3 到 6 节）。
   备份不加密，但界面不为此单独提示（D30）：导出、开启 iCloud、登录 Google Drive 都不弹确认框，说明里也不写。分组里有：
-  - 「导出到文件」：「导出…」直接打开系统的保存对话框，默认文件名 `solaris-backup-<时间>.json`。平时只有标题；导出后
+  - 「导出到文件」：「导出…」直接打开系统的保存对话框，默认文件名 `openweir-backup-<时间>.json`。平时只有标题；导出后
     第二行显示「已导出到 …」或失败原因，6 秒后消失。
   - 「从文件恢复」：「恢复…」打开系统的打开对话框。本机没有配置时直接按"替换"导入；有配置时弹出「从文件恢复」
     对话框：备份的设备、时间和配置、方案的份数，本机现有的份数，以及"合并"（默认）和"替换"两个选项，「恢复」是
@@ -686,7 +686,7 @@ UI 只保存和传递覆写原文，解析与合并在内核里做；模拟宿�
 - **登录时打开**（`desktop/login.py`，平台接口 `LoginItem`）：
   - Windows：为当前用户注册一个计划任务（`schtasks /Create /XML`）：登录触发器只针对该用户，以该用户身份、
     交互式令牌、不提权运行，普通优先级，没有运行时限，动作是 `<界面>.exe --background`（界面只进托盘）。
-    任务名 `Solaris (<域>_<用户名>)`。用计划任务而不是注册表的 `Run` 键：登录后立即启动，不受 Windows
+    任务名 `OpenWeir (<域>_<用户名>)`。用计划任务而不是注册表的 `Run` 键：登录后立即启动，不受 Windows
     对启动项的延迟；卸载器按同一个任务名清理（`package/windows/setup.ps1`）。读状态用
     `schtasks /Query /XML`，用户在任务计划程序里禁用的任务视为关闭。
     Windows 的说明为「登录时打开并自动连接」。仅登录任务的 `--background` 启动检查真实任务状态并

@@ -11,8 +11,8 @@ import (
 
 	C "github.com/metacubex/mihomo/constant"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/admission"
-	"github.com/Ember-Moth/Solaris/src/core/internal/geodata/geodatatest"
+	"github.com/openweir/app-desktop/src/core/internal/admission"
+	"github.com/openweir/app-desktop/src/core/internal/geodata/geodatatest"
 )
 
 // testHome is shared by every test: mihomo opens cache.db in the first home it uses and
@@ -21,7 +21,7 @@ var testHome string
 
 // helperEnv makes the test binary open one engine and report the result, for checks
 // that need environment variables mihomo reads before main.
-const helperEnv = "SOLARIS_ENGINE_HELPER"
+const helperEnv = "OPENWEIR_ENGINE_HELPER"
 
 // noTUN is the host most tests admit profiles on: the development server's.
 var noTUN = admission.Host{Tun: admission.TunNone}

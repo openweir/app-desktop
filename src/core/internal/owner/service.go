@@ -12,12 +12,12 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/control"
-	"github.com/Ember-Moth/Solaris/src/core/internal/controlpb"
-	"github.com/Ember-Moth/Solaris/src/core/internal/engine"
-	"github.com/Ember-Moth/Solaris/src/core/internal/geodata"
-	"github.com/Ember-Moth/Solaris/src/core/internal/peer"
-	"github.com/Ember-Moth/Solaris/src/core/internal/sysproxy"
+	"github.com/openweir/app-desktop/src/core/internal/control"
+	"github.com/openweir/app-desktop/src/core/internal/controlpb"
+	"github.com/openweir/app-desktop/src/core/internal/engine"
+	"github.com/openweir/app-desktop/src/core/internal/geodata"
+	"github.com/openweir/app-desktop/src/core/internal/peer"
+	"github.com/openweir/app-desktop/src/core/internal/sysproxy"
 )
 
 // Platform is what the service needs from Windows; tests stand in for it.
@@ -376,7 +376,7 @@ func (s *Service) Suspending(mode controlpb.Mode) {
 		s.mu.Unlock()
 		return
 	}
-	const prefix = "# Solaris automatic recovery mode\nmode: "
+	const prefix = "# OpenWeir automatic recovery mode\nmode: "
 	profile := proto.Clone(s.profile).(*controlpb.StartRequest)
 	profile.Overrides = slices.DeleteFunc(profile.Overrides, func(value string) bool {
 		return value == prefix+"rule\n" || value == prefix+"global\n" || value == prefix+"direct\n"

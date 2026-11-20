@@ -16,11 +16,9 @@ from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
-from scripts import build_app
-from scripts.build_apple import BuildError
-from solaris.models.backup import BackupError, Backups
-from solaris.models.backup_auto import AutoBackup, BackupTargets
-from solaris.models.backup_google import (
+from openweir.models.backup import BackupError, Backups
+from openweir.models.backup_auto import AutoBackup, BackupTargets
+from openweir.models.backup_google import (
     CLIENT_ID_ENV,
     CLIENT_SECRET_ENV,
     GOOGLE_DRIVE,
@@ -31,9 +29,11 @@ from solaris.models.backup_google import (
     SignInPages,
     configured_client,
 )
-from solaris.models.credentials import CredentialError
-from solaris.models.profiles import KIND_SUBSCRIPTION, Profile, ProfileList
-from solaris.models.store import ProfileStore
+from openweir.models.credentials import CredentialError
+from openweir.models.profiles import KIND_SUBSCRIPTION, Profile, ProfileList
+from openweir.models.store import ProfileStore
+from scripts import build_app
+from scripts.build_apple import BuildError
 from tests.support.credentials import MemoryCredentials
 from tests.support.google import CLIENT, QUOTA_EXCEEDED, FakeGoogle
 
@@ -103,7 +103,7 @@ def test_a_build_bundles_the_client(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     monkeypatch.setenv(CLIENT_SECRET_ENV, "secret")
     (option,) = build_app.google_client(tmp_path)
     bundled = tmp_path / "google_client.json"
-    assert option == f"--include-data-files={bundled}=solaris/google_client.json"
+    assert option == f"--include-data-files={bundled}=openweir/google_client.json"
     assert configured_client({}, bundled) == GoogleClient("id.apps.googleusercontent.com", "secret")
 
 
@@ -281,7 +281,7 @@ def test_snapshots_carry_their_info(google: FakeGoogle, signed_in: Any, tmp_path
     entry = run(lambda: signed_in.upload(snapshot))
 
     (stored,) = google.snapshots()
-    assert stored.name == f"solaris-backup-20270115-080100-{snapshot.digest[:12]}.json"
+    assert stored.name == f"openweir-backup-20270115-080100-{snapshot.digest[:12]}.json"
     assert stored.content == snapshot.encode()
     assert stored.properties["profiles"] == "1"
     assert (entry.info, entry.size) == (snapshot.info, len(snapshot.encode()))
@@ -305,7 +305,7 @@ def test_listing_pages_and_skips_other_files(
         data.change()
         run(lambda: signed_in.upload(data.backups.snapshot()))
     google.add_file("notes.txt", b"hello", {"device": "x"})
-    google.add_file("solaris-backup-20270115-080000-0123456789ab.json", b"{}")  # no info
+    google.add_file("openweir-backup-20270115-080000-0123456789ab.json", b"{}")  # no info
     listed = run(signed_in.list)
     assert len(listed) == 5
     times = [e.info.created_at for e in listed]

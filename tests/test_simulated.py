@@ -11,8 +11,8 @@ from typing import Any
 import pytest
 from google.protobuf import json_format
 
-from solaris.host import service
-from solaris.host.base import (
+from openweir.host import service
+from openweir.host.base import (
     Composition,
     CompositionSource,
     EasyTierSettings,
@@ -29,7 +29,7 @@ from solaris.host.base import (
     TunnelConfig,
     ZeroTierSettings,
 )
-from solaris.protocol import control_pb2
+from openweir.protocol import control_pb2
 from tests.support.simulated import SimulatedHost
 
 pb = control_pb2

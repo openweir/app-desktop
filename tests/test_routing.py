@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from solaris.models.profiles import KIND_SUBSCRIPTION, Profile, ProfileList
-from solaris.models.routing import (
+from openweir.models.profiles import KIND_SUBSCRIPTION, Profile, ProfileList
+from openweir.models.routing import (
     DIRECT,
     MODE_PLAN,
     MODE_PROFILE,
@@ -17,7 +17,7 @@ from solaris.models.routing import (
     RoutingState,
     RoutingStore,
 )
-from solaris.models.store import ProfileStore
+from openweir.models.store import ProfileStore
 from tests.support.storage import stored
 
 

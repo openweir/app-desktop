@@ -9,7 +9,7 @@ import (
 	"github.com/metacubex/mihomo/common/yaml"
 	"github.com/metacubex/mihomo/constant/features"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/admission"
+	"github.com/openweir/app-desktop/src/core/internal/admission"
 )
 
 // Keep the downloadable user templates valid as the fork evolves. Native-tag CI

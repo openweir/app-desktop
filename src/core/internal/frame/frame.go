@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/Ember-Moth/Solaris/src/core/internal/product"
+	"github.com/openweir/app-desktop/src/core/internal/product"
 )
 
 type Kind uint16

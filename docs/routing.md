@@ -404,7 +404,7 @@ D 编号也在那里。
   大小和 SHA-256 由 [`scripts/fetch_geodata.py`](../scripts/fetch_geodata.py) 固定。MMDB 和 ASN 文件用于对应模式及规则。
   宿主在打开 engine 前通过 `Seed` 原子补齐 home 中的缺失文件，保留已有数据；复制失败时不以网络下载兜底。
   macOS 在扩展 attach 时从 bundle 复制，Windows 从安装目录的 `geodata/` 复制，开发服务也会准备这些资源。
-- **分类兜底**：`src/solaris/host/geo_categories.py` 由 `fetch_geodata.py --categories` 生成，包含分类名和摘要。
+- **分类兜底**：`src/openweir/host/geo_categories.py` 由 `fetch_geodata.py --categories` 生成，包含分类名和摘要。
   内核缺少分类数据或暂不可用时，界面使用该清单；CI 用 `--check` 检查它与随包数据一致。
 - **更新**：基础段开启 `geo-auto-update`，周期 24 小时。Python 每 30 秒读取已应用配置的 `GetGeoUpdate`，按每份
   启用数据的安装时间判断过期；模式决定使用 GeoIP.dat 或 MMDB，未使用的 ASN 不参与判断。`Validate` 不改变更新计划。

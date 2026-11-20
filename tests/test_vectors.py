@@ -3,8 +3,8 @@
 import json
 from pathlib import Path
 
-from solaris.protocol import control_pb2
-from solaris.protocol.frame import (
+from openweir.protocol import control_pb2
+from openweir.protocol.frame import (
     HEADER_SIZE,
     KIND_REQUEST,
     KIND_RESPONSE,

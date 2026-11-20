@@ -3,7 +3,7 @@ from PySide6.QtCore import QPointF, Qt
 from PySide6.QtQuick import QQuickItem
 from pytestqt.qtbot import QtBot
 
-from solaris.host.base import ProxyGroup, Rule
+from openweir.host.base import ProxyGroup, Rule
 from tests.support.window import Loaded, find_all, kind
 
 
