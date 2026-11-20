@@ -494,6 +494,17 @@ SIGN = (
 )
 
 
+# The release environment names the signer (D49); the checks below need one to compare with.
+TEST_SIGNER = {
+    "OPENWEIR_WINDOWS_SIGNER": "OpenWeir",
+    "OPENWEIR_WINDOWS_SIGNER_EKU": "1.3.6.1.4.1.311.97.1.0",
+}
+
+
+def _signing_env(env: dict[str, str] | None = None) -> dict[str, str]:
+    return {**(os.environ if env is None else env), **TEST_SIGNER}
+
+
 def _sign_script(*arguments: str, env: dict[str, str] | None = None) -> tuple[int, str]:
     done = subprocess.run(
         [*SIGN, *arguments],
@@ -501,7 +512,7 @@ def _sign_script(*arguments: str, env: dict[str, str] | None = None) -> tuple[in
         text=True,
         check=False,
         timeout=120,
-        env=env,
+        env=_signing_env(env),
     )
     return done.returncode, done.stdout + done.stderr
 
@@ -552,6 +563,7 @@ def test_sign_script_checks_each_file_a_windows_powershell_script_names(tmp_path
         text=True,
         check=False,
         timeout=120,
+        env=_signing_env(),
     )
     output = done.stdout + done.stderr
     assert done.returncode == 1, output
@@ -574,6 +586,25 @@ def test_sign_script_needs_the_release_signing_setup(tmp_path: Path) -> None:
     status, output = _sign_script("-Directory", str(tmp_path), env=environment)
     assert status != 0
     assert "has no openweir-service.exe" in output
+
+
+@ON_WINDOWS
+def test_sign_script_needs_the_signer_from_the_release_environment(tmp_path: Path) -> None:
+    program = tmp_path / "OpenWeir.exe"
+    program.write_bytes(_pe(build_windows.PE_MACHINE_AMD64))
+    environment = {key: value for key, value in os.environ.items() if key not in TEST_SIGNER}
+    done = subprocess.run(
+        [*SIGN, "-Check", str(program)],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=120,
+        env=environment,
+    )
+    assert done.returncode != 0
+    assert (
+        "Set OPENWEIR_WINDOWS_SIGNER and OPENWEIR_WINDOWS_SIGNER_EKU" in done.stdout + done.stderr
+    )
 
 
 def _workflow(name: str) -> dict[str, Any]:

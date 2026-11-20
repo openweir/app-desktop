@@ -293,7 +293,9 @@ import SystemExtensions
 import OpenWeirManagerHeader
 import os
 
-let tunnelBundleIdentifier = "org.openweir.app.tunnel"
+// TunnelController.swift, left out here, defines these from the running bundle.
+let appBundleIdentifier = "org.openweir.app"
+let tunnelBundleIdentifier = appBundleIdentifier + ".tunnel"
 let logger = Logger(subsystem: "org.openweir.app.tests", category: "fake-extensions")
 
 final class Submitter {
