@@ -555,7 +555,7 @@ def test_export_diagnostics(qtbot: QtBot, tmp_path: Path) -> None:
     assert info["language"] == "zh"
     assert info["exported_at"] == datetime.fromtimestamp(NOW, UTC).isoformat(timespec="seconds")
     host = json.loads(files["host.json"])
-    assert host["info"]["core_version"] == CORE_VERSION  # the screens show only v1.19.33
+    assert host["info"]["core_version"] == CORE_VERSION  # the screens show only openweir-v1.0.0
     assert host["status"]["state"] == "running"
     assert "www.example.com:443" in files["mihomo.log"]
     assert "WARN  dial failed" in files["mihomo.log"]

@@ -579,7 +579,7 @@ OpenWeir 是 Windows 与 macOS 上的 mihomo 图形客户端，界面用 PySide6
 
 色彩分三层：窗口底色 `background` `#F5F7F8`（规范的 `bg.base`），侧栏 `sidebar` `#EEF0F2`，内容容器 `surface` `#FFFFFF`（`bg.surface`）。层级靠底色差和 1px 线条表达，不靠阴影。
 
-- **品牌色** `brand` `#00B3A4`（规范的 `brand.primary`）：只给 OpenWeir 标记用（见 Shapes「品牌标记」），不用于控件、文字或状态。
+- **品牌色** `brand` `#00B3A4`（规范的 `brand.primary`）：界面内不使用（侧栏标记用 `text`，见 Shapes「品牌标记」），不用于控件、文字或状态。
 - **强调色** `primary` `#00807A`：开关开启、主按钮、焦点环、当前导航项图标、下载速率的线与箭头。规范的品牌主色 `#00B3A4` 在白底上只有 2.6:1，当不了线条和图标，桌面端按规范给 WinUI 的映射取深一档的 `#00807A`，主按钮上的文字 `on-primary` 用白色。悬停 `primary-hover` `#00736D`，按下 `primary-pressed` `#006560`；三者上的白字对比度分别为 4.8、5.7、6.9。`primary` 在窗口底色上 4.5:1、`surface` 上 4.8:1、`surface-selected` 上 4.3:1。每个页面、每个对话框最多一个主色按钮。
 - **链接** `link` `#00665E`（规范的 `brand.text`），悬停 `link-hover` `#004F49`。只用于跳转到其他页面的文字链接（如「管理」「全部 37 个」），以及跳到另一页同一操作的快捷方式（如概览页的「改用我的方案」）。唯一的例外是标题栏撤销提示里的「撤销」（见 Layout）。
 - **文字**四级：`text` `#0B0F12` 正文与标题；`text-secondary` `#4A5560` 侧栏导航、等宽数值；`text-tertiary` `#53606B` 未选中的分段项、次要数值；`text-muted` `#5F6A75` 分组标题、说明文字、表头。`text-muted` 在侧栏底色上仍有 4.8:1。
@@ -610,7 +610,7 @@ OpenWeir 是 Windows 与 macOS 上的 mihomo 图形客户端，界面用 PySide6
 - **底色分层**：窗口底色 `background` `#0B0F12`（规范的 `bg.base`）→ 侧栏 `sidebar` `#101519` → 分组、浮层和输入框 `surface` `#161B20`（`bg.surface`）。行悬停和表头 `surface-subtle` `#1B2127`，选中行 `surface-selected` `#0F3B38`（`brand.container`），导航项悬停 `sidebar-hover` `#161C21`。侧栏比窗口底色亮一级，和 macOS 深色侧栏一致；当前导航项仍用 `surface`，比侧栏亮。
 - **分段控件底槽** `control-track` `#05080A` 是唯一比窗口底色暗的颜色：底槽在深色下凹进去，选中项用 `surface`。
 - **文字**四级：`text` `#F2F5F7`（规范的 `text.primary`，不用纯白）、`text-secondary` `#B4BDC4`、`text-tertiary` `#A6B0B8`、`text-muted` `#9AA4AC`。`text-muted` 在 `surface-selected` 上仍有 4.9:1，在 `surface` 上 6.8:1。
-- **品牌色** `brand` `#2EE6D2`，同样只给标记用。
+- **品牌色** `brand` `#2EE6D2`，同样不在界面内使用。
 - **强调色** `primary` `#26D0BE`（规范的 `brand.fill`），悬停 `primary-hover` `#3ADBCA`，按下 `primary-pressed` `#4FE3D3`：深色下越操作越亮，与浅色下越操作越暗一样，都是拉开与底色的差距。主按钮上的文字 `on-primary` 用规范的 `brand.onPrimary` `#00201D`，三种状态上的对比度为 8.9、9.9、10.8。`primary` 用作线条、图标和焦点环时，在窗口底色上 9.9:1、`surface` 上 9.0:1、`surface-selected` 上 6.4:1。
 - **链接** `link` `#5EEBDC`（`brand.text`），悬停 `link-hover` `#9FF3EA`，同样是悬停变亮；**INFO** 级别 `info` `#62AFFF`。
 - **线条**都比 `surface` 亮，深色下靠亮线勾边：`divider` `#292D32`、`border` `#30363C`、`border-button` `#414950`。`border-control` `#7F8A93` 在 `surface` 上 4.9:1、窗口底色上 5.5:1、`surface-selected` 上 3.5:1，满足非文字 3:1；开关的圆钮（`surface`）在关闭轨道上 4.9:1，在开启轨道（`primary`）上 9.0:1。
@@ -765,8 +765,7 @@ Windows 与 macOS 共用随包字体，字号、字重和回退顺序一致。�
 - **图标**：线性图标，24 网格、2px 描边、圆角端点与拐角（与 Lucide 同一风格）。导航 18px，行内 14–16px。不使用填充图标、插画或 emoji；
   唯一的例外是实心的品牌标记。
 - **品牌标记**：OpenWeir 标记，来源是 assets 仓库的 `openweir.svg`（100 单位视框，无填充色），用法按 design 仓库的品牌规则。
-  界面内只用不带底色的品牌色标记：侧栏左上角 30px，颜色 `brand`（浅色 `#00B3A4`，深色 `#2EE6D2`；`brand` 只给标记用，界面的强调色仍是
-  `primary`）；`Icons.qml` 里是缩放到 24 网格的实心路径。应用图标是 `#00B3A4` 底的圆角方块（圆角为边长的 22%）里 `#00201D` 的标记，macOS 按
+  界面内只用不带底色的单色标记：侧栏左上角 30px，颜色 `text`（浅色下黑色 `#0B0F12`，深色下白色 `#F2F5F7`）；`Icons.qml` 里是缩放到 24 网格的实心路径。应用图标是 `#00B3A4` 底的圆角方块（圆角为边长的 22%）里 `#00201D` 的标记，macOS 按
   1024 画布上 824 的网格留边。标记不加描边、阴影或渐变，最小 16px。所有尺寸由 `scripts/gen_icons.py` 生成，母版在 `ui/brand/`，
   `.icns`、`.ico` 在 `package/icons/`。
 

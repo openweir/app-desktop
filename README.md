@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="src/openweir/ui/brand/app-icon-macos.svg" width="128" height="128" alt="OpenWeir">
+  <img src="docs/images/logo.svg" width="128" height="128" alt="OpenWeir">
 </p>
 
 <h1 align="center">OpenWeir</h1>

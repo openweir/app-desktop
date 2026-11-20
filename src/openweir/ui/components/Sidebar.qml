@@ -55,11 +55,12 @@ Rectangle {
             Layout.leftMargin: Theme.space2
             spacing: 10
 
-            // The OpenWeir mark in the brand colour, without a tile (DESIGN.md "Shapes").
+            // The OpenWeir mark in the text colour, black in light and white in dark, without a
+            // tile (DESIGN.md "Shapes").
             Icon {
                 name: "mark"
                 size: 30
-                color: Theme.brand
+                color: Theme.text
             }
 
             ColumnLayout {

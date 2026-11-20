@@ -96,7 +96,7 @@ GB = 1024**3
 MB = 1024**2
 
 # What the core reports: mihomo pinned to a commit by go.mod replace (D38) has a pseudo-version.
-CORE_VERSION = "v1.19.33-0.20261103155416-c2de0f865c7e"
+CORE_VERSION = "openweir-v1.0.0+v1.19.34-0.20261120142920-7d3383e170ce"
 
 NODES: dict[str, tuple[str, int]] = {  # a delay of 0 is a failed test
     "香港 01": ("VLESS", 68),
