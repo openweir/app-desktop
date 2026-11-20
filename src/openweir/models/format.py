@@ -93,7 +93,8 @@ def ago(timestamp: float, now: float) -> str:
 
 
 def version_number(version: str) -> str:
-    """The release number in a Go module version, without a pseudo-version's timestamp and
-    commit or build metadata: ``v1.19.33`` for ``v1.19.33-0.20261103155416-c2de0f865c7e``,
-    which the core reports for mihomo pinned to a commit (D38)."""
+    """The release number in a version, without a pseudo-version's timestamp and commit or
+    build metadata: ``openweir-v1.0.0`` for ``openweir-v1.0.0+v1.19.34-0.2026…-01b2f212fab3``,
+    which the core reports for the pinned kernel release (D38), and ``v1.19.33`` for a bare
+    ``v1.19.33-0.20261103155416-c2de0f865c7e``."""
     return _PSEUDO_VERSION.sub("", version.strip().partition("+")[0])

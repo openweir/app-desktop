@@ -680,9 +680,9 @@ UI 只保存和传递覆写原文，解析与合并在内核里做；模拟宿�
   诊断信息和崩溃报告。更新、开源许可、诊断和崩溃报告由 `viewmodels/about.py` 的 `AboutViewModel`
   提供，设计见 [release.md](release.md)；内核版本和许可证来自 `SettingsViewModel`。
   - 「检查频率」只在开启自动检查更新时显示，关闭时整行隐藏。
-  - 「内核」只写版本号。内核报告的是 go.mod 里 replace 的版本，固定到提交时是 Go 伪版本（D38），如
-    `v1.19.33-0.20261103155416-c2de0f865c7e`；`models/format.version_number` 去掉时间戳、提交哈希和 `+` 后的
-    构建信息，写作 `v1.19.33`，侧栏的服务状态块相同。诊断信息的 `host.json` 保留完整版本。
+  - 「内核」只写版本号。内核报告 mihomo 源码里的发版名，后面以 `+` 接 go.mod 里 replace 的伪版本（D38），如
+    `openweir-v1.0.0+v1.19.34-0.20261120141919-01b2f212fab3`；`models/format.version_number` 去掉 `+` 后的部分，
+    写作 `openweir-v1.0.0`，和路由器显示的一致，侧栏的服务状态块相同。诊断信息的 `host.json` 保留完整版本。
 - **登录时打开**（`desktop/login.py`，平台接口 `LoginItem`）：
   - Windows：为当前用户注册一个计划任务（`schtasks /Create /XML`）：登录触发器只针对该用户，以该用户身份、
     交互式令牌、不提权运行，普通优先级，没有运行时限，动作是 `<界面>.exe --background`（界面只进托盘）。

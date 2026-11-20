@@ -344,11 +344,11 @@ exits.md 第 9 节的待实测项。
    写 `SHA256SUMS`，把这四个文件放进一个**草稿** Release（不上传源代码包，D43）。同一个标签已有 Release 时这一步失败，
    要先删掉旧的草稿再重新运行。标签发布后不删除，也不移到别的提交：它就是这个版本的源代码。
 
-   同时在 `openweir/mihomo` 上给这个版本 `replace` 固定的提交打 `openweir-v<版本>`（5.4 节），以后变基强推 `Alpha`
-   时它仍然取得到：
+   打标签前确认 `replace` 固定的是 `openweir/mihomo` 上一个已发布的内核版本，也就是 `openweir-v<内核版本>`
+   标签指向的提交（5.4 节）。这个标签由内核发版自动打出，以后变基强推 `main` 时它仍然取得到，不需要另打标签：
 
    ```bash
-   git tag -a openweir-v1.0.0 <提交> -m "mihomo source pinned by OpenWeir v1.0.0" && git push origin openweir-v1.0.0
+   git ls-remote --tags https://github.com/openweir/mihomo 'openweir-v*'   # 确认固定的提交在其中
    ```
 4. **草稿**：从草稿下载三个安装包，在测试机上再装一遍；在"更新内容"下写这个版本的变化，删掉模板里的注释行。
 5. **发布**，二选一：
@@ -403,14 +403,13 @@ exits.md 第 9 节的待实测项。
 
 ### 5.4 依赖升级
 
-- **mihomo 增强版**：固定到 openweir/mihomo `Alpha` 分支（D44）的明确提交（`src/core/go.mod` 的 `replace`），不使用浮动
-  分支作为构建输入。发布过的版本固定的提交是那个版本对应的源代码（D43），不要让它们从 `openweir/mihomo` 上消失：
-  每个发布版本在 fork 上有一个 annotated tag `openweir-v<版本>` 指向它固定的提交（第 4 节第 3 步）。随上游 `Alpha`
-  变基后要强推 `Alpha`，强推前先确认当前固定的提交已经有这样的 tag，强推用 `--force-with-lease`；`Meta` 分支（1.0.0
-  的提交）不动。界面显示的内核版本是 replace 伪版本去掉时间戳和哈希（[ui.md](ui.md)），伪版本的基准是 fork 上最近的
-  上游发布 tag，所以 fork 只同步到已包含的上游发布的前一个：包含 v1.19.34 时同步 v1.19.33，伪版本是
-  `v1.19.34-0.…`，界面显示 v1.19.34；`require` 里的 `github.com/metacubex/mihomo` 写已包含的最新上游发布。上游原样的
-  发布 tag 推到 fork 不会让已发布的伪版本失效。mihomo 的运行时（`hub`、`executor`、`tunnel` 等
+- **mihomo 增强版**：固定到 openweir/mihomo `main` 分支（D51）上的内核发版提交，即 `openweir-v<内核版本>` 标签
+  指向的提交（`src/core/go.mod` 的 `replace`，第 4 节第 3 步），不使用浮动分支作为构建输入。`Alpha`、`Meta` 只是上游的
+  原样镜像，不放本项目的提交。发布过的版本固定的提交是那个版本对应的源代码（D43），由内核发版标签保留，`main`
+  随上游变基强推时它仍然取得到；强推用 `--force-with-lease`。内核版本号和应用版本号各自独立：要用新内核，先在 fork
+  的 `main` 上同时改 `VERSION` 和 `constant.Version` 发版，再把 `replace` 改到那个提交（`engine_test.go` 要求内核
+  报告 `openweir-vX.Y.Z`）。界面显示的内核版本就是这个发版名（[ui.md](ui.md)），和路由器一致；`require` 里的
+  `github.com/metacubex/mihomo` 写已包含的最新上游发布。mihomo 的运行时（`hub`、`executor`、`tunnel` 等
   包级状态）只在 engine 里用（`imports_test.go` 检查）；`admission`、`compose`、`vpngate` 用 mihomo 无状态的解析
   函数、类型和常量，升级时这几处也要核对。升级前跑完整测试，并按 [architecture.md](architecture.md) §3.3 逐条复核
   安全要求和 3.4 节的发布构建标签。

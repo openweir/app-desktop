@@ -55,7 +55,7 @@
 两个脚本都会先下载钉住版本的 GEO 数据（`scripts/fetch_geodata.py`）。发布用的安装包由 GitHub Actions 的发布工作流
 构建（[release.md](release.md)）。
 
-内核通过 go.mod replace 固定到 `openweir/mihomo` 的 Alpha 提交（D38、D44），包含 Naive、AnyTLS+REALITY 和 Snell v4–v6。
+内核通过 go.mod replace 固定到 `openweir/mihomo` `main` 分支上的内核发版提交（D38、D51），包含 Naive、AnyTLS+REALITY 和 Snell v4–v6。
 用户配置与完整示例见 [mihomo 增强版配置指南](mihomo-fork.md)。
 构建脚本启用 `with_naive`，并取 Go 模块图锁定的 Cronet 原生版本：Windows 携带 `libcronet.dll`，macOS 静态链接。
 绑定与原生库必须一起升级；不要仅替换 DLL。普通无标签的 Go 测试/开发服务不含 Naive，可在 Mac 上这样验证：

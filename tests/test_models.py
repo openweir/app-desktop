@@ -65,6 +65,8 @@ def test_latency_levels(delay: int | None, level: str) -> None:
 @pytest.mark.parametrize(
     ("version", "number"),
     [
+        ("openweir-v1.0.0+v1.19.34-0.20261120141919-01b2f212fab3", "openweir-v1.0.0"),
+        ("openweir-v1.0.0", "openweir-v1.0.0"),
         ("v1.19.33", "v1.19.33"),
         ("v1.19.33-0.20261103155416-c2de0f865c7e", "v1.19.33"),
         ("v1.20.0-alpha.1.0.20261103155416-c2de0f865c7e", "v1.20.0-alpha.1"),

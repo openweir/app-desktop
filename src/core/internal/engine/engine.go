@@ -180,8 +180,12 @@ func checkPathSandbox(home string) error {
 // owner, and so an Engine (docs/architecture.md §5.4).
 func Version() string {
 	coreOnce.Do(func() {
-		coreVerStr = moduleVersion()
-		C.Version = coreVerStr
+		// The fork's source names its release (openweir-vX.Y.Z), the same name the router
+		// shows; the pinned module version follows as build metadata for diagnostics.
+		coreVerStr = C.Version
+		if mod := moduleVersion(); mod != "" && mod != C.Version {
+			coreVerStr += "+" + mod
+		}
 	})
 	return coreVerStr
 }
@@ -197,7 +201,7 @@ func moduleVersion() string {
 			}
 		}
 	}
-	return C.Version
+	return ""
 }
 
 // Close stops the core and lets another Engine open in this process.

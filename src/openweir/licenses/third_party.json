@@ -1189,7 +1189,7 @@
     },
     {
       "name": "github.com/openweir/mihomo",
-      "version": "v1.19.34-0.20261120115516-04e8cc02b0d9",
+      "version": "v1.19.34-0.20261120142920-7d3383e170ce",
       "license": "GPL-3.0-only",
       "kind": "go",
       "url": "https://github.com/openweir/mihomo",

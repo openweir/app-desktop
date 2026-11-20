@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"runtime/pprof"
 	"strings"
@@ -61,14 +62,17 @@ func TestOnlyOneEnginePerProcess(t *testing.T) {
 	}
 }
 
-// The core version comes from the binary's build info. Test binaries record their
-// dependencies only from Go 1.27 on, which go.mod's toolchain line asks for; an older
-// toolchain leaves mihomo's placeholder, 1.10.0.
-func TestCoreVersionIsTheMihomoInGoMod(t *testing.T) {
+// The core version is the fork's release name from mihomo's source, with the pinned module
+// version from build info as metadata. Test binaries record their dependencies only from
+// Go 1.27 on, which go.mod's toolchain line asks for.
+func TestCoreVersionIsTheReleasedMihomoInGoMod(t *testing.T) {
 	engine := openEngine(t, admission.TunNone)
-	want := requiredVersion(t, mihomoModule)
-	if got := engine.CoreVersion(); got != want || C.Version != want {
-		t.Fatalf("core version %q, mihomo's own %q; go.mod requires %s", got, C.Version, want)
+	if !regexp.MustCompile(`^openweir-v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$`).MatchString(C.Version) {
+		t.Fatalf("mihomo reports %q; pin go.mod to an openweir-vX.Y.Z kernel release", C.Version)
+	}
+	want := C.Version + "+" + requiredVersion(t, mihomoModule)
+	if got := engine.CoreVersion(); got != want {
+		t.Fatalf("core version %q, want %q", got, want)
 	}
 }
 
