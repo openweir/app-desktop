@@ -15,11 +15,12 @@ on:
 
 permissions:
   contents: write
-  actions: read
+  actions: write
 
+# A newer develop commit supersedes the preview being published.
 concurrency:
   group: prerelease
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   publish:
@@ -62,6 +63,11 @@ jobs:
             mv "$exe" "OpenWeir-$preview-windows-$arch-unsigned-setup.exe"
           done
           files=(OpenWeir-*)
+          if [ "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/develop" --jq .object.sha)" != "$HEAD_SHA" ]; then
+            echo "A later develop commit has superseded this CI run." >> "$GITHUB_STEP_SUMMARY"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           if [ ${#files[@]} -eq 0 ]; then
             echo "This CI run built no installer; nothing to publish"
             echo "publish=false" >> "$GITHUB_OUTPUT"
@@ -100,4 +106,13 @@ jobs:
             --jq '[.[] | select(.isPrerelease and (.tagName | test("^v.+-preview\\.[0-9]+$")))] | sort_by(.createdAt) | reverse | .[1:] | .[].tagName' |
           while read -r tag; do
             gh release delete "$tag" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
+          done
+
+      # Runs cancelled by a newer push only clutter the Actions list.
+      - name: Delete cancelled runs
+        if: always()
+        run: |
+          gh run list --repo "$GITHUB_REPOSITORY" --status cancelled --limit 100 --json databaseId --jq '.[].databaseId' |
+          while read -r id; do
+            gh run delete "$id" --repo "$GITHUB_REPOSITORY" || true
           done
