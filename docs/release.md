@@ -36,8 +36,10 @@ Release 上有三个安装包和 SHA256SUMS，共四个文件（1.0.0 另有源�
 
 ### 1.1 发布工作流
 
-`.github/workflows/release.yml` 在推送 `v*` 标签时运行（预览版的 `v*-preview.*` 除外，见 1.2；也可以手动运行，但只有标签才创建 Release）。每个 job 都在
-`release` Environment 里，由它的审批人批准后才开始：先批准 macOS 和两个 Windows 架构的构建 job，它们成功后再批准创建 Release 的 job。
+不用手动打标签，也不用单独触发：推送到 `main` 后，CI（`ci.yml`）全部检查通过，最后的 `release` job 调用
+`.github/workflows/release.yml`（`workflow_call`，所以跑的是这个提交里的工作流文件）。它先由 **qualify** job 用
+`scripts/next_version.py` 算出版本；这个提交已不是 `main` 的最新提交、这个版本已经发布过，就什么也不做；版本比已发布的旧则失败。
+之后的 job 都在 `release` Environment 里，由它的审批人批准后才开始：先批准 macOS 和两个 Windows 架构的构建 job，它们成功后再批准创建 Release 的 job。
 
 1. **macOS universal** 和 **Windows x64 / ARM64** 三个构建任务分别构建、签名、公证（macOS）安装包，Windows 的安装包还在
    runner 上装一遍、升级、卸载（architecture.md 第 10 节）。产物连同各自的 `.sha256` 存为 workflow artifact。各构建任务都把 Environment
@@ -52,12 +54,12 @@ Release 上有三个安装包和 SHA256SUMS，共四个文件（1.0.0 另有源�
    `ARTIFACT_SIGNING_ACCOUNT`、`ARTIFACT_SIGNING_PROFILE`；`AZURE_SUBSCRIPTION_ID` 不用。签名由 `package/windows/sign.ps1`
    调用 signtool 和 Artifact Signing 的 dlib 完成，时间戳来自 `http://timestamp.acs.microsoft.com`；签什么、怎么核对见
    architecture.md 第 10 节。签名失败、核对不过，job 就失败，不会产出未签名的安装包。
-2. **release** job（只对标签运行，`contents: write`）：
-   - 确认标签是 `v<scripts/next_version.py 算出的版本>`，版本是三段数字（界面只认这种，第 2 节）；
+2. **release** job（`contents: write`）：
+   - 确认版本与 qualify 算出的一致，版本是三段数字（界面只认这种，第 2 节）；
    - 取回三个安装包 artifact，用构建 job 写的 `.sha256` 核对三个安装包；`.sha256` 文件不上传；
    - 用 `sha256sum` 为三个安装包写 `SHA256SUMS`；
-   - `gh release create --draft --verify-tag` 创建**草稿**，上传这四个文件。同一个标签已有 Release 时这一步失败，要先
-     删掉旧的草稿再重新运行。
+   - `gh release create v<版本> --draft --target <提交>` 创建**草稿**，上传这四个文件；同一版本之前 main 推送留下的草稿先删掉。
+     有人发布草稿时 GitHub 才在该提交上创建 `v<版本>` 标签。
 
    `tests/test_release_workflow.py` 核对这几步：上传的正是界面要找的三个安装包和 `SHA256SUMS`，没有源代码包；发布说明
    和 NOTICES 写着第 5 节的源代码位置。
@@ -72,9 +74,9 @@ GitHub 把正文里的换行原样显示，所以模板的段落不折行；除 
 
 ### 1.2 分支与预览版
 
-日常开发提交到 `develop`，准备发布的代码合并到 `main`，在 `main` 上打 `v*` 标签发正式版（1.1）。
+日常开发提交到 `develop`，准备发布的代码合并到 `main`，推送 `main` 即发正式版草稿（1.1）。
 
-`develop` 上的 CI 通过后，`.github/workflows/prerelease.yml` 把这次 CI 构建的未签名安装包发成 GitHub 预发布版本：tag 为
+推送 `develop` 后 CI 全部通过，最后的 `preview` job 调用 `.github/workflows/prerelease.yml`（`workflow_call`），把这次 CI 构建的未签名安装包发成 GitHub 预发布版本：tag 为
 `v<版本>-preview.<n>`（同一版本从 1 起编号，标题即 tag），附件是 `OpenWeir-<版本>-preview.<n>-macos-universal-unsigned.dmg`、
 `OpenWeir-<版本>-preview.<n>-windows-<x64|arm64>-unsigned-setup.exe` 和 `SHA256SUMS`。测试人员从 Releases 页面下载，不必进
 Actions 找构建产物。
@@ -82,10 +84,10 @@ Actions 找构建产物。
 - develop 与 main 指向同一提交时（例如刚发布正式版），develop 的 CI 不跑任何检查，也不发预览版，由 main 那次运行覆盖。
 - 只保留最新的一个预览版：发布新的之后，之前的连同 tag 一起删除。只改文档、CI 没有构建安装包时不发布。
 - 较新的提交会取消还在进行的 CI 和预览发布（main 的 CI 除外），每次发布预览版后删除已取消的运行记录。
-- 正式版发布后，`remove-previews.yml` 删除同一版本的全部预览版及其 tag。
+- 正式版发布后，`remove-previews.yml` 删除同一版本的全部预览版及其 tag；`main` 的 CI 最后也调用它补删遗漏的。
+- `develop` 的版本已正式发布（main 合并回来）时不发预览版。
 - 检查更新只读 `releases/latest`，GitHub 不把预发布版本算作 latest，所以预览版不会被当作更新推送（第 2 节）。
-- `release.yml` 的 tag 触发排除 `v*-preview.*`；而且 `GITHUB_TOKEN` 创建的 tag 本来就不会触发其他工作流。
-- `workflow_run` 只认默认分支（`main`）上的工作流文件，所以 `prerelease.yml` 在 `main` 上也要有。
+- 发布不用 `workflow_run` 或 tag 推送触发：`workflow_run` 总是跑默认分支上的工作流文件，而 `workflow_call` 跑的是这次提交的。
 - 预览版不签名，签名和公证只在正式版（1.1）里做，所以预览版不需要任何证书或签名用的变量。Windows 安装时 SmartScreen 提示未知发布者；macOS 版可以打开界面，但系统扩展需要 Developer ID 签名与公证才能激活，
   所以连不上。发布说明里写明这两点。
 

@@ -1,4 +1,6 @@
-# Previews as GitHub pre-releases (docs/release.md "预览版"): after CI passes on develop, its
+# Previews as GitHub pre-releases (docs/release.md "预览版"): the last job of CI (ci.yml) calls
+# this on a push to develop once every check has passed, so it runs this commit's copy and
+# publishes the installers this CI run built. Its
 # unsigned macOS disk image and Windows installers go out as v<version>-preview.<N> (N counts
 # from 1 per version), so testers download them from the release page instead of Actions artifacts. main
 # holds what is to be released, and its v* tags make the signed releases (release.yml). Pre-releases
@@ -8,31 +10,24 @@
 name: Preview
 
 on:
-  workflow_run:
-    workflows: [CI]
-    types: [completed]
-    branches: [develop]
-
-permissions:
-  contents: write
-  actions: write
-
-# A newer develop commit supersedes the preview being published.
-concurrency:
-  group: prerelease
-  cancel-in-progress: true
+  workflow_call:
 
 jobs:
   publish:
-    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+    # A newer develop commit supersedes the preview being published.
+    concurrency:
+      group: prerelease
+      cancel-in-progress: true
     env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+      GH_TOKEN: ${{ github.token }}
+      HEAD_SHA: ${{ github.sha }}
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -40,8 +35,6 @@ jobs:
       - name: Installers from the CI run
         uses: actions/download-artifact@v7
         with:
-          run-id: ${{ github.event.workflow_run.id }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
           pattern: "{macos-universal,windows-installer}-*"
           merge-multiple: true
           path: dist
@@ -67,6 +60,13 @@ jobs:
           files=(OpenWeir-*)
           if [ "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/develop" --jq .object.sha)" != "$HEAD_SHA" ]; then
             echo "A later develop commit has superseded this CI run." >> "$GITHUB_STEP_SUMMARY"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # develop at a released commit (main merged back) has nothing new to preview.
+          if gh release view "v$version" --repo "$GITHUB_REPOSITORY" --json isDraft,isPrerelease \
+              --jq '(.isDraft or .isPrerelease) | not' 2>/dev/null | grep -qx true; then
+            echo "v$version is already released; no preview." >> "$GITHUB_STEP_SUMMARY"
             echo "publish=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi

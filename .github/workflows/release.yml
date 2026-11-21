@@ -3,32 +3,77 @@ name: Release
 # The signed and notarized macOS build (apple/README.md): OpenWeir.app from scripts/build_app.py,
 # notarized and stapled, in a notarized disk image with its SHA-256. And the Windows installers
 # from scripts/build_windows.py, signed with Azure Artifact Signing (D42), with their SHA-256.
-# Runs for v* tags and by hand, in the release environment: its reviewers approve each run
-# before the jobs get the signing secrets, the Azure sign-in and the Google OAuth client. For a
-# tag, a last job puts all three installers and SHA256SUMS into a draft GitHub Release
-# (docs/release.md §1), which a person publishes. The source is the tag itself (D43).
+# The last jobs of CI (ci.yml) call this on a push to main once every check has passed, so it
+# runs this commit's copy of the workflow. The version comes from git (scripts/next_version.py):
+# the newest vX.Y.Z tag and the conventional commits after it. The builds run in the release
+# environment: its reviewers approve each run before the jobs get the signing secrets, the Azure
+# sign-in and the Google OAuth client. A last job puts all three installers and SHA256SUMS into
+# a draft GitHub Release v<version> at this commit (docs/release.md §1), which a person
+# publishes; publishing creates the tag, which is the source (D43).
 on:
-  workflow_dispatch:
-  push:
-    # Previews are tagged v<version>-preview.<n> by prerelease.yml; they are not releases.
-    tags: ["v*", "!v*-preview.*"]
-
-permissions:
-  contents: read
-
-concurrency:
-  group: release-${{ github.ref }}
-  cancel-in-progress: false
+  workflow_call:
 
 env:
   UV_HTTP_RETRIES: "5"
 
 jobs:
+  # Whether this commit is still main's tip and its version is new: a later main push
+  # supersedes it, and a version that is already released (or older) publishes nothing.
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    concurrency:
+      group: openweir-desktop-release
+      cancel-in-progress: false
+    outputs:
+      version: ${{ steps.plan.outputs.version }}
+      publish: ${{ steps.plan.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Version from git
+        id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version=$(python3 scripts/next_version.py)
+          tag="v$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          main=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)
+          if [[ "$GITHUB_REF" != refs/heads/main || "$main" != "$GITHUB_SHA" ]]; then
+            echo "A later main commit has superseded this CI run." >> "$GITHUB_STEP_SUMMARY"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+            --jq '.[] | select(.draft == false and .prerelease == false) | .tag_name' > "$RUNNER_TEMP/released"
+          if grep -Fxq "$tag" "$RUNNER_TEMP/released"; then
+            echo "$tag is already released." >> "$GITHUB_STEP_SUMMARY"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          newest=$( { grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' "$RUNNER_TEMP/released" || true; echo "$tag"; } | sort -V | tail -1 )
+          if [[ "$newest" != "$tag" ]]; then
+            echo "::error::$tag is older than the released $newest"
+            exit 1
+          fi
+          echo "Releasing $tag from $GITHUB_SHA." >> "$GITHUB_STEP_SUMMARY"
+          echo "publish=true" >> "$GITHUB_OUTPUT"
+
   macos:
+    needs: qualify
+    if: needs.qualify.outputs.publish == 'true'
     name: macOS universal (signed and notarized)
     # The app needs macOS 26 (D28), so the release is built and checked on that system.
     runs-on: macos-26
     environment: release
+    permissions:
+      contents: read
     env:
       # product.json leaves the signing identities empty; the release sets them (D47).
       OPENWEIR_APPLE_TEAM_ID: ${{ vars.OPENWEIR_APPLE_TEAM_ID }}
@@ -59,11 +104,13 @@ jobs:
           key: geodata-${{ hashFiles('scripts/fetch_geodata.py') }}
       - name: Version
         id: version
+        env:
+          RELEASE_VERSION: ${{ needs.qualify.outputs.version }}
         run: |
           version="$(uv run --no-project python -c \
             'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
-          if [[ "$GITHUB_REF_TYPE" == tag && "$GITHUB_REF_NAME" != "v$version" ]]; then
-            echo "::error::Tag $GITHUB_REF_NAME does not match version $version computed from git"
+          if [[ "$version" != "$RELEASE_VERSION" ]]; then
+            echo "::error::Version $version does not match $RELEASE_VERSION that qualify computed"
             exit 1
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
@@ -254,6 +301,8 @@ jobs:
           rm -rf "$signing"
 
   windows:
+    needs: qualify
+    if: needs.qualify.outputs.publish == 'true'
     name: Windows ${{ matrix.arch }} (signed)
     runs-on: ${{ matrix.os }}
     environment: release
@@ -305,11 +354,13 @@ jobs:
       - name: Version
         id: version
         shell: bash
+        env:
+          RELEASE_VERSION: ${{ needs.qualify.outputs.version }}
         run: |
           version="$(uv run --no-project python -c \
             'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
-          if [[ "$GITHUB_REF_TYPE" == tag && "$GITHUB_REF_NAME" != "v$version" ]]; then
-            echo "::error::Tag $GITHUB_REF_NAME does not match version $version computed from git"
+          if [[ "$version" != "$RELEASE_VERSION" ]]; then
+            echo "::error::Version $version does not match $RELEASE_VERSION that qualify computed"
             exit 1
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
@@ -484,15 +535,14 @@ jobs:
           if-no-files-found: error
           retention-days: 90
 
-  # The GitHub Release of a v* tag, with exactly the assets of docs/release.md §1. It stays a
+  # The GitHub Release v<version>, with exactly the assets of docs/release.md §1. It stays a
   # draft: the updater asks GitHub for the latest published release, which skips drafts, so
   # nothing reaches installed copies until a person has downloaded the installers from the
   # draft, tried them and written the notes, then publishes it. In the release environment
   # like the builds, so that only its reviewers' runs write to the repository's releases.
   release:
     name: Draft GitHub Release
-    needs: [macos, windows]
-    if: github.ref_type == 'tag'
+    needs: [qualify, macos, windows]
     runs-on: ubuntu-latest
     environment: release
     timeout-minutes: 30
@@ -508,11 +558,13 @@ jobs:
         run: python3 scripts/next_version.py --write
       - name: Version
         id: version
+        env:
+          RELEASE_VERSION: ${{ needs.qualify.outputs.version }}
         run: |
           version="$(python3 -c \
             'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
-          if [[ "$GITHUB_REF_NAME" != "v$version" ]]; then
-            echo "::error::Tag $GITHUB_REF_NAME does not match version $version computed from git"
+          if [[ "$version" != "$RELEASE_VERSION" ]]; then
+            echo "::error::Version $version does not match $RELEASE_VERSION that qualify computed"
             exit 1
           fi
           # The updater reads only X.Y.Z tags (docs/release.md §2).
@@ -580,7 +632,11 @@ jobs:
             echo "::error::.github/release-notes.md has a placeholder other than {{version}}"
             exit 1
           fi
-          gh release create "$GITHUB_REF_NAME" --draft --verify-tag \
+          # A draft of this version from an earlier main push is superseded by this one.
+          if [[ "$(gh release view "v$VERSION" --json isDraft --jq .isDraft 2>/dev/null)" == true ]]; then
+            gh release delete "v$VERSION" --yes
+          fi
+          gh release create "v$VERSION" --draft --target "$GITHUB_SHA" \
             --title "OpenWeir $VERSION" --notes-file "$RUNNER_TEMP/notes.md" \
             "build/release/$DMG" "build/release/$INSTALLER" "build/release/$INSTALLER_ARM64" \
             build/release/SHA256SUMS

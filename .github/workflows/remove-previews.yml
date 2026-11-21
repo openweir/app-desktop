@@ -1,26 +1,30 @@
-# Publishing a stable release (a draft from release.yml, published by hand) replaces the
-# previews of its version from prerelease.yml: remove them with their tags.
+# A published stable release (a draft from release.yml, published by hand) replaces the
+# previews of its version from prerelease.yml: remove them with their tags. Runs when a release
+# is published, and as a last job of CI on main (ci.yml) to catch any that were missed.
 name: Remove previews
 
 on:
   release:
     types: [published]
-
-permissions:
-  contents: write
+  workflow_call:
 
 jobs:
   remove:
     if: ${{ !github.event.release.prerelease }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     env:
       GH_TOKEN: ${{ github.token }}
-      TAG: ${{ github.event.release.tag_name }}
     steps:
-      - name: Remove this version's previews
+      - name: Remove previews of released versions
         run: |
+          gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName,isPrerelease,isDraft \
+            --jq '.[] | select((.isPrerelease or .isDraft) | not) | .tagName' > "$RUNNER_TEMP/released"
           gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName,isPrerelease \
-            --jq ".[] | select(.isPrerelease and (.tagName | startswith(\"$TAG-preview.\"))) | .tagName" |
+            --jq '.[] | select(.isPrerelease) | .tagName' |
           while read -r tag; do
-            gh release delete "$tag" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
+            if grep -Fxq "${tag%-preview.*}" "$RUNNER_TEMP/released"; then
+              gh release delete "$tag" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
+            fi
           done

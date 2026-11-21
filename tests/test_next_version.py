@@ -36,7 +36,7 @@ def test_bump(messages: list[str], expected: str) -> None:
 
 @pytest.mark.parametrize("bad", ["v1.2.3", "1.2", "01.2.3", "1.2.3-preview.1"])
 def test_bump_rejects_invalid(bad: str) -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="invalid release version"):
         nv.bump(bad, [])
 
 
@@ -80,7 +80,8 @@ def test_write_version(tmp_path: Path) -> None:
     )
     nv.write_version("1.5.0", pyproject)
     text = pyproject.read_text(encoding="utf-8")
-    assert 'version = "1.5.0"' in text and 'version = "9"' in text
+    assert 'version = "1.5.0"' in text
+    assert 'version = "9"' in text
 
 
 @pytest.mark.parametrize(
@@ -105,3 +106,39 @@ def test_workflows_compute_the_version(workflow: str, jobs: list[str]) -> None:
             workflow,
             job,
         )
+
+
+def _load(name: str) -> dict:
+    return yaml.load(
+        (ROOT / ".github" / "workflows" / name).read_text(encoding="utf-8"),
+        Loader=yaml.BaseLoader,
+    )
+
+
+def test_ci_publishes_as_its_last_jobs() -> None:
+    """Previews and releases are called from CI after every check, never by workflow_run or
+    a tag push, so they run this commit's copy of the workflow."""
+    jobs = _load("ci.yml")["jobs"]
+    for job, workflow, branch in [
+        ("preview", "prerelease.yml", "develop"),
+        ("release", "release.yml", "main"),
+        ("remove-previews", "remove-previews.yml", "main"),
+    ]:
+        assert jobs[job]["uses"] == f"./.github/workflows/{workflow}"
+        assert jobs[job]["needs"] == ["result"]
+        assert f"refs/heads/{branch}" in jobs[job]["if"]
+        on = _load(workflow)["on"]
+        assert "workflow_call" in on
+        assert "workflow_run" not in on
+        assert "push" not in on
+    assert jobs["release"]["secrets"] == "inherit"
+
+
+def test_release_builds_wait_for_qualify() -> None:
+    jobs = _load("release.yml")["jobs"]
+    assert "--write" not in jobs["qualify"]["steps"][-1]["run"]
+    for job in ("macos", "windows"):
+        assert jobs[job]["needs"] == "qualify"
+        assert jobs[job]["environment"] == "release"
+        assert "publish" in jobs[job]["if"]
+    assert jobs["release"]["needs"] == ["qualify", "macos", "windows"]

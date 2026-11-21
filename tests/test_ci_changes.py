@@ -204,7 +204,8 @@ def test_workflow_wires_every_job_and_preserves_a_full_run_entry() -> None:
     config = workflow()
     jobs = config["jobs"]
     assert "workflow_dispatch" in config["on"]
-    assert set(jobs) == ci.JOBS | {"changes", "result"}
+    # The publishing jobs come after result (test_next_version.py checks them).
+    assert set(jobs) == ci.JOBS | {"changes", "result", "preview", "release", "remove-previews"}
     assert jobs["changes"]["outputs"] == {
         "jobs": "${{ steps.select.outputs.jobs }}",
         "protocol": "${{ steps.select.outputs.protocol }}",

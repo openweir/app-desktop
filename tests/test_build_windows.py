@@ -636,9 +636,13 @@ def test_only_the_release_workflow_signs() -> None:
     assert "subscription-id" not in steps[login]["with"]
     (smoke,) = [run for run in runs if "smoke-test.ps1" in run]
     assert "-Signed" in smoke.split()
-    ci = (build_windows.ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    # CI's own jobs never sign; only its release job, which calls release.yml, grants id-token.
+    ci = _workflow("ci.yml")["jobs"]
+    release = ci.pop("release")
+    assert release["uses"] == "./.github/workflows/release.yml"
+    text = yaml.safe_dump(ci)
     for signing in ("--sign", "-Signed", "id-token", "azure/login", "ARTIFACT_SIGNING"):
-        assert signing not in ci
+        assert signing not in text
 
 
 def test_a_signed_service_needs_the_release_signer(
