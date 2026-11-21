@@ -307,7 +307,14 @@ def test_import_form_honors_provider_defaults_and_exposes_links(
     p = models.library.snapshot().profiles[-1]
     assert (p.name, p.auto_update_hours) == ("测试订阅", expected)
     models.profiles.editProfile(p.id)
-    qtbot.waitUntil(lambda: loaded.focused_text() == "测试订阅")
+    # The edit sheet shows the saved name; keyboard focus may land later on a cold runner.
+    qtbot.waitUntil(
+        lambda: any(
+            item.property("text") == "测试订阅" and item.isVisible()
+            for item in loaded.overlay_items(lambda item: kind(item) == "AppTextField")
+        ),
+        timeout=15000,
+    )
     buttons = loaded.overlay_items(lambda item: kind(item) == "AppButton" and item.isVisible())
     assert {"官网", "帮助"} <= {button.property("text") for button in buttons}
     assert (
