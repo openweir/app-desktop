@@ -23,7 +23,7 @@ Windows 安装器采用自定义 Win32 界面（D39），由 MSVC 编译为 NSIS
 
 | 项目 | 约定 |
 | --- | --- |
-| 标签 | `v<版本>`，版本即 `pyproject.toml` 的 `version`，形如 `1.0.0`（三段数字）。预发布和草稿不提供给更新 |
+| 标签 | `v<版本>`，版本由 `scripts/next_version.py` 从 git 算出（最新的稳定 `vX.Y.Z` 标签加其后的约定式提交：`!` 或 `BREAKING CHANGE:` 升主版本，`feat` 升次版本，其余升修订号），CI 构建前写入 `pyproject.toml`，形如 `1.0.0`（三段数字）。预发布和草稿不提供给更新 |
 | 标题与说明 | `OpenWeir <版本>`；说明取自 `.github/release-notes.md`，`{{version}}` 换成版本；说明先英文后中文，两段的"更新内容"都在草稿里手写 |
 | macOS 安装包 | `OpenWeir-<版本>-macos-universal.dmg`：由 `scripts/build_dmg.py` 制作，挂载后是一个固定的窗口，左边 `OpenWeir.app`、右边“应用程序”的快捷方式（apple/README.md 的“磁盘映像”）；磁盘映像用 Developer ID（Team 为 `OPENWEIR_APPLE_TEAM_ID`）签名、公证并 staple |
 | Windows 安装包 | `OpenWeir-<版本>-windows-x64-setup.exe`：NSIS 安装器（architecture.md 第 9 节）。安装器、卸载器和装进去的程序用 Azure Artifact Signing 做 Authenticode 签名并加时间戳，签名者是 `OpenWeir`（D42）；更新时核对校验和与签名者（第 3 节第 4 步）。1.0.0 不签名（D29） |
@@ -53,7 +53,7 @@ Release 上有三个安装包和 SHA256SUMS，共四个文件（1.0.0 另有源�
    调用 signtool 和 Artifact Signing 的 dlib 完成，时间戳来自 `http://timestamp.acs.microsoft.com`；签什么、怎么核对见
    architecture.md 第 10 节。签名失败、核对不过，job 就失败，不会产出未签名的安装包。
 2. **release** job（只对标签运行，`contents: write`）：
-   - 确认标签是 `v<pyproject.toml 的版本>`，版本是三段数字（界面只认这种，第 2 节）；
+   - 确认标签是 `v<scripts/next_version.py 算出的版本>`，版本是三段数字（界面只认这种，第 2 节）；
    - 取回三个安装包 artifact，用构建 job 写的 `.sha256` 核对三个安装包；`.sha256` 文件不上传；
    - 用 `sha256sum` 为三个安装包写 `SHA256SUMS`；
    - `gh release create --draft --verify-tag` 创建**草稿**，上传这四个文件。同一个标签已有 Release 时这一步失败，要先

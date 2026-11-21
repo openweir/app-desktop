@@ -33,6 +33,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
           persist-credentials: false
 
       # The Windows installers are kept for a day and the disk image for a week (ci.yml).
@@ -49,7 +50,8 @@ jobs:
         id: files
         run: |
           shopt -s nullglob
-          version=$(python3 -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
+          # The version comes from git: the newest vX.Y.Z tag and the conventional commits after it.
+          version=$(python3 scripts/next_version.py --write)
           # Previews of a version count from 1: the next number after this version's newest preview.
           last=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName \
             --jq "[.[].tagName | select(startswith(\"v$version-preview.\")) | ltrimstr(\"v$version-preview.\") | select(test(\"^[0-9]+\$\")) | tonumber] | max // 0")
