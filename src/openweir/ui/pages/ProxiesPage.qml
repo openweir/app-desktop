@@ -219,8 +219,8 @@ Item {
 
                             width: groupList.width
                             implicitHeight: header ? Theme.rowSingle : Theme.rowDouble
-                            leftPadding: region ? 14 + Theme.space3 : 14
-                            rightPadding: 14
+                            leftPadding: region ? Theme.space4 + Theme.space3 : Theme.space4
+                            rightPadding: Theme.space4
                             topPadding: Theme.space2
                             bottomPadding: Theme.space2
                             checked: selected  // what screen readers hear; clicking does not toggle it
@@ -243,15 +243,18 @@ Item {
                             Keys.onTabPressed: event => event.accepted = page.tabFrom(groupList, groupButton, index, !(event.modifiers & Qt.ShiftModifier))
                             Keys.onBacktabPressed: event => event.accepted = page.tabFrom(groupList, groupButton, index, false)
 
-                            contentItem: ColumnLayout {
-                                spacing: 0
+                            contentItem: RowLayout {
+                                spacing: Theme.space3
 
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 6
+                                // The selected group's primary check, as the nodes' (DESIGN.md
+                                // "分组与行"); in the row that folds the regions, its disclosure
+                                // (DESIGN.md "可折叠区"), so that the names line up.
+                                Item {
+                                    implicitWidth: 16
+                                    implicitHeight: 16
 
-                                    // The region section's disclosure (DESIGN.md "可折叠区").
                                     Icon {
+                                        anchors.centerIn: parent
                                         visible: groupButton.header
                                         name: "chevron"
                                         size: 14
@@ -265,28 +268,45 @@ Item {
                                         }
                                     }
 
-                                    UiText {
-                                        Layout.fillWidth: true
-                                        text: groupButton.name
-                                        role: groupButton.selected ? Theme.type.bodyMdStrong : Theme.type.labelMd
-                                        elide: Text.ElideRight
-                                    }
-
-                                    // The section's group count, or the group's type.
-                                    UiText {
-                                        text: groupButton.header ? groupButton.now : groupButton.kind
-                                        role: Theme.type.caption
-                                        color: Theme.textMuted
+                                    Icon {
+                                        visible: groupButton.selected
+                                        name: "check"
+                                        size: 16
+                                        color: Theme.primary
                                     }
                                 }
 
-                                UiText {
+                                ColumnLayout {
                                     Layout.fillWidth: true
-                                    visible: !groupButton.header
-                                    text: groupButton.now
-                                    role: Theme.type.caption
-                                    color: Theme.textTertiary
-                                    elide: Text.ElideRight
+                                    spacing: 0
+
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 6
+
+                                        UiText {
+                                            Layout.fillWidth: true
+                                            text: groupButton.name
+                                            role: groupButton.selected ? Theme.type.bodyMdStrong : Theme.type.labelMd
+                                            elide: Text.ElideRight
+                                        }
+
+                                        // The section's group count, or the group's type.
+                                        UiText {
+                                            text: groupButton.header ? groupButton.now : groupButton.kind
+                                            role: Theme.type.caption
+                                            color: Theme.textMuted
+                                        }
+                                    }
+
+                                    UiText {
+                                        Layout.fillWidth: true
+                                        visible: !groupButton.header
+                                        text: groupButton.now
+                                        role: Theme.type.caption
+                                        color: Theme.textTertiary
+                                        elide: Text.ElideRight
+                                    }
                                 }
                             }
 
@@ -349,8 +369,8 @@ Item {
 
                         RowLayout {
                             anchors.fill: parent
-                            anchors.leftMargin: 14
-                            anchors.rightMargin: 14
+                            anchors.leftMargin: Theme.space4
+                            anchors.rightMargin: Theme.space4
                             spacing: Theme.space3
 
                             Item {
@@ -426,8 +446,8 @@ Item {
 
                             width: nodeList.width
                             implicitHeight: Theme.rowSingle
-                            leftPadding: 14
-                            rightPadding: 14
+                            leftPadding: Theme.space4
+                            rightPadding: Theme.space4
                             hoverEnabled: selectable
                             focusPolicy: selectable ? Qt.StrongFocus : Qt.NoFocus
                             checked: selected  // what screen readers hear; clicking does not toggle it
