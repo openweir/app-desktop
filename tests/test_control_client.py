@@ -1,5 +1,6 @@
 import asyncio
 import itertools
+import threading
 import time
 from collections.abc import Awaitable, Callable
 from typing import cast
@@ -783,6 +784,7 @@ def test_service_host_takes_over_through_the_helper(monkeypatch: pytest.MonkeyPa
     pb = control_pb2
     taken_over = False
     claims: list[bool] = []
+    daemons: list[bool] = []
 
     async def answer(request: control_pb2.Request) -> control_pb2.Response:
         if request.WhichOneof("method") == "claim":
@@ -793,6 +795,8 @@ def test_service_host_takes_over_through_the_helper(monkeypatch: pytest.MonkeyPa
 
     def helper() -> None:
         nonlocal taken_over
+        # UAC's prompt waits for the user; quitting meanwhile must not wait for it.
+        daemons.append(threading.current_thread().daemon)
         taken_over = True
 
     def declined() -> None:
@@ -812,6 +816,7 @@ def test_service_host_takes_over_through_the_helper(monkeypatch: pytest.MonkeyPa
                 assert claims == []
                 await host.take_over(helper)
                 assert claims == [False]
+                assert daemons == [True]
                 assert await host.validate(TunnelConfig("a: 1\n")) is None
             finally:
                 await host.close()

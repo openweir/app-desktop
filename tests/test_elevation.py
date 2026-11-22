@@ -40,6 +40,23 @@ def test_an_elevated_user_is_an_administrator() -> None:
     assert elevation.is_administrator()
 
 
+def test_run_elevated_stops_waiting_for_a_helper_that_does_not_finish(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    if sys.platform != "win32":
+        pytest.skip("UAC is on Windows")
+    import ctypes
+
+    if not ctypes.windll.shell32.IsUserAnAdmin():
+        pytest.skip("only an elevated process starts another without UAC's prompt")
+    monkeypatch.setattr(elevation, "HELPER_WAIT_S", 0.5)
+    shell = Path(os.environ.get("COMSPEC", r"C:\Windows\System32\cmd.exe"))
+    with pytest.raises(HostError) as raised:
+        elevation.run_elevated(shell, "/c ping -n 6 127.0.0.1 > nul")
+    assert raised.value.code == "take_over_failed"
+    assert "did not finish" in raised.value.message
+
+
 def test_run_elevated_returns_the_exit_status() -> None:
     if sys.platform != "win32":
         pytest.skip("UAC is on Windows")

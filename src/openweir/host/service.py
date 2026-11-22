@@ -52,6 +52,7 @@ from openweir.host.base import (
 from openweir.host.client import ControlClient
 from openweir.host.timeouts import remaining_seconds, request_timeout
 from openweir.host.transport import Opener
+from openweir.host.workers import run_blocking
 from openweir.protocol import control_pb2
 
 pb = control_pb2
@@ -444,8 +445,10 @@ class ServiceHost:
     async def take_over(self, helper: Callable[[], None]) -> None:
         """Stop another user's running tunnel and become the owner (D5b). ``helper`` has the
         service do it with an administrator's rights, and blocks until it did; the service
-        then restarts for us, which the claim waits for."""
-        await asyncio.to_thread(helper)
+        then restarts for us, which the claim waits for. The helper waits for UAC's prompt,
+        as long as the user leaves it open: a daemon thread, so that quitting meanwhile
+        does not wait for it."""
+        await run_blocking(helper)
         await self.close()
         await self.claim()
 

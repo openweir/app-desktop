@@ -4,8 +4,9 @@ docs/architecture.md §5.4).
 The UI runs with the user's filtered token, which the service does not let take over. Once
 the user confirmed it, the UI starts the service's own executable as the take-over helper
 through UAC (``ShellExecuteEx`` with the ``runas`` verb); the service accepts that executable
-on its pipe only with an administrator's rights. Starting it blocks until the helper is
-done: run it on a worker thread.
+on its pipe only with an administrator's rights. Starting it blocks until UAC's prompt is
+answered and the helper is done, or HELPER_WAIT_S passed: run it on a daemon thread
+(host/workers.py), since nothing bounds how long the prompt waits for the user.
 """
 
 from __future__ import annotations
@@ -27,7 +28,10 @@ _ELEVATION_TYPE_FULL, _ELEVATION_TYPE_LIMITED = 2, 3
 _SEE_MASK_NOCLOSEPROCESS = 0x00000040
 _SEE_MASK_NOASYNC = 0x00000100
 _SW_HIDE = 0
-_INFINITE = 0xFFFFFFFF
+_WAIT_OBJECT_0, _WAIT_TIMEOUT = 0, 0x102
+# The helper dials the pipe for up to 10 s and the service answers its claim within the
+# claim's 30 s; past this the UI stops waiting for it.
+HELPER_WAIT_S = 60.0
 _COINIT_APARTMENTTHREADED = 0x2
 _COINIT_DISABLE_OLE1DDE = 0x4
 _ERROR_CANCELLED = 1223  # the user declined UAC's prompt
@@ -108,7 +112,8 @@ def is_administrator() -> bool:
 def run_elevated(executable: Path, parameters: str) -> int:
     """Run ``executable`` with an administrator's rights once UAC confirmed it, wait for it
     and return its exit status. Raises HostError("cancelled") when the user declines, and
-    HostError("take_over_failed") when it does not start."""
+    HostError("take_over_failed") when it does not start or not finish within
+    HELPER_WAIT_S."""
     if sys.platform != "win32":
         raise HostError("unsupported_method", "elevation is only on Windows")
     shell32 = ctypes.WinDLL("shell32", use_last_error=True)
@@ -118,6 +123,7 @@ def run_elevated(executable: Path, parameters: str) -> int:
     ole32.CoInitializeEx.restype = ctypes.c_long
     shell32.ShellExecuteExW.argtypes = (ctypes.POINTER(_ShellExecuteInfo),)
     kernel32.WaitForSingleObject.argtypes = (wintypes.HANDLE, wintypes.DWORD)
+    kernel32.WaitForSingleObject.restype = wintypes.DWORD
     kernel32.GetExitCodeProcess.argtypes = (wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD))
     kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
     info = _ShellExecuteInfo()
@@ -144,7 +150,12 @@ def run_elevated(executable: Path, parameters: str) -> int:
     if not info.hProcess:
         raise HostError("take_over_failed", "the helper did not start")
     try:
-        kernel32.WaitForSingleObject(info.hProcess, _INFINITE)
+        waited = kernel32.WaitForSingleObject(info.hProcess, int(HELPER_WAIT_S * 1000))
+        if waited == _WAIT_TIMEOUT:
+            message = f"the helper did not finish within {HELPER_WAIT_S:g} s"
+            raise HostError("take_over_failed", message)
+        if waited != _WAIT_OBJECT_0:
+            raise HostError("take_over_failed", ctypes.FormatError(ctypes.get_last_error()))
         status = wintypes.DWORD()
         if not kernel32.GetExitCodeProcess(info.hProcess, ctypes.byref(status)):
             raise HostError("take_over_failed", ctypes.FormatError(ctypes.get_last_error()))

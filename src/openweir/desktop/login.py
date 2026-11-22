@@ -87,18 +87,25 @@ _TASK_NAME_RESERVED = re.compile(r'[\\/:*?"<>|]')
 
 # Runs schtasks with these arguments; returns its exit code and output.
 Runner = Callable[[Sequence[str]], tuple[int, str]]
+# schtasks answers in a moment; one that hangs must not keep its worker thread, which the
+# interpreter waits for as it exits, and with it the quit.
+SCHTASKS_TIMEOUT_S = 30.0
 
 
 def run_schtasks(args: Sequence[str]) -> tuple[int, str]:
     flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-    done = subprocess.run(
-        ["schtasks", *args],
-        capture_output=True,
-        text=True,
-        errors="replace",
-        creationflags=flags,
-        check=False,
-    )
+    try:
+        done = subprocess.run(
+            ["schtasks", *args],
+            capture_output=True,
+            text=True,
+            errors="replace",
+            creationflags=flags,
+            check=False,
+            timeout=SCHTASKS_TIMEOUT_S,
+        )
+    except subprocess.TimeoutExpired as error:
+        raise LoginItemError(f"schtasks did not finish within {SCHTASKS_TIMEOUT_S:g} s") from error
     return done.returncode, (done.stdout + done.stderr).strip()
 
 

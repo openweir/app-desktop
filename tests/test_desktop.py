@@ -10,6 +10,7 @@ import xml.etree.ElementTree as ET
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Any
 
 import pytest
 from PySide6.QtCore import QCoreApplication
@@ -31,6 +32,7 @@ from openweir.desktop.login import (
     NOT_FOUND,
     NOT_REGISTERED,
     REQUIRES_APPROVAL,
+    SCHTASKS_TIMEOUT_S,
     TASK_NAMESPACE,
     LoginItemError,
     LoginItemStatus,
@@ -38,6 +40,7 @@ from openweir.desktop.login import (
     ScheduledTask,
     UnavailableLoginItem,
     default_login_item,
+    run_schtasks,
     task_enabled,
     task_xml,
 )
@@ -104,6 +107,21 @@ def test_scheduled_task_round_trip() -> None:
     schtasks.deny = True
     with pytest.raises(LoginItemError, match="Access is denied"):
         task.set_enabled(True)
+
+
+def test_schtasks_that_hangs_is_given_up(monkeypatch: pytest.MonkeyPatch) -> None:
+    """It runs on a worker thread that the interpreter waits for as it exits."""
+    given: dict[str, Any] = {}
+
+    def hanging(command: list[str], **options: Any) -> subprocess.CompletedProcess[str]:
+        given.update(options)
+        raise subprocess.TimeoutExpired(command, options["timeout"])
+
+    monkeypatch.setattr(subprocess, "run", hanging)
+    with pytest.raises(LoginItemError, match="did not finish") as raised:
+        run_schtasks(["/Query", "/TN", "OpenWeir"])
+    assert raised.value.code == "login_item_failed"
+    assert given["timeout"] == SCHTASKS_TIMEOUT_S
 
 
 def test_task_definition() -> None:
