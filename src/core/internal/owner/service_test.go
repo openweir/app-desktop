@@ -158,7 +158,8 @@ func bundled(t *testing.T) string {
 	return dir
 }
 
-// start runs the service as a new process would: Open, then Attach.
+// start runs the service as a new process would: Open, then Attach, whose sign-in it waits
+// for.
 func start(t *testing.T, root string, m *machine) (*Service, *fakeCore, string) {
 	t.Helper()
 	service, home, err := Open(context.Background(), root, bundled(t), m, slog.New(slog.NewTextHandler(io.Discard, nil)))
@@ -167,7 +168,14 @@ func start(t *testing.T, root string, m *machine) (*Service, *fakeCore, string) 
 	}
 	core := &fakeCore{host: service}
 	service.Attach(core)
+	settle(t, service)
 	return service, core, home
+}
+
+// settle waits until the service has handled the sign-ins and sign-outs it was told of.
+func settle(t *testing.T, s *Service) {
+	t.Helper()
+	eventually(t, func() bool { s.mu.Lock(); defer s.mu.Unlock(); return len(s.sessionJobs) == 0 })
 }
 
 // geoData is what home holds of the GEO data, by file name.
@@ -665,6 +673,7 @@ func TestFailedResumeGivesTheProxyBack(t *testing.T) {
 	}
 	core = &fakeCore{host: service, resumeErr: errors.New("apply_failed: listen tcp 127.0.0.1:7890: address already in use")}
 	service.Attach(core)
+	settle(t, service)
 	if core.failedResumes != 1 || core.running {
 		t.Fatalf("%d failed resumes, running %v", core.failedResumes, core.running)
 	}

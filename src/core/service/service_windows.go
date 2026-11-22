@@ -153,9 +153,28 @@ func serve(ctx context.Context, sessions <-chan sessionEvent, powerEvents *power
 		defer opened.Close()
 		core = opened
 	}
+	var signer peer.Signer
+	if product.SignedRelease == "true" {
+		if product.WindowsSigner == "" || product.WindowsSignerEKU == "" {
+			return errors.New("a signed release needs WindowsSigner and WindowsSignerEKU")
+		}
+		signer = peer.Signer{Name: product.WindowsSigner, EKU: product.WindowsSignerEKU}
+	}
+	// The service's own executable connects as the take-over helper (decision D5b).
+	verify := peer.PipeClientVerifier(filepath.Join(filepath.Dir(executable), product.UIExecutable), executable, signer)
 	dispatcher := control.New(control.Options{Engine: core, HostMethods: true, Host: host, OnUnresponsive: operation.Terminate})
 	defer dispatcher.Close()
 	defer host.Close()
+	// The pipe is there before the owner's tunnel comes back, which Attach leaves to the
+	// background: after a crash the UI can connect, and disconnect, while the core starts.
+	listener, err := winio.ListenPipe(product.PipeName, &winio.PipeConfig{
+		SecurityDescriptor: product.PipeSDDL,
+		InputBufferSize:    pipeBufferSize,
+		OutputBufferSize:   pipeBufferSize,
+	})
+	if err != nil {
+		return fmt.Errorf("listen on %s: %w", product.PipeName, err)
+	}
 	host.Attach(dispatcher)
 	watcher, err := watchPower(powerEvents)
 	if err != nil {
@@ -184,23 +203,6 @@ func serve(ctx context.Context, sessions <-chan sessionEvent, powerEvents *power
 		}
 	}()
 
-	listener, err := winio.ListenPipe(product.PipeName, &winio.PipeConfig{
-		SecurityDescriptor: product.PipeSDDL,
-		InputBufferSize:    pipeBufferSize,
-		OutputBufferSize:   pipeBufferSize,
-	})
-	if err != nil {
-		return fmt.Errorf("listen on %s: %w", product.PipeName, err)
-	}
-	var signer peer.Signer
-	if product.SignedRelease == "true" {
-		if product.WindowsSigner == "" || product.WindowsSignerEKU == "" {
-			return errors.New("a signed release needs WindowsSigner and WindowsSignerEKU")
-		}
-		signer = peer.Signer{Name: product.WindowsSigner, EKU: product.WindowsSignerEKU}
-	}
-	// The service's own executable connects as the take-over helper (decision D5b).
-	verify := peer.PipeClientVerifier(filepath.Join(filepath.Dir(executable), product.UIExecutable), executable, signer)
 	logger.Info("service started", "version", product.Version, "core", engine.Version(), "owned", home != "",
 		"signed", product.SignedRelease == "true")
 	return ending(ctx, server.Serve(ctx, listener, verify, dispatcher, logger))

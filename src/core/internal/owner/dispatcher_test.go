@@ -178,3 +178,63 @@ func TestCancelledResumeKeepsItsGuardWhileTheStartRuns(t *testing.T) {
 		t.Fatal("the finished resume kept its guard")
 	}
 }
+
+// After a crash, the service answers on its pipe while the owner's tunnel comes back: Attach
+// leaves the resume to the background, and a Stop the owner sends meanwhile keeps its intent
+// at once, then ends the resume once the core is done starting.
+func TestAttachLeavesTheResumeToTheBackground(t *testing.T) {
+	root := t.TempDir()
+	machine := newMachine()
+	machine.sessions[1] = alice
+	home := kept{Home(root, alice)}
+	if err := os.MkdirAll(home.home, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := home.saveProfile(profile(false)); err != nil {
+		t.Fatal(err)
+	}
+	if err := home.setWasRunning(true); err != nil {
+		t.Fatal(err)
+	}
+	engine := &stubEngine{entered: make(chan struct{}), release: make(chan struct{})}
+	service, dispatcher, hung := front(t, root, machine, engine)
+	// The owner is still in the logon that connected before the crash.
+	logon, err := machine.SessionLogonTime(1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	service.owner.LogonTime = logon
+
+	attached := make(chan struct{})
+	go func() { service.Attach(dispatcher); close(attached) }()
+	select {
+	case <-attached:
+	case <-time.After(5 * time.Second):
+		close(engine.release)
+		t.Fatal("Attach waited for the core to start")
+	}
+	select {
+	case <-engine.entered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the owner's tunnel did not come back")
+	}
+	stopped := make(chan *controlpb.Response, 1)
+	go func() {
+		stopped <- handle(t, dispatcher, as(alice, 1), &controlpb.Request{Id: 1, Method: &controlpb.Request_Stop{
+			Stop: &controlpb.StopRequest{}}})
+	}()
+	eventually(t, func() bool { return !home.wasRunning() })
+	close(engine.release)
+	if response := <-stopped; response.GetError() != nil {
+		t.Fatal(response.GetError())
+	}
+	settle(t, service)
+	if engine.running.Load() || service.ResumeAllowed() || home.wasRunning() || home.resumeInterrupted() {
+		t.Fatal("the resume outlived the owner's Stop")
+	}
+	select {
+	case failure := <-hung:
+		t.Fatalf("%s was taken for a hung core", failure.Method)
+	default:
+	}
+}

@@ -218,13 +218,13 @@ func TestSignOutCancelsResumeBeforeTheCoreConnects(t *testing.T) {
 		t.Fatal("resume did not start")
 	}
 	s.SessionChanged(1, false)
-	eventually(t, func() bool { s.mu.Lock(); defer s.mu.Unlock(); return len(s.sessionJobs) == 0 })
+	settle(t, s)
 	close(release)
 	if core.Running() || s.ResumeAllowed() {
 		t.Fatal("resume survived sign-out")
 	}
 	s.SessionChanged(1, true)
-	eventually(t, func() bool { s.mu.Lock(); defer s.mu.Unlock(); return len(s.sessionJobs) == 0 })
+	settle(t, s)
 	if core.Running() || s.ResumeAllowed() || (kept{home}).wasRunning() {
 		t.Fatal("sign-in after logoff restored an old connection")
 	}

@@ -148,7 +148,10 @@ func Open(ctx context.Context, root, geodataDir string, platform Platform, log *
 }
 
 // Attach hands the service the core, then brings the owner's tunnel back if it was up and
-// they are still in the same Windows logon session (§5.2).
+// they are still in the same Windows logon session (§5.2). That is handled in the background
+// as their sign-in: the core's start can take its whole budget, and the service answers on
+// its pipe meanwhile. A Stop sent then keeps its intent at once and supersedes the resume,
+// which the dispatcher's operation queue orders with it.
 func (s *Service) Attach(core Core) {
 	s.core = core
 	s.mu.Lock()
@@ -165,7 +168,7 @@ func (s *Service) Attach(core Core) {
 	if slices.Contains(sessions, owner.Session) {
 		session = owner.Session
 	}
-	s.SignedIn(session)
+	s.SessionChanged(session, true)
 }
 
 func (s *Service) running() bool { return s.core != nil && s.core.Running() }

@@ -58,6 +58,7 @@ func TestWakeRestoresSelectionWithTheRealCore(t *testing.T) {
 	dispatcher := control.New(control.Options{Engine: core, Host: host, HostMethods: true})
 	defer func() { host.Close(); dispatcher.Close(); _ = core.Close() }()
 	host.Attach(dispatcher)
+	settle(t, host)
 	port := porttest.Free(t)
 	config := fmt.Sprintf(`mixed-port: %d
 mode: rule
