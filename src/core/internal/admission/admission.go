@@ -116,9 +116,14 @@ func Prepare(profile Profile, host Host) (*Prepared, error) {
 	if profile.Options.TUN && host.Tun == TunNone {
 		return nil, fmt.Errorf("%w: this host never creates a TUN", ErrUnsupported)
 	}
-	doc, composed, err := document(profile, host)
+	doc, composed, base, err := document(profile, host)
 	if err != nil {
 		return nil, invalidConfig(err)
+	}
+	if composed != nil || base {
+		// The base section is the core's: its sniffing follows the TUN, before the overrides,
+		// which may still set it (docs/routing.md §8.6).
+		compose.SniffFor(doc, host.Tun == TunFD || host.Tun == TunOwned && profile.Options.TUN)
 	}
 	if err := applyOverrides(doc, profile.Overrides); err != nil {
 		return nil, invalidConfig(err)
@@ -167,29 +172,28 @@ func invalidConfig(err error) error {
 }
 
 // document is where the pipeline starts: the profile's YAML, or the composed configuration.
-func document(profile Profile, host Host) (map[string]any, *compose.Result, error) {
+// base says that a profile's own starts with the base section (compose.Normalized.Base).
+func document(profile Profile, host Host) (doc map[string]any, composed *compose.Result, base bool, err error) {
 	if profile.Composition == nil {
-		doc, err := decodeDocument(profile.Config, host.Template)
-		return doc, nil, err
+		read, err := decodeDocument(profile.Config, host.Template)
+		if err != nil {
+			return nil, nil, false, err
+		}
+		return read.Profile, nil, read.Base, nil
 	}
-	composed, err := compose.Compose(*profile.Composition)
-	if err != nil {
-		return nil, nil, err
+	if composed, err = compose.Compose(*profile.Composition); err != nil {
+		return nil, nil, false, err
 	}
-	return composed.Config, composed, nil
+	return composed.Config, composed, false, nil
 }
 
 // decodeDocument reads the profile as a generic mapping, through subconv in whatever format
 // it came (compose.Normalize, D54): nodes, groups, rules and providers mihomo would refuse
 // are left out rather than failing the profile. Decoding into a map resolves anchors and
 // merge keys, so a patch cannot be bypassed by an alias.
-func decodeDocument(source []byte, template *rules.Client) (map[string]any, error) {
+func decodeDocument(source []byte, template *rules.Client) (*compose.Normalized, error) {
 	if len(bytes.TrimSpace(source)) == 0 {
 		return nil, errors.New("the configuration is empty")
 	}
-	read, err := compose.Normalize(source, template)
-	if err != nil {
-		return nil, err
-	}
-	return read.Profile, nil
+	return compose.Normalize(source, template)
 }

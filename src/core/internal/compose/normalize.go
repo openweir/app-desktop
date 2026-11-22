@@ -29,6 +29,9 @@ type Normalized struct {
 	// Rules are a mihomo or Clash profile's rules as written, nil for the other formats and
 	// with the template: ConvertToPlan reads them itself, to say why it leaves each one out.
 	Rules any
+	// Base says that the profile starts with the base section (a format other than mihomo's),
+	// whose sniffing follows the host's TUN (SniffFor).
+	Base bool
 }
 
 // HasRules reports whether the subscription routes: by rules of its own that survived, not
@@ -120,7 +123,7 @@ func Normalize(data []byte, template *rules.Client) (*Normalized, error) {
 	}
 	out := &Normalized{
 		Profile: profile, Format: result.Format, Warnings: result.Warnings, Stats: result.RuleStats,
-		Template: result.Template,
+		Template: result.Template, Base: original == nil,
 	}
 	if original != nil && result.Template == nil {
 		out.Rules = original["rules"]

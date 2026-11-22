@@ -558,9 +558,16 @@ D 编号也在那里。
 - **GEO 数据**：`geodata-mode: true`、`geodata-loader: memconservative`（按需读文件，内存占用小）、
   `geo-auto-update: true`、`geo-update-interval: 24`；`geox-url` 是 meta-rules-dat 的 `latest` 发布（与 mihomo
   的默认值相同）。
-- **嗅探**：开启；HTTP（80、8080–8880）和 TLS（443、8443）用嗅探到的域名覆盖目标地址，由节点解析；QUIC（443、
-  8443）的域名只用于规则匹配，目标地址不变：UDP 出站在本机解析域名，覆盖后每条发往 IP 的 QUIC 都要先在本机解析
-  SNI，解析不到就连不上；跳过 `Mijia Cloud` 和 `+.push.apple.com`；`parse-pure-ip`、`force-dns-mapping`。
+- **嗅探**：开启；QUIC（443、8443）的域名只用于规则匹配，目标地址不变：UDP 出站在本机解析域名，覆盖后每条发往 IP
+  的 QUIC 都要先在本机解析 SNI，解析不到就连不上；跳过 `Mijia Cloud` 和 `+.push.apple.com`；`parse-pure-ip`、
+  `force-dns-mapping`。HTTP（80、8080–8880）和 TLS（443、8443）是否用嗅探到的域名覆盖目标地址，看接管方式
+  （`compose.SniffFor`，准入在覆写之前调用，所以覆写仍可改）：
+  - **TUN 开着、DNS 是 fake-ip**（Windows 开着 TUN，macOS 总是）：不覆盖，只用于规则匹配。这时应用解析过的连接都经
+    fake-ip 映射带着域名到达，覆盖只会改写直接发往 IP 的连接，而这些正是用 IP 连服务器、借用别的域名作 SNI 的程序
+    （REALITY、Hysteria 2 和 TUIC 客户端、域前置），覆盖后它们会连到被借用的网站上去。OpenWrt 插件同样只在它的 DNS
+    保护关闭时覆盖。
+  - **只有系统代理或混合端口**：覆盖，由节点解析。应用自己解析的地址可能来自被污染的 DNS，换成域名交给节点更可靠。
+  - 适用于基础段：「我的方案」的拼装，以及 mihomo 格式以外、前面加了基础段的订阅；mihomo/Clash 配置自己的嗅探设置不改。
 - **DNS**：
   - `enhanced-mode: fake-ip`，地址段 `198.18.0.1/16`；`fake-ip-filter` 排除 `geosite:private`、局域网和本机
     后缀、Windows 联网检测、NTP 和 STUN 的域名；

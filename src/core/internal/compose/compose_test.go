@@ -336,6 +336,38 @@ func TestBaseSection(t *testing.T) {
 	}
 }
 
+// Under the TUN with fake-ip DNS, the base section's TLS and HTTP sniffing only feed the rules
+// (SniffFor, docs/routing.md §8.6); without it they give the node the name to resolve.
+func TestSniffFor(t *testing.T) {
+	overrides := func(config map[string]any) []any {
+		sniff := config["sniffer"].(map[string]any)["sniff"].(map[string]any)
+		var out []any
+		for _, protocol := range []string{"HTTP", "TLS", "QUIC"} {
+			out = append(out, sniff[protocol].(map[string]any)["override-destination"])
+		}
+		return out
+	}
+	config := composeOK(t, `{"version": 1}`).Config
+	if got := overrides(config); !slices.Equal(got, []any{true, true, false}) {
+		t.Fatalf("the base section's sniffing = %v", got)
+	}
+	SniffFor(config, false)
+	if got := overrides(config); !slices.Equal(got, []any{true, true, false}) {
+		t.Fatalf("without the TUN = %v", got)
+	}
+	SniffFor(config, true)
+	if got := overrides(config); !slices.Equal(got, []any{false, false, false}) {
+		t.Fatalf("under the TUN = %v", got)
+	}
+	// Without fake-ip DNS the TUN gets addresses, and the override stays.
+	config = composeOK(t, `{"version": 1}`).Config
+	config["dns"].(map[string]any)["enhanced-mode"] = "redir-host"
+	SniffFor(config, true)
+	if got := overrides(config); !slices.Equal(got, []any{true, true, false}) {
+		t.Fatalf("under the TUN without fake-ip = %v", got)
+	}
+}
+
 func TestPlanErrors(t *testing.T) {
 	for plan, want := range map[string]string{
 		``:                                   "empty",

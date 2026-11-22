@@ -14,18 +14,21 @@ import (
 	C "github.com/metacubex/mihomo/constant"
 	"github.com/metacubex/mihomo/constant/features"
 	LC "github.com/metacubex/mihomo/listener/config"
+
+	"github.com/openweir/app-desktop/src/core/internal/compose"
 )
 
 const minimal = "mixed-port: 7890\nproxies: []\nrules: ['MATCH,DIRECT']\n"
 
 func TestOverridesExtendLists(t *testing.T) {
-	doc, err := decodeDocument([]byte(`proxies: [{name: a, type: direct}]
+	read, err := decodeDocument([]byte(`proxies: [{name: a, type: direct}]
 proxy-groups: [{name: G, type: select, proxies: [a]}]
 rules: ['DOMAIN,a.example,G', 'MATCH,G']
 `), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
+	doc := read.Profile
 	err = applyOverrides(doc, [][]byte{
 		[]byte(`prepend-rules: ['DOMAIN,first.example,DIRECT']
 append-rules: ['MATCH,DIRECT']
@@ -157,5 +160,60 @@ func TestFDModeVerifiesTheStackForAllNetworks(t *testing.T) {
 	}
 	if err := verifyFDTun(tun, true); err == nil {
 		t.Fatal("mixed passed while the tunnel includes all networks")
+	}
+}
+
+// The base section's TLS and HTTP sniffing override the destination only without the TUN
+// (docs/routing.md §8.6): under it, fake-ip DNS names every resolved flow, and the override
+// would only send bare-IP flows that borrow a name to the site they disguise as. A
+// subscription's own sniffing, and what an override sets, stay.
+func TestSniffingFollowsTheTUN(t *testing.T) {
+	overrides := func(profile map[string]any) []any {
+		sniff := profile["sniffer"].(map[string]any)["sniff"].(map[string]any)
+		return []any{sniff["HTTP"].(map[string]any)["override-destination"],
+			sniff["TLS"].(map[string]any)["override-destination"], sniff["QUIC"].(map[string]any)["override-destination"]}
+	}
+	composition := &compose.Composition{Plan: []byte(`{"version": 1}`)}
+	links := []byte("trojan://secret@t.example:443#SG\n")
+	own := []byte(minimal + "dns: {enable: true, enhanced-mode: fake-ip}\n" +
+		"sniffer: {enable: true, sniff: {TLS: {ports: [443], override-destination: true}}}\n")
+	for _, run := range []struct {
+		name    string
+		host    Host
+		options RunOptions
+		want    []any
+	}{
+		{"no TUN", Host{Tun: TunNone}, RunOptions{}, []any{true, true, false}},
+		{"system proxy only", Host{Tun: TunOwned}, RunOptions{TUN: false}, []any{true, true, false}},
+		{"owned TUN", Host{Tun: TunOwned}, RunOptions{TUN: true}, []any{false, false, false}},
+		{"fd mode", Host{Tun: TunFD}, RunOptions{}, []any{false, false, false}},
+	} {
+		for _, profile := range []Profile{{Composition: composition}, {Config: links}} {
+			profile.Options = run.options
+			prepared, err := Prepare(profile, run.host)
+			if err != nil {
+				t.Fatalf("%s: %v", run.name, err)
+			}
+			if got := overrides(prepared.Document); !slices.Equal(got, run.want) {
+				t.Errorf("%s, composed %v: override-destination = %v, want %v", run.name, profile.Composition != nil, got, run.want)
+			}
+		}
+		prepared, err := Prepare(Profile{Config: own, Options: run.options}, run.host)
+		if err != nil {
+			t.Fatalf("%s: %v", run.name, err)
+		}
+		tls := prepared.Document["sniffer"].(map[string]any)["sniff"].(map[string]any)["TLS"].(map[string]any)
+		if tls["override-destination"] != true {
+			t.Errorf("%s: the subscription's own sniffing changed: %v", run.name, tls)
+		}
+	}
+	override := Profile{Composition: composition, Options: RunOptions{TUN: true},
+		Overrides: [][]byte{[]byte("sniffer: {sniff: {TLS: {ports: [443], override-destination: true}}}\n")}}
+	prepared, err := Prepare(override, Host{Tun: TunOwned})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tls := prepared.Document["sniffer"].(map[string]any)["sniff"].(map[string]any)["TLS"].(map[string]any); tls["override-destination"] != true {
+		t.Errorf("an override's sniffing changed: %v", tls)
 	}
 }
