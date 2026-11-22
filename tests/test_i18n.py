@@ -205,3 +205,6 @@ def test_english_failures() -> None:
     assert timeout == "The service isn’t responding"  # noqa: RUF001
     assert failure_text(HostError("brand_new", "it broke")) == "Operation failed: it broke"
     assert failure_text(RuntimeError("boom")) == "Operation failed: boom"
+    # The core's own English is left out where the code says it all.
+    too_large = HostError("response_too_large", "the list_rules answer takes 11135024 bytes")
+    assert failure_text(too_large) == "Too much data; it exceeds the transfer limit"

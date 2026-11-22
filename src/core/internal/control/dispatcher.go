@@ -39,6 +39,7 @@ const (
 	CodeNotClaimed           = "not_claimed"
 	CodeOwnedByOtherUser     = "owned_by_other_user"
 	CodeServiceRestarting    = "service_restarting"
+	CodeResponseTooLarge     = "response_too_large"
 	codeInternal             = "internal_error"
 )
 
@@ -187,7 +188,9 @@ func (d *Dispatcher) Close() {
 
 // Handle answers one encoded Request. Every failure, including an undecodable request,
 // becomes an Error result, so the caller always has a Response to send back. ctx lives
-// as long as the caller's connection; subscriptions made on it end with it.
+// as long as the caller's connection; subscriptions made on it end with it. No answer
+// exceeds frame.MaxResponseBytes: the Windows pipe could not carry it, and dropping the
+// connection would drop every other request and subscription on it too.
 func (d *Dispatcher) Handle(ctx context.Context, caller peer.Identity, payload []byte) []byte {
 	if len(payload) > frame.MaxRequestBytes {
 		return EncodeFailure(0, CodeInvalidRequest, "request exceeds the size limit")
@@ -207,7 +210,13 @@ func (d *Dispatcher) Handle(ctx context.Context, caller peer.Identity, payload [
 	case request.Method == nil:
 		return EncodeFailure(id, CodeInvalidRequest, "request names no known method")
 	}
-	return encode(id, d.execute(ctx, caller, &request))
+	response := encode(id, d.execute(ctx, caller, &request))
+	if len(response) > frame.MaxResponseBytes {
+		return EncodeFailure(id, CodeResponseTooLarge, fmt.Sprintf(
+			"the %s answer takes %d bytes, over the %d-byte limit",
+			methodName(&request), len(response), frame.MaxResponseBytes))
+	}
+	return response
 }
 
 func (d *Dispatcher) dispatch(ctx context.Context, caller peer.Identity, request *controlpb.Request) *controlpb.Response {

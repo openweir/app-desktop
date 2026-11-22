@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/openweir/app-desktop/src/core/internal/controlpb"
@@ -24,6 +25,9 @@ const (
 	// maxPollBytes keeps a PollEvents response well under the 8 MiB frame limit; events
 	// past it wait for the next poll.
 	maxPollBytes = 4 << 20
+	// maxSnapshotBytes bounds one connection snapshot, which a poll returns whole: tens of
+	// thousands of connections would otherwise make a single event over the frame limit.
+	maxSnapshotBytes = maxPollBytes
 )
 
 type topic int
@@ -295,7 +299,8 @@ func (s *subscriptions) pump(stop <-chan struct{}, done chan<- struct{}) {
 			samples[topicTraffic] = &controlpb.Event{Payload: &controlpb.Event_Traffic{Traffic: s.engine.Traffic()}}
 		}
 		if wanted[topicConnections] {
-			samples[topicConnections] = &controlpb.Event{Payload: &controlpb.Event_Connections{Connections: s.engine.Connections()}}
+			snapshot := capSnapshot(s.engine.Connections(), maxSnapshotBytes)
+			samples[topicConnections] = &controlpb.Event{Payload: &controlpb.Event_Connections{Connections: snapshot}}
 		}
 		s.mu.Lock()
 		for _, sub := range s.byID {
@@ -305,6 +310,20 @@ func (s *subscriptions) pump(stop <-chan struct{}, done chan<- struct{}) {
 		}
 		s.mu.Unlock()
 	}
+}
+
+// capSnapshot keeps the connections of snapshot that fit in limit bytes. The engine lists
+// them oldest first, so the newest are the ones left out: the rows the connections page
+// shows, and the rates it works out across polls, stay with the same connections.
+func capSnapshot(snapshot *controlpb.ConnectionSnapshot, limit int) *controlpb.ConnectionSnapshot {
+	size := 0
+	for i, connection := range snapshot.GetConnections() {
+		size += protowire.SizeTag(1) + protowire.SizeBytes(proto.Size(connection))
+		if size > limit {
+			return &controlpb.ConnectionSnapshot{Connections: snapshot.Connections[:i]}
+		}
+	}
+	return snapshot
 }
 
 // close ends every subscription and waits for the background work to stop.

@@ -853,6 +853,10 @@
         <translation>The core isn’t responding; try again shortly</translation>
     </message>
     <message>
+        <source>数据过多，超出了传输上限</source>
+        <translation>Too much data; it exceeds the transfer limit</translation>
+    </message>
+    <message>
         <source>操作已取消</source>
         <translation>Operation cancelled</translation>
     </message>

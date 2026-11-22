@@ -15,6 +15,8 @@ _MESSAGES = {
     "connection_closed": QT_TRANSLATE_NOOP("Feedback", "与服务的连接已断开"),
     "timeout": QT_TRANSLATE_NOOP("Feedback", "服务没有响应"),
     "core_unresponsive": QT_TRANSLATE_NOOP("Feedback", "内核没有响应，请稍后重试"),
+    # An answer over the 8 MiB the control protocol carries, e.g. 100,000 inline rules.
+    "response_too_large": QT_TRANSLATE_NOOP("Feedback", "数据过多，超出了传输上限"),
     "cancelled": QT_TRANSLATE_NOOP("Feedback", "操作已取消"),
     "extension_busy": QT_TRANSLATE_NOOP("Feedback", "系统正在处理扩展请求，请稍后重试"),
     "extension_deactivation_pending": QT_TRANSLATE_NOOP(
