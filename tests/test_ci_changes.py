@@ -94,6 +94,60 @@ def test_selects_consumers_without_unrelated_jobs(paths: list[str], expected: se
 
 
 @pytest.mark.parametrize(
+    ("paths", "added"),
+    [
+        (["apple/Manager/Deadline.swift"], {"windows-installer", "windows-arm64-upgrade"}),
+        (["package/windows/installer.nsi"], {"apple"}),
+        (
+            ["src/core/internal/peer/credentials_darwin.go"],
+            {"windows-installer", "windows-arm64-upgrade"},
+        ),
+    ],
+)
+def test_a_develop_push_builds_every_installer_or_none(paths: list[str], added: set[str]) -> None:
+    plan = ci.select(paths)
+    assert not added & plan.jobs
+    preview = ci.for_preview(plan, "push", "refs/heads/develop")
+    assert preview.jobs == plan.jobs | ci.INSTALLERS
+    assert preview.jobs - plan.jobs == added
+    # Elsewhere a platform's change builds only that platform.
+    assert ci.for_preview(plan, "push", "refs/heads/main") == plan
+    assert ci.for_preview(plan, "pull_request", "refs/heads/develop") == plan
+    # A develop push that builds no installer still builds none, and publishes no preview.
+    docs = ci.select(["docs/usage.md", "scripts/gen_i18n.py"])
+    assert ci.for_preview(docs, "push", "refs/heads/develop") == docs
+
+
+@pytest.mark.parametrize(
+    ("ref", "expected"),
+    [("refs/heads/develop", ci.INSTALLERS), ("refs/heads/main", {"apple"})],
+)
+def test_the_command_line_applies_the_preview_rule(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    ref: str,
+    expected: set[str],
+) -> None:
+    event = tmp_path / "event.json"
+    event.write_text(json.dumps({"after": "a" * 40}))
+    for name, value in {
+        "GITHUB_EVENT_PATH": str(event),
+        "GITHUB_EVENT_NAME": "push",
+        "GITHUB_REF": ref,
+        "GITHUB_RUN_ATTEMPT": "1",
+        "GITHUB_OUTPUT": str(tmp_path / "output"),
+        "GITHUB_STEP_SUMMARY": str(tmp_path / "summary"),
+    }.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.setattr(ci, "previous_success", lambda head: None)
+    monkeypatch.setattr(ci, "for_event", lambda *_, **__: ci.Plan(frozenset({"apple"})))
+    monkeypatch.setattr(sys, "argv", ["ci_changes.py"])
+    ci.main()
+    assert set(json.loads(capsys.readouterr().out)["jobs"]) == expected
+
+
+@pytest.mark.parametrize(
     "path", ["uv.lock", "src/core/go.mod", ".github/workflows/ci.yml", "new-tool/config.toml"]
 )
 def test_shared_or_unknown_inputs_select_everything(path: str) -> None:

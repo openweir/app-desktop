@@ -529,13 +529,14 @@ jobs:
           path: ${{ runner.temp }}/openweir-ui/
           if-no-files-found: ignore
           retention-days: 14
+      # Kept as long as the disk image, so that a rerun of the preview job still finds them.
       - uses: actions/upload-artifact@v7
         with:
           name: windows-installer-${{ matrix.arch }}-${{ github.sha }}
           path: ${{ matrix.build }}/OpenWeir-*-windows-${{ matrix.arch }}-setup.exe
           if-no-files-found: error
           compression-level: 0
-          retention-days: 1
+          retention-days: 7
 
   windows-arm64-upgrade:
     needs: [changes, windows-installer]

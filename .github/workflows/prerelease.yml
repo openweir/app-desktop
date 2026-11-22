@@ -5,8 +5,10 @@
 # from 1 per version), so testers download them from the release page instead of Actions artifacts. main
 # holds what is to be released, and its v* tags make the signed releases (release.yml). Pre-releases
 # are never offered as updates (src/openweir/update/releases.py reads releases/latest only), and
-# only the newest is kept. A CI run that built no installer (documentation only) publishes
-# nothing.
+# only the newest is kept, so a preview carries all three installers: a develop push that builds
+# one builds them all (scripts/ci_changes.py), and a run without each of them publishes nothing
+# and leaves the previous preview in place. A CI run that built no installer (documentation
+# only) publishes nothing either.
 name: Preview
 
 on:
@@ -20,6 +22,7 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: write
       actions: write
@@ -31,7 +34,8 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       HEAD_SHA: ${{ github.sha }}
     steps:
-      # The Windows installers are kept for a day and the disk image for a week (ci.yml).
+      # CI keeps the installers for a week (ci.yml), long enough for a rerun of this job. When
+      # nothing matches, nothing is downloaded and dist is not created.
       - name: Installers from the CI run
         uses: actions/download-artifact@v7
         with:
@@ -47,38 +51,45 @@ jobs:
           shopt -s nullglob
           # CI's changes job computed it from git (scripts/next_version.py).
           version="$VERSION"
+          skip() {
+            echo "$1" >> "$GITHUB_STEP_SUMMARY"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          }
+          if [ "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/develop" --jq .object.sha)" != "$HEAD_SHA" ]; then
+            skip "A later develop commit has superseded this CI run."
+          fi
+          # develop at a released commit (main merged back) has nothing new to preview.
+          released=$(gh release view "v$version" --repo "$GITHUB_REPOSITORY" --json isDraft,isPrerelease \
+            --jq '(.isDraft or .isPrerelease) | not' 2>/dev/null || true)
+          if [ "$released" = true ]; then
+            skip "v$version is already released; no preview."
+          fi
+          mkdir -p dist
+          cd dist
+          dmgs=(*.dmg)
+          x64=(OpenWeir-*-windows-x64-setup.exe)
+          arm64=(OpenWeir-*-windows-arm64-setup.exe)
+          if [ $((${#dmgs[@]} + ${#x64[@]} + ${#arm64[@]})) -eq 0 ]; then
+            skip "This CI run built no installer; nothing to publish."
+          fi
+          # The new preview replaces the previous one, so it carries every platform or is not made.
+          if [ ${#dmgs[@]} -ne 1 ] || [ ${#x64[@]} -ne 1 ] || [ ${#arm64[@]} -ne 1 ]; then
+            echo "::warning::Found ${#dmgs[@]} disk image(s), ${#x64[@]} x64 and ${#arm64[@]} ARM64 installer(s), not one of each; the previous preview stays"
+            skip "Not one of each installer; no preview, and the previous one stays."
+          fi
           # Previews of a version count from 1: the next number after this version's newest preview.
           last=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName \
             --jq "[.[].tagName | select(startswith(\"v$version-preview.\")) | ltrimstr(\"v$version-preview.\") | select(test(\"^[0-9]+\$\")) | tonumber] | max // 0")
           preview="$version-preview.$((last + 1))"
-          echo "tag=v$preview" >> "$GITHUB_OUTPUT"
-          echo "version=$preview" >> "$GITHUB_OUTPUT"
-          cd dist
-          for dmg in *.dmg; do mv "$dmg" "OpenWeir-$preview-macos-universal-unsigned.dmg"; done
-          for exe in OpenWeir-*-windows-*-setup.exe; do
-            arch=$(echo "$exe" | sed -E 's/.*-windows-([a-z0-9]+)-setup\.exe/\1/')
-            mv "$exe" "OpenWeir-$preview-windows-$arch-unsigned-setup.exe"
-          done
+          mv "${dmgs[0]}" "OpenWeir-$preview-macos-universal-unsigned.dmg"
+          mv "${x64[0]}" "OpenWeir-$preview-windows-x64-unsigned-setup.exe"
+          mv "${arm64[0]}" "OpenWeir-$preview-windows-arm64-unsigned-setup.exe"
           files=(OpenWeir-*)
-          if [ "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/develop" --jq .object.sha)" != "$HEAD_SHA" ]; then
-            echo "A later develop commit has superseded this CI run." >> "$GITHUB_STEP_SUMMARY"
-            echo "publish=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          # develop at a released commit (main merged back) has nothing new to preview.
-          if gh release view "v$version" --repo "$GITHUB_REPOSITORY" --json isDraft,isPrerelease \
-              --jq '(.isDraft or .isPrerelease) | not' 2>/dev/null | grep -qx true; then
-            echo "v$version is already released; no preview." >> "$GITHUB_STEP_SUMMARY"
-            echo "publish=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          if [ ${#files[@]} -eq 0 ]; then
-            echo "This CI run built no installer; nothing to publish"
-            echo "publish=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
           sha256sum "${files[@]}" > SHA256SUMS
           ls -l
+          echo "tag=v$preview" >> "$GITHUB_OUTPUT"
+          echo "version=$preview" >> "$GITHUB_OUTPUT"
           echo "publish=true" >> "$GITHUB_OUTPUT"
 
       - name: Publish the pre-release
@@ -121,11 +132,13 @@ jobs:
             gh release delete "$tag" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
           done
 
-      # Runs cancelled by a newer push only clutter the Actions list.
+      # develop's CI runs cancelled by a newer push only clutter the Actions list. Only those:
+      # a cancelled run of another branch or workflow may be one someone wants to look at.
       - name: Delete cancelled runs
         if: always()
         run: |
-          gh run list --repo "$GITHUB_REPOSITORY" --status cancelled --limit 100 --json databaseId --jq '.[].databaseId' |
+          gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --branch develop --status cancelled \
+            --limit 100 --json databaseId --jq '.[].databaseId' |
           while read -r id; do
             gh run delete "$id" --repo "$GITHUB_REPOSITORY" || true
           done

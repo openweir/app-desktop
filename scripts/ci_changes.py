@@ -2,6 +2,8 @@
 
 Unknown inputs and unavailable history select every job. Pushes reuse a successful
 ancestor CI run, not an unchecked previous commit. File paths always come from Git.
+A push to develop that builds one installer builds all three: they go out together as a
+preview (prerelease.yml), which replaces the previous one.
 """
 
 from __future__ import annotations
@@ -35,6 +37,10 @@ CORE = frozenset({"go", "e2e", "apple", "windows-installer", "tun"})
 UI = frozenset({"python", "e2e", "apple", "windows-installer"})
 WINDOWS = frozenset({"python", "installer-ui", "windows-installer"})
 BUILD = frozenset({"python", "apple", "windows-installer", "installer-ui"})
+# The jobs that build the preview's installers: the macOS disk image, and the Windows x64 and
+# ARM64 installers, which windows-arm64-upgrade then checks together.
+INSTALLERS = frozenset({"apple", "windows-installer", "windows-arm64-upgrade"})
+PREVIEW_REF = "refs/heads/develop"
 GLOBAL_FILES = frozenset(
     {
         "pyproject.toml",
@@ -165,6 +171,14 @@ def select(paths: Iterable[str]) -> Plan:
     return Plan(
         frozenset(jobs), protocol, "changed inputs" if jobs else "documentation or empty diff"
     )
+
+
+def for_preview(plan: Plan, event_name: str, ref: str | None) -> Plan:
+    """On a push to develop, every installer when any is built: the preview publishes the
+    run's installers as a set and removes the previous one, so it must not lack a platform."""
+    if event_name != "push" or ref != PREVIEW_REF or not plan.jobs & INSTALLERS:
+        return plan
+    return Plan(plan.jobs | INSTALLERS, plan.protocol, plan.reason, plan.base)
 
 
 def valid_sha(value: object) -> TypeGuard[str]:
@@ -310,6 +324,7 @@ def main() -> None:
             else:
                 base = previous_success(event["after"]) if name == "push" else None
                 plan = for_event(name, event, push_base=base)
+            plan = for_preview(plan, name, os.environ.get("GITHUB_REF"))
         except Exception:
             plan = complete("event unavailable")
     jobs = json.dumps(sorted(plan.jobs), separators=(",", ":"))
