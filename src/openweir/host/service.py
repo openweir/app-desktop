@@ -376,7 +376,9 @@ class ServiceHost:
         self.takeover = takeover
         self._client: ControlClient | None = None
         self._connect_lock = asyncio.Lock()
-        self._subscriptions: dict[str, int] = {}
+        # By topic: the subscription's id, and the client of the connection it lives on; a
+        # subscription ends with its connection (docs/architecture.md §4.4).
+        self._subscriptions: dict[str, tuple[ControlClient | None, int]] = {}
         self._connections: list[Connection] = []  # the latest snapshot, shared by every poll
         self._log_level = ""  # the level of the logs subscription
 
@@ -673,21 +675,30 @@ class ServiceHost:
         check = pb.HealthCheckRequest(group=group, test=DELAY_TESTS[test])
         await self._call(pb.Request(health_check=check))
 
+    def _live(self, client: ControlClient | None) -> bool:
+        """Whether a subscription made over ``client`` can still be polled: its connection is
+        the one in use, and open."""
+        return client is self._client and (client is None or not client.closed)
+
     async def _poll(self, topic: str, subscribe: pb.Request) -> list[pb.Event]:
-        """Drain a subscription, re-subscribing once if the service expired it."""
+        """Drain a subscription, subscribing again when its connection closed, and once more
+        when the service no longer knows it: it expired, or the connection closed while the
+        poll was on its way."""
         for attempt in range(2):
-            if topic not in self._subscriptions:
+            held = self._subscriptions.get(topic)
+            if held is None or not self._live(held[0]):
                 response = await self._call(subscribe)
-                self._subscriptions[topic] = response.subscribe.subscription_id
-            request = pb.Request(
-                poll_events=pb.PollEventsRequest(subscription_id=self._subscriptions[topic])
-            )
+                held = (self._client, response.subscribe.subscription_id)
+                self._subscriptions[topic] = held
+            request = pb.Request(poll_events=pb.PollEventsRequest(subscription_id=held[1]))
             try:
                 return list((await self._call(request)).poll_events.events)
             except HostError as error:
                 if error.code != "unknown_subscription" or attempt:
                     raise
-                del self._subscriptions[topic]
+                # A reconnect may have dropped it already, or another poll replaced it.
+                if self._subscriptions.get(topic) == held:
+                    del self._subscriptions[topic]
         raise AssertionError("unreachable")
 
     async def poll_traffic(self) -> list[TrafficSample]:
@@ -743,8 +754,11 @@ class ServiceHost:
 
     async def _unsubscribe(self, topic: str) -> None:
         """End a subscription now rather than leave it to expire; one that already expired
-        is fine."""
-        request = pb.UnsubscribeRequest(subscription_id=self._subscriptions.pop(topic))
+        is fine, and one whose connection closed ended with it."""
+        held = self._subscriptions.pop(topic, None)
+        if held is None or not self._live(held[0]):
+            return
+        request = pb.UnsubscribeRequest(subscription_id=held[1])
         try:
             await self._call(pb.Request(unsubscribe=request))
         except HostError as error:

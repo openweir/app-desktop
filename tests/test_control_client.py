@@ -1,4 +1,5 @@
 import asyncio
+import itertools
 import time
 from collections.abc import Awaitable, Callable
 from typing import cast
@@ -597,6 +598,83 @@ def test_service_host_subscribes_to_logs_again_for_another_level() -> None:
     asyncio.run(scenario())
     assert subscribed == [pb.LOG_LEVEL_INFO, pb.LOG_LEVEL_DEBUG]
     assert unsubscribed == [1]
+
+
+def test_service_host_subscribes_again_on_a_new_connection() -> None:
+    """A subscription ends with the connection it was made on (docs/architecture.md §4.4).
+    After the service dropped the connection, the next poll subscribes on the new one,
+    whether the drop shows before the poll or only while the poll reconnects."""
+    pb = control_pb2
+    ids = itertools.count(1)
+    writers: list[asyncio.StreamWriter] = []
+
+    async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        writers.append(writer)
+        known: set[int] = set()  # this connection's subscriptions
+        try:
+            while True:
+                request = pb.Request.FromString(await read_frame(reader, KIND_REQUEST))
+                polled = request.poll_events.subscription_id
+                if request.WhichOneof("method") in ("subscribe_traffic", "subscribe_logs"):
+                    known.add(next(ids))
+                    response = pb.Response(
+                        subscribe=pb.SubscribeResponse(subscription_id=max(known))
+                    )
+                elif polled in known:
+                    sample = pb.TrafficSample(down_bytes_per_second=polled)
+                    entry = pb.LogEntry(level=pb.LOG_LEVEL_INFO, message=str(polled))
+                    events = [pb.Event(traffic=sample), pb.Event(log=entry)]
+                    response = pb.Response(poll_events=pb.PollEventsResponse(events=events))
+                else:
+                    error = pb.Error(code="unknown_subscription", message="no such subscription")
+                    response = pb.Response(error=error)
+                response.protocol_version = 1
+                response.id = request.id
+                writer.write(encode(KIND_RESPONSE, response.SerializeToString()))
+        except asyncio.IncompleteReadError, ConnectionError:
+            writer.close()
+
+    async def scenario() -> None:
+        server = await asyncio.start_server(handle, "127.0.0.1", 0)
+        port = server.sockets[0].getsockname()[1]
+
+        async def opener() -> Streams:
+            return await asyncio.open_connection("127.0.0.1", port)
+
+        async with server:
+            host = ServiceHost(opener)
+            try:
+                rates = [s.down_bytes_per_second for s in await host.poll_traffic()]
+                assert rates == [1]
+                assert [e.message for e in await host.poll_logs("info")] == ["2"]
+                # The service drops the connection, and the client has seen it.
+                first = host._client
+                assert first is not None
+                writers[0].close()
+                async with asyncio.timeout(2):
+                    while not first.closed:
+                        await asyncio.sleep(0.01)
+                rates = [s.down_bytes_per_second for s in await host.poll_traffic()]
+                assert rates == [3]
+                # The connection drops while the poll is on its way: the poll reconnects,
+                # and the new connection does not know the subscription.
+                second = host._client
+                assert second is not None
+                connected = host._connected
+
+                async def dropping() -> ControlClient:
+                    second._abort("the service went away")
+                    host._connected = connected
+                    return await connected()
+
+                host._connected = dropping
+                rates = [s.down_bytes_per_second for s in await host.poll_traffic()]
+                assert rates == [4]
+                assert [e.message for e in await host.poll_logs("info")] == ["5"]
+            finally:
+                await host.close()
+
+    asyncio.run(scenario())
 
 
 def _not_ours(code: str) -> control_pb2.Response:

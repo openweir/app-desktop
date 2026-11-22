@@ -134,7 +134,7 @@ def test_deactivation_forgets_the_old_tunnel_and_next_connect_activates_again() 
     async def scenario() -> None:
         config = TunnelConfig("proxies: []\n")
         await host.start(config)
-        host._subscriptions["traffic"] = 42
+        host._subscriptions["traffic"] = (None, 42)
         assert host.core_available
         await host.deactivate_extension()
         assert manager.tunnel == extension.TUNNEL_NOT_CONFIGURED
