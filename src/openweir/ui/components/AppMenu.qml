@@ -24,6 +24,21 @@ Menu {
     property Item placedAnchor
     property real placedTop
     property real placedBottom
+    // How much of the list shows: a menu of more than ten items shows the first ten, with
+    // the separators among them, and scrolls the rest inside it (DESIGN.md "菜单").
+    readonly property real shownHeight: {
+        let height = 0
+        let items = 0
+        for (let i = 0; i < count; i++) {
+            const item = itemAt(i)
+            if (!item?.visible)
+                continue
+            if (item instanceof T.MenuItem && ++items > 10)
+                return height
+            height += item.height
+        }
+        return Infinity
+    }
 
     function openBelow(anchor: Item) {
         openAt(anchor, anchor.width - width)
@@ -103,6 +118,7 @@ Menu {
         }
         return Math.min(widest, Math.max(Theme.menuMaxWidth, minimumWidth))
     }
+    implicitHeight: Math.max(implicitBackgroundHeight + topInset + bottomInset, Math.min(implicitContentHeight, shownHeight) + topPadding + bottomPadding)
     margins: Theme.overlayMargin
     padding: Theme.space1
 
@@ -119,6 +135,11 @@ Menu {
     onImplicitHeightChanged: {
         if (visible && placedAnchor)
             y = placedY()
+    }
+    // The item the keyboard highlights scrolls into sight in a menu that scrolls.
+    onCurrentIndexChanged: {
+        if (currentIndex >= 0)
+            (contentItem as ListView)?.positionViewAtIndex(currentIndex, ListView.Contain)
     }
 
     enter: Transition {
