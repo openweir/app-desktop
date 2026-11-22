@@ -40,11 +40,11 @@ Rectangle {
 
     ColumnLayout {
         anchors.fill: parent
-        // macOS: the mark goes below the traffic lights, which the system places in the title
-        // bar the safe area covers. Windows: the app's name is on the title band's centre line,
-        // level with the page title and the caption buttons.
+        // macOS: the mark sits just below the traffic lights, which the system places in the
+        // title bar the safe area covers, clearing them by space-2. Windows: the app's name is on
+        // the title band's centre line, level with the page title and the caption buttons.
         anchors.topMargin: TitleBand.mac
-            ? Math.max(Theme.sidebarTopMacos, root.SafeArea.margins.top + Theme.space6)
+            ? Math.max(Theme.sidebarTopMacos, root.SafeArea.margins.top + Theme.space2)
             : Theme.sidebarTopWindows
         anchors.bottomMargin: Theme.space5
         anchors.leftMargin: 14

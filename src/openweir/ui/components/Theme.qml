@@ -151,7 +151,7 @@ QtObject {
     readonly property int titlebarHeight: 48  // spacing.titlebar-height
     readonly property int titlebarPageTop: 6  // spacing.titlebar-page-top
     readonly property int captionButtonWidth: 46  // spacing.caption-button-width
-    readonly property int sidebarTopMacos: 52  // spacing.sidebar-top-macos
+    readonly property int sidebarTopMacos: 36  // spacing.sidebar-top-macos
     readonly property int sidebarTopWindows: 16  // spacing.sidebar-top-windows
     readonly property int controlSm: 32  // spacing.control-sm
     readonly property int controlMd: 36  // spacing.control-md

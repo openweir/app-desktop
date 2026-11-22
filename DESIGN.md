@@ -157,7 +157,7 @@ spacing:
   titlebar-height: 48px
   titlebar-page-top: 6px
   caption-button-width: 46px
-  sidebar-top-macos: 52px
+  sidebar-top-macos: 36px
   sidebar-top-windows: 16px
   control-sm: 32px
   control-md: 36px
@@ -702,7 +702,7 @@ Windows 与 macOS 共用随包字体，字号、字重和回退顺序一致。�
 - **整体结构**：左侧固定宽度 `sidebar-width`（216px）侧栏，右侧内容区。内容区内边距上 `titlebar-page-top` 6px（见下文「顶部区域」）、左右 `page-x` 32px、下 `page-bottom` 40px。
 - **顶部区域**：窗口最上面 `titlebar-height` 48px 是标题带，侧栏和内容区都从窗口上沿开始，没有单独的标题栏底色或分隔线。
   - 页面标题栏的垂直中线落在标题带中线（距上沿 24px）：内容区上内边距 `titlebar-page-top` 6px，36px 高的标题栏正好居中。
-  - **macOS**：系统的红绿灯在侧栏左上角，由系统绘制和定位。侧栏上内边距 `sidebar-top-macos` 52px，标记和应用名排在红绿灯下面。
+  - **macOS**：系统的红绿灯在侧栏左上角，由系统绘制和定位。侧栏上内边距 `sidebar-top-macos` 36px，标记和应用名紧贴在红绿灯下面，只让出红绿灯的高度再加 8px。
     红绿灯的位置以窗口的安全边距为准，不写死。
   - **Windows**：右上角三个按钮，各宽 `caption-button-width` 46px、高 48px，从右到左依次是关闭、最大化（窗口最大化时换成"还原"图形）、
     最小化；图形是 10px 的 1px 线条，颜色 `text`。悬停底色 `caption-hover`，按下 `caption-pressed`；关闭按钮悬停时底色

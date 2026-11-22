@@ -556,7 +556,7 @@ UI 只保存和传递覆写原文，解析与合并在内核里做；模拟宿�
   - 拖动和双击：侧栏顶部和页面标题栏（`PageHeader`，向上、向两侧盖住页边距）下面各垫一层 `TitleBandArea`。
     拖过阈值后调用 `startSystemMove()`，由系统移动窗口，贴靠照常；双击按 `TitleBar.doubleClickAction()`
     缩放或最小化。控件在它上面，点击归控件。页面滚动后，滚进标题带的内容不能拖动窗口，侧栏顶部始终可以。
-  - macOS：红绿灯由系统绘制和定位。侧栏上内边距取 `sidebar-top-macos` 与"安全边距上沿 + 24"中较大的一个，
+  - macOS：红绿灯由系统绘制和定位。侧栏上内边距取 `sidebar-top-macos` 与"安全边距上沿 + 8"中较大的一个，
     系统标题栏更高时标记跟着下移。Qt 不隐藏窗口标题，`attach` 经 Objective-C 运行时把 `titleVisibility`
     设为隐藏，读屏和「窗口」菜单仍有标题。双击读系统设置 `AppleActionOnDoubleClick`：`Minimize` 最小化，
     `None` 不动，其余缩放。
