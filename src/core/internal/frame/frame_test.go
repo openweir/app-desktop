@@ -71,3 +71,32 @@ func TestTruncatedPayload(t *testing.T) {
 		t.Fatalf("err = %v, want io.ErrUnexpectedEOF", err)
 	}
 }
+
+// Skip keeps the first bytes of a payload and reads past the rest, leaving the next frame.
+func TestSkipKeepsTheHeadAndFindsTheNextFrame(t *testing.T) {
+	var buffer bytes.Buffer
+	for _, payload := range []string{"head and a long tail", "next"} {
+		if err := Write(&buffer, KindRequest, []byte(payload)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	length, err := ReadHeader(&buffer, KindRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	head, err := Skip(&buffer, length, make([]byte, 4))
+	if err != nil || string(head) != "head" {
+		t.Fatalf("head = %q, %v", head, err)
+	}
+	if next, err := Read(&buffer, KindRequest); err != nil || string(next) != "next" {
+		t.Fatalf("next frame = %q, %v", next, err)
+	}
+	// A payload shorter than the head comes back whole.
+	short := bytes.NewReader([]byte("ab"))
+	if head, err := Skip(short, 2, make([]byte, 4)); err != nil || string(head) != "ab" {
+		t.Fatalf("short head = %q, %v", head, err)
+	}
+	if _, err := Skip(bytes.NewReader([]byte("abcdef")), 9, make([]byte, 4)); !errors.Is(err, io.ErrUnexpectedEOF) {
+		t.Fatalf("truncated skip = %v, want io.ErrUnexpectedEOF", err)
+	}
+}

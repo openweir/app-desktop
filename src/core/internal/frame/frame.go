@@ -52,22 +52,50 @@ func Write(w io.Writer, kind Kind, payload []byte) error {
 // Read receives one frame of the expected kind. The header is validated before the
 // payload buffer is allocated, so an oversized length never reaches make.
 func Read(r io.Reader, want Kind) ([]byte, error) {
-	var header [HeaderSize]byte
-	if _, err := io.ReadFull(r, header[:]); err != nil {
-		return nil, err
-	}
-	length, err := ParseHeader(header, want)
+	length, err := ReadHeader(r, want)
 	if err != nil {
 		return nil, err
 	}
+	return ReadPayload(r, length)
+}
+
+// ReadHeader receives and validates one header, and returns the length of the payload
+// that follows it. A reader with a lower limit of its own reads the header with this.
+func ReadHeader(r io.Reader, want Kind) (int, error) {
+	var header [HeaderSize]byte
+	if _, err := io.ReadFull(r, header[:]); err != nil {
+		return 0, err
+	}
+	return ParseHeader(header, want)
+}
+
+// ReadPayload receives the length bytes of payload that follow a header.
+func ReadPayload(r io.Reader, length int) ([]byte, error) {
 	payload := make([]byte, length)
 	if _, err := io.ReadFull(r, payload); err != nil {
-		if errors.Is(err, io.EOF) {
-			return nil, io.ErrUnexpectedEOF
-		}
-		return nil, err
+		return nil, unexpectedEOF(err)
 	}
 	return payload, nil
+}
+
+// Skip reads past length bytes of payload without keeping them, so the next frame can be
+// read. It returns the first prefix of them, at most what prefix holds.
+func Skip(r io.Reader, length int, prefix []byte) ([]byte, error) {
+	prefix = prefix[:min(len(prefix), length)]
+	if _, err := io.ReadFull(r, prefix); err != nil {
+		return nil, unexpectedEOF(err)
+	}
+	if _, err := io.CopyN(io.Discard, r, int64(length-len(prefix))); err != nil {
+		return nil, unexpectedEOF(err)
+	}
+	return prefix, nil
+}
+
+func unexpectedEOF(err error) error {
+	if errors.Is(err, io.EOF) {
+		return io.ErrUnexpectedEOF
+	}
+	return err
 }
 
 func ParseHeader(header [HeaderSize]byte, want Kind) (int, error) {

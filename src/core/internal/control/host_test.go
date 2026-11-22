@@ -3,6 +3,7 @@ package control
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"google.golang.org/protobuf/proto"
@@ -11,6 +12,7 @@ import (
 	"github.com/openweir/app-desktop/src/core/internal/engine"
 	"github.com/openweir/app-desktop/src/core/internal/peer"
 	"github.com/openweir/app-desktop/src/core/internal/porttest"
+	"github.com/openweir/app-desktop/src/core/internal/server"
 )
 
 // fakeHost owns the service for owner and records what the dispatcher tells it.
@@ -268,5 +270,36 @@ func TestDevelopmentOwnership(t *testing.T) {
 	info := call(t, development(t), request(1, getInfo)).GetGetInfo()
 	if info.GetOwnership() != controlpb.Ownership_OWNERSHIP_CALLER {
 		t.Fatalf("ownership = %v", info.GetOwnership())
+	}
+}
+
+var _ server.Gate = (*Dispatcher)(nil)
+
+// The server refuses a large request from anyone but the owner unread; the answer is the
+// one any method but GetInfo and Claim gets them, under the request's own id.
+func TestRefusalOfALargeRequest(t *testing.T) {
+	host := &fakeHost{owner: "S-1-5-21-1"}
+	d := New(Options{Engine: unlinked{}, HostMethods: true, Host: host})
+	t.Cleanup(d.Close)
+	if d.Refusal(peer.Identity{UserID: "S-1-5-21-1"}) != nil {
+		t.Fatal("the owner's large requests are refused")
+	}
+	payload, err := proto.Marshal(request(1<<40, startRequest(strings.Repeat("#", 1<<20), nil)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	head := payload[:64]
+	for user, code := range map[string]string{"S-1-5-21-2": CodeOwnedByOtherUser, "idle": CodeNotClaimed} {
+		refusal := d.Refusal(peer.Identity{UserID: user})
+		if refusal == nil {
+			t.Fatalf("%s may send large requests", user)
+		}
+		expectError(t, decode(t, refusal(head)), 1<<40, code)
+	}
+	// A head without the id still gets an answer, for request 0.
+	expectError(t, decode(t, d.Refusal(peer.Identity{UserID: "idle"})([]byte{0xff})), 0, CodeNotClaimed)
+	// Hosts without owners take requests of any size.
+	if development(t).Refusal(peer.Identity{UserID: "501"}) != nil {
+		t.Fatal("the development server refuses large requests")
 	}
 }

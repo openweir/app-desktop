@@ -354,6 +354,11 @@ Windows 的帧头为 12 字节，整数一律小端序：
 响应的上限两种宿主都执行：分发器的回答编码后超过 8 MiB 时（如十万条内联规则的 `ListRules`、很大的 `ListGroups`、
 `ConvertToPlan` 或 `ExportPlan`），改为回答不可重试的 `response_too_large`。帧写不出去会关闭整条连接，连带同一连接上
 在途的请求和订阅，界面重连后再问还是一样。
+
+任何交互用户都能运行界面、连上以 SYSTEM 身份运行的服务，所以服务限制连接：同时最多 64 条（含还在校验的），每个
+用户最多 8 条，超出的直接断开。属主以外的调用者只能调用 `GetInfo` 和 `Claim`（5.4 节），它们只有几个字节；这样的
+调用者发来超过 4 KiB 的请求时，服务只读出开头的 64 字节取请求的 `id`，跳过其余部分，按它此刻得到的
+`not_claimed`、`owned_by_other_user` 或 `service_restarting` 作答，不把载荷读进内存，也不解码，连接照常可用。
 Windows 上 UI 断线后按退避间隔重连，并重新建立订阅。
 
 ### 4.3 方法表
@@ -603,6 +608,9 @@ PID 来防止管道名被抢注。
    `rejected control client`，原因是 `pipe client signature: …` 或 `pipe client is signed by …`；
 5. 最后确认客户端进程仍在运行。
 
+谁都可以反复连接，所以这类日志限流：`rejected control client`、连接数超限的 `refused a control connection` 和
+读取出错的 `control connection closed`，同一类每分钟最多记一行，下一行的 `unlogged` 写明这期间略去了几条。
+
 服务启动时在 `service.log` 的 `service started` 一行记下 `signed=true` 或 `signed=false`。
 
 **未签名的构建**：CI、测试 VM 和本地的构建不加 `--sign`，链接服务时只注入版本，`SignedRelease` 保持默认的 `"false"`，
@@ -777,7 +785,8 @@ macOS 不监听任何 socket，控制消息全部走 Network Extension 自带的
 | 属主的配置与凭据落在磁盘上 | `profile.json` 和 mihomo 的缓存只有 SYSTEM 和属主能读 |
 | 配置开放 mihomo 控制器 | engine 清空全部控制器字段，HTTP 控制器从不启动；embed mode 作为第二道防线 |
 | 通过控制接口替换二进制或重启进程 | 对外只有方法表中的方法，没有对应能力 |
-| 畸形或超大的消息 | Windows 先校验帧头再分配缓冲区，macOS 在解码前检查长度；未知方法和枚举直接拒绝 |
+| 畸形或超大的消息 | Windows 先校验帧头再分配缓冲区，macOS 在解码前检查长度；未知方法和枚举直接拒绝；属主以外的调用者的请求超过 4 KiB 时不读入内存（4.2 节） |
+| 其他用户耗尽 SYSTEM 服务的资源或写满磁盘 | 连接同时最多 64 条、每个用户 8 条；被拒连接的日志每类每分钟一行（5.3 节） |
 | 订阅拖住内核或泄漏 | 事件缓存在有界缓冲区，满了丢弃最旧的；超过 30 秒未拉取的订阅自动失效 |
 | 其他用户接管隧道 | 属主 SID 校验；另一个用户的隧道运行时不能认领，只有经 UAC 提权的管理员能接管（5.4 节）；一个服务进程只打开一个属主的 home |
 | 同一用户的其他进程借界面接管隧道 | 接管要求客户端 token 启用 Administrators 组，只有经 UAC 确认的提权进程有；界面不提权，服务的可执行文件不提权运行时通不过客户端校验 |

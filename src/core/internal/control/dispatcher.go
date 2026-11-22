@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/openweir/app-desktop/src/core/internal/admission"
@@ -225,6 +226,47 @@ func (d *Dispatcher) Handle(ctx context.Context, caller peer.Identity, payload [
 			methodName(&request), len(response), frame.MaxResponseBytes))
 	}
 	return response
+}
+
+// Refusal is server.Gate's. The Windows service lets anyone but its owner call GetInfo and
+// Claim alone, which take a few bytes, so the server refuses a larger request from them
+// unread, with the answer any other method would get them. head is its first bytes.
+func (d *Dispatcher) Refusal(caller peer.Identity) func(head []byte) []byte {
+	if d.host == nil {
+		return nil
+	}
+	err := d.host.Admit(caller)
+	if err == nil {
+		return nil
+	}
+	return func(head []byte) []byte { return encode(requestID(head), hostFailure(err)) }
+}
+
+// requestIDField is Request.id's field number.
+var requestIDField = (&controlpb.Request{}).ProtoReflect().Descriptor().Fields().ByName("id").Number()
+
+// requestID reads a Request's id from the first bytes of its encoding, where encoders put
+// it, ahead of the method; zero when they do not hold it.
+func requestID(head []byte) uint64 {
+	for len(head) > 0 {
+		number, kind, n := protowire.ConsumeTag(head)
+		if n < 0 {
+			return 0
+		}
+		head = head[n:]
+		if number == requestIDField && kind == protowire.VarintType {
+			id, n := protowire.ConsumeVarint(head)
+			if n < 0 {
+				return 0
+			}
+			return id
+		}
+		if n = protowire.ConsumeFieldValue(number, kind, head); n < 0 {
+			return 0
+		}
+		head = head[n:]
+	}
+	return 0
 }
 
 func (d *Dispatcher) dispatch(ctx context.Context, caller peer.Identity, request *controlpb.Request) *controlpb.Response {
