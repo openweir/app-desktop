@@ -47,7 +47,7 @@ from tests.support.window import Loaded, accessible, find_all, kind
 TITLEBAR_HEIGHT = 48
 TITLEBAR_PAGE_TOP = 6
 CAPTION_BUTTON_WIDTH = 46
-SIDEBAR_TOP = {MAC: 52, WINDOWS: 16}
+SIDEBAR_TOP = {MAC: 36, WINDOWS: 16}
 HWND = 0x1234
 HTLEFT = 10
 ALT = 1 << 29
