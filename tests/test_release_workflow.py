@@ -96,6 +96,23 @@ def test_a_release_awaiting_approval_holds_back_no_later_main_run() -> None:
     assert ci["concurrency"]["cancel-in-progress"] == "${{ github.ref != 'refs/heads/main' }}"
 
 
+def test_a_release_without_google_drive_says_so_in_the_draft() -> None:
+    # Google Drive backup is optional (docs/storage.md §4), so its absence warns: in each build
+    # job's summary, and at the top of the draft's notes, from what the builds bundled.
+    workflow = yaml.load(WORKFLOW.read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
+    for name in ("macos", "windows"):
+        job = workflow["jobs"][name]
+        assert job["outputs"]["google_drive"] == "${{ steps.google.outputs.bundled }}"
+        (google,) = [s for s in job["steps"] if s.get("id") == "google"]
+        assert "GITHUB_STEP_SUMMARY" in google["run"]
+        assert "exit 1" not in google["run"]
+    create = step("Create the draft")
+    assert "needs.macos.outputs.google_drive" in create["env"]["GOOGLE_DRIVE"]
+    assert "needs.windows.outputs.google_drive" in create["env"]["GOOGLE_DRIVE"]
+    run = create["run"]
+    assert run.index("NO GOOGLE DRIVE BACKUP") < run.index("gh release create")
+
+
 def test_the_notes_say_where_the_source_is() -> None:
     notes = NOTES.read_text(encoding="utf-8")
     assert set(re.findall(r"\{\{\w*\}\}", notes)) == {"{{version}}"}

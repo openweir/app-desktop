@@ -49,8 +49,10 @@ Release 上有三个安装包和 SHA256SUMS，共四个文件（1.0.0 另有源�
 1. **macOS universal** 和 **Windows x64 / ARM64** 三个构建任务分别构建、签名、公证（macOS）安装包，Windows 的安装包还在
    runner 上装一遍、升级、卸载（architecture.md 第 10 节）。产物连同各自的 `.sha256` 存为 workflow artifact。各构建任务都把 Environment
    的机密 `OPENWEIR_GOOGLE_CLIENT_ID`、`OPENWEIR_GOOGLE_CLIENT_SECRET` 交给构建脚本，打包进 Google Drive 备份用的 OAuth
-   客户端（storage.md 第 4 节）；没有这两个机密时给出警告，照常构建，安装包里没有 Google Drive 备份。客户端在 Google
-   Cloud 里的设置见 [maintenance.md](maintenance.md) 2.8 节。
+   客户端（storage.md 第 4 节）；没有这两个机密时照常构建，安装包里没有 Google Drive 备份。这个功能是可选的（storage.md
+   第 4 节，usage.md），所以不让发布失败，但要让人看到：各构建 job 给出警告并写进运行摘要，release job 在草稿说明的
+   最前面加一行 HTML 注释（`NO GOOGLE DRIVE BACKUP: …`），写说明的人会看到，发布前删掉；忘了删，页面上也不显示。
+   客户端在 Google Cloud 里的设置见 [maintenance.md](maintenance.md) 2.8 节。
 
    Windows 的签名（D42）：job 有 `id-token: write`，构建完安装目录后由 `azure/login` 用 GitHub 的 OIDC 令牌以托管标识
    `id-openweir-release` 登录 Azure。它的联合凭据只认这个仓库的 `release` 环境；它只在证书配置文件上有

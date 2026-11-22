@@ -88,6 +88,8 @@ jobs:
     # The build takes about an hour; notarizing the app and the image may take up to three
     # attempts each (scripts/notarize.py).
     timeout-minutes: 240
+    outputs:
+      google_drive: ${{ steps.google.outputs.bundled }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
@@ -187,14 +189,21 @@ jobs:
           chmod 600 "$signing/AuthKey.p8"
 
       # Google Drive backup needs the project's OAuth client (docs/maintenance.md §2.8); the
-      # build bundles it, and a build without one has no Google Drive backup.
+      # build bundles it, and a build without one has no Google Drive backup. The feature is
+      # optional (docs/storage.md §4), so its absence warns rather than fails, in the run's
+      # summary and at the top of the draft's notes (the release job).
       - name: Google OAuth client
+        id: google
         env:
           OPENWEIR_GOOGLE_CLIENT_ID: ${{ secrets.OPENWEIR_GOOGLE_CLIENT_ID }}
           OPENWEIR_GOOGLE_CLIENT_SECRET: ${{ secrets.OPENWEIR_GOOGLE_CLIENT_SECRET }}
         run: |
           if [[ -z "$OPENWEIR_GOOGLE_CLIENT_ID" || -z "$OPENWEIR_GOOGLE_CLIENT_SECRET" ]]; then
             echo "::warning::No Google OAuth client in the release environment; this app has no Google Drive backup."
+            echo "### No Google Drive backup in the macOS app: the release environment has no Google OAuth client" >> "$GITHUB_STEP_SUMMARY"
+            echo "bundled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "bundled=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Rosetta for the x64 Python compiler
@@ -312,6 +321,10 @@ jobs:
     runs-on: ${{ matrix.os }}
     environment: release
     timeout-minutes: 120
+    # Both architectures build with the same environment's secrets, so either leg's answer is
+    # the job's.
+    outputs:
+      google_drive: ${{ steps.google.outputs.bundled }}
     # GitHub's OIDC token for azure/login: Azure's federated credential for the signing
     # identity trusts this repository's release environment and nothing else.
     permissions:
@@ -364,14 +377,21 @@ jobs:
           path: build/geodata
           key: geodata-${{ hashFiles('scripts/fetch_geodata.py') }}
 
+      # As in the macOS job: optional, so a warning in the summary and the draft's notes.
       - name: Google OAuth client
+        id: google
         shell: bash
         env:
           OPENWEIR_GOOGLE_CLIENT_ID: ${{ secrets.OPENWEIR_GOOGLE_CLIENT_ID }}
           OPENWEIR_GOOGLE_CLIENT_SECRET: ${{ secrets.OPENWEIR_GOOGLE_CLIENT_SECRET }}
+          ARCH: ${{ matrix.arch }}
         run: |
           if [[ -z "$OPENWEIR_GOOGLE_CLIENT_ID" || -z "$OPENWEIR_GOOGLE_CLIENT_SECRET" ]]; then
             echo "::warning::No Google OAuth client in the release environment; this installer has no Google Drive backup."
+            echo "### No Google Drive backup in the Windows $ARCH installer: the release environment has no Google OAuth client" >> "$GITHUB_STEP_SUMMARY"
+            echo "bundled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "bundled=true" >> "$GITHUB_OUTPUT"
           fi
 
       # --sign links the service with SignedRelease: it accepts only a UI with OpenWeir's
@@ -627,11 +647,23 @@ jobs:
           DMG: ${{ steps.version.outputs.dmg }}
           INSTALLER: ${{ steps.version.outputs.installer }}
           INSTALLER_ARM64: ${{ steps.version.outputs.installer_arm64 }}
+          GOOGLE_DRIVE: ${{ needs.macos.outputs.google_drive == 'true' && needs.windows.outputs.google_drive == 'true' }}
         run: |
           sed "s/{{version}}/$VERSION/g" .github/release-notes.md > "$RUNNER_TEMP/notes.md"
           if grep -q "{{" "$RUNNER_TEMP/notes.md"; then
             echo "::error::.github/release-notes.md has a placeholder other than {{version}}"
             exit 1
+          fi
+          # Whoever writes the notes sees this first; as a comment it never shows on the page.
+          if [[ "$GOOGLE_DRIVE" != true ]]; then
+            echo "::warning::These installers have no Google Drive backup: the release environment has no Google OAuth client"
+            echo "### These installers have no Google Drive backup (no Google OAuth client in the release environment)" >> "$GITHUB_STEP_SUMMARY"
+            {
+              echo "<!-- NO GOOGLE DRIVE BACKUP: these installers were built without the Google OAuth client (docs/maintenance.md §2.8). Add OPENWEIR_GOOGLE_CLIENT_ID and OPENWEIR_GOOGLE_CLIENT_SECRET to the release environment and re-run the CI run, or publish without it and delete this comment. -->"
+              echo
+              cat "$RUNNER_TEMP/notes.md"
+            } > "$RUNNER_TEMP/notes-flagged.md"
+            mv "$RUNNER_TEMP/notes-flagged.md" "$RUNNER_TEMP/notes.md"
           fi
           # Approval may come long after the run started. Draft only while this commit is still
           # main's tip: a later push's own run drafts that one, and this one must not replace it.
