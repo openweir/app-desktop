@@ -81,7 +81,7 @@ func TestPipeClientVerifier(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if identity.UserID != user.User.Sid.String() || identity.SessionID != session || identity.ProcessID != uint32(os.Getpid()) ||
+		if identity.UserID != user.User.Sid.String() || identity.SessionID != session ||
 			identity.Administrator != elevated(t) {
 			t.Fatalf("identity = %+v", identity)
 		}

@@ -178,6 +178,20 @@ func settle(t *testing.T, s *Service) {
 	eventually(t, func() bool { s.mu.Lock(); defer s.mu.Unlock(); return len(s.sessionJobs) == 0 })
 }
 
+// signIn and signOut report a sign-in or a sign-out as the SCM does, and wait for the service
+// to handle it.
+func signIn(t *testing.T, s *Service, session uint32) {
+	t.Helper()
+	s.SessionChanged(session, true)
+	settle(t, s)
+}
+
+func signOut(t *testing.T, s *Service, session uint32) {
+	t.Helper()
+	s.SessionChanged(session, false)
+	settle(t, s)
+}
+
 // geoData is what home holds of the GEO data, by file name.
 func geoData(t *testing.T, home string) map[string]string {
 	t.Helper()
@@ -377,7 +391,7 @@ func TestTunnelRecoveryIsScopedToLogon(t *testing.T) {
 			if !(kept{home}).wasRunning() {
 				t.Fatal("connection intent was not kept")
 			}
-			// No Close or SignedOut: model a crash or an abrupt power loss.
+			// No Close or sign-out: model a crash or an abrupt power loss.
 			m.sessions = map[uint32]string{tc.session: alice}
 			m.logons = map[uint32]int64{tc.session: tc.logon}
 			service, core, _ = start(t, root, m)
@@ -409,7 +423,7 @@ func TestNewLoginWaitsForExplicitConnection(t *testing.T) {
 	m.sessions = map[uint32]string{}
 	service, core, _ = start(t, root, m)
 	m.sessions[2] = bob
-	service.SignedIn(2)
+	signIn(t, service, 2)
 	if len(core.resumed) != 0 {
 		t.Fatal("resumed for another user")
 	}
@@ -418,7 +432,7 @@ func TestNewLoginWaitsForExplicitConnection(t *testing.T) {
 	if service.ResumeAllowed() {
 		t.Fatal("recovery allowed before logon verification")
 	}
-	service.SignedIn(4)
+	signIn(t, service, 4)
 	if len(core.resumed) != 0 || (kept{home}).wasRunning() {
 		t.Fatal("resumed at a new login")
 	}
@@ -430,17 +444,17 @@ func TestNewLoginWaitsForExplicitConnection(t *testing.T) {
 	if !core.running {
 		t.Fatal("explicit start did not allow same-logon recovery")
 	}
-	service.SignedOut(2)
+	signOut(t, service, 2)
 	if !core.running {
 		t.Fatal("stopped for another user's logoff")
 	}
 	delete(m.sessions, 4)
-	service.SignedOut(4)
+	signOut(t, service, 4)
 	if core.running || (kept{home}).wasRunning() {
 		t.Fatal("owner logoff retained connection intent")
 	}
 	m.sessions[5] = alice
-	service.SignedIn(5)
+	signIn(t, service, 5)
 	if core.running {
 		t.Fatal("resumed after logoff")
 	}
@@ -536,12 +550,12 @@ func TestSystemProxyIsTheOwners(t *testing.T) {
 	// Signing out leaves the service unable to write the owner's settings; their next
 	// sign-in restores those settings before a new explicit connection.
 	delete(m.sessions, 1)
-	service.SignedOut(1)
+	signOut(t, service, 1)
 	if _, saved, _ := (kept{home}).previousProxy(); !saved || service.SystemProxyEnabled() {
 		t.Fatalf("saved %v, enabled %v after sign-out", saved, service.SystemProxyEnabled())
 	}
 	m.sessions[3] = alice
-	service.SignedIn(3)
+	signIn(t, service, 3)
 	if core.running || m.proxies[alice] != theirs {
 		t.Fatalf("running %v, proxy %+v before explicit connection", core.running, m.proxies[alice])
 	}
@@ -636,14 +650,14 @@ func TestFormerOwnerGetsTheirProxyBack(t *testing.T) {
 		t.Fatal(err)
 	}
 	delete(m.sessions, 1)
-	service.SignedOut(1)
+	signOut(t, service, 1)
 	m.sessions[2] = bob
 	if err := service.Claim(as(bob, 2)); !errors.Is(err, control.ErrRestarting) {
 		t.Fatal(err)
 	}
 	service, _, _ = start(t, root, m)
 	m.sessions[3] = alice
-	service.SignedIn(3)
+	signIn(t, service, 3)
 	if m.proxies[alice] != theirs {
 		t.Fatalf("alice's proxy = %+v", m.proxies[alice])
 	}
@@ -705,7 +719,7 @@ func TestClaimRestartGivesTheProxyToTheFormerOwner(t *testing.T) {
 			}
 			// Her sign-out stops the tunnel, but the service cannot write her settings then.
 			delete(m.sessions, 1)
-			service.SignedOut(1)
+			signOut(t, service, 1)
 			m.sessions[2], m.proxies[bob] = bob, bobs
 			if err := service.Claim(as(bob, 2)); !errors.Is(err, control.ErrRestarting) {
 				t.Fatalf("claim = %v", err)
@@ -733,7 +747,7 @@ func TestClaimRestartGivesTheProxyToTheFormerOwner(t *testing.T) {
 
 			service, _, _ = start(t, root, m)
 			m.sessions[4] = alice
-			service.SignedIn(4)
+			signIn(t, service, 4)
 			if m.proxies[alice] != theirs || m.proxies[bob] != bobs {
 				t.Fatalf("alice's proxy %+v, bob's %+v", m.proxies[alice], m.proxies[bob])
 			}
@@ -808,7 +822,7 @@ func TestAdministratorTakesOver(t *testing.T) {
 		t.Fatalf("admit the former owner: %v", err)
 	}
 	m.sessions[3] = alice
-	service.SignedIn(3)
+	signIn(t, service, 3)
 	if len(core.resumed) != 0 {
 		t.Fatalf("resumed %v", core.resumed)
 	}
@@ -847,7 +861,7 @@ func TestTakeOverKeepsTheProxyForTheNextSignIn(t *testing.T) {
 	}
 	service, _, _ = start(t, root, m)
 	m.sessions[3] = alice
-	service.SignedIn(3)
+	signIn(t, service, 3)
 	if m.proxies[alice] != theirs {
 		t.Fatalf("alice's proxy = %+v", m.proxies[alice])
 	}

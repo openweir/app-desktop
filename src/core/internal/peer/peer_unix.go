@@ -21,10 +21,10 @@ func UnixSocketVerifier(allowedUID uint32) Verifier {
 		if err != nil {
 			return nil, Identity{}, err
 		}
-		var uid, pid uint32
+		var uid uint32
 		var credentialsErr error
 		if err := raw.Control(func(fd uintptr) {
-			uid, pid, credentialsErr = peerCredentials(int(fd))
+			uid, credentialsErr = peerUID(int(fd))
 		}); err != nil {
 			return nil, Identity{}, err
 		}
@@ -34,6 +34,6 @@ func UnixSocketVerifier(allowedUID uint32) Verifier {
 		if uid != allowedUID {
 			return nil, Identity{}, fmt.Errorf("socket peer uid %d is not %d", uid, allowedUID)
 		}
-		return conn, Identity{UserID: strconv.FormatUint(uint64(uid), 10), ProcessID: pid}, nil
+		return conn, Identity{UserID: strconv.FormatUint(uint64(uid), 10)}, nil
 	}
 }

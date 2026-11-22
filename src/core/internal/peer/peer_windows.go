@@ -107,7 +107,7 @@ func verify(processID uint32, installedUI, helper string, signer Signer, held *h
 	if event, err := windows.WaitForSingleObject(process, 0); err != nil || event != uint32(windows.WAIT_TIMEOUT) {
 		return Identity{}, errors.New("pipe client exited while it was checked")
 	}
-	return Identity{UserID: user.User.Sid.String(), SessionID: sessionID, ProcessID: processID, Administrator: admin}, nil
+	return Identity{UserID: user.User.Sid.String(), SessionID: sessionID, Administrator: admin}, nil
 }
 
 // administrator says token has the Administrators group enabled. UAC filters an

@@ -457,14 +457,8 @@ func (s *Service) Close() {
 	}
 }
 
-// SignedIn follows a sign-in to session. Only the same logon may recover an old tunnel;
+// signedIn follows a sign-in to session. Only the same logon may recover an old tunnel;
 // a user whose proxy settings the service left behind gets them back.
-func (s *Service) SignedIn(session uint32) {
-	ctx, sequence, _ := s.beginSession(session, true)
-	defer s.finishSession(session, sequence)
-	s.signedIn(ctx, session, sequence)
-}
-
 func (s *Service) signedIn(ctx context.Context, session uint32, sequence uint64) {
 	if ctx.Err() != nil {
 		return
@@ -523,14 +517,9 @@ func (s *Service) signedIn(ctx context.Context, session uint32, sequence uint64)
 	}
 }
 
-// SignedOut stops the tunnel when its owner signs out of the session they use it from: the
-// TUN takes every user's traffic (decision D5). It comes back at their next sign-in.
-func (s *Service) SignedOut(session uint32) {
-	ctx, sequence, ours := s.beginSession(session, false)
-	defer s.finishSession(session, sequence)
-	s.signedOutOf(ctx, session, ours)
-}
-
+// signedOutOf stops the tunnel when its owner signs out of the session they use it from: the
+// TUN takes every user's traffic, and their intent to connect ends with the logon (decision
+// D5).
 func (s *Service) signedOutOf(ctx context.Context, session uint32, ours bool) {
 	if !ours {
 		return
