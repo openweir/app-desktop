@@ -1,0 +1,14 @@
+# Dependabot keeps the GitHub Actions the workflows pin by commit (with the version as a comment)
+# up to date: one grouped pull request a month, against develop.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: ci

@@ -37,7 +37,7 @@ jobs:
       # CI keeps the installers for a week (ci.yml), long enough for a rerun of this job. When
       # nothing matches, nothing is downloaded and dist is not created.
       - name: Installers from the CI run
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131  # v7.0.0
         with:
           pattern: "{macos-universal,windows-installer}-*"
           merge-multiple: true

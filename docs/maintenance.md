@@ -421,6 +421,10 @@ exits.md 第 9 节的待实测项。
   subconv 自己的 `testdata/<格式>/input.*`，新版加了格式就照样补一份。subconv 改了警告代码或略去规则的写法时，同步
   `host/base.py` 的 `NODE_LEFT_OUT`、`RULE_LEFT_OUT` 和模拟宿主（`tests/support/simulated_core.py`）。路由模板的主机
   和清单格式归 subconv 的 `rules` 包，升级时读它的 docs/rules.md。
+- **GitHub Actions**：工作流里的每个 action 都固定到提交 SHA，后面的注释写它是哪个版本（`# vX.Y.Z`，
+  `tests/test_workflows.py` 核对）。Dependabot（`.github/dependabot.yml`）每月向 `develop` 提一个合并了全部 action 更新的
+  PR，提交前缀 `ci`。手动升级时用 `git ls-remote --tags https://github.com/<owner>/<action> 'refs/tags/vX*'` 查同一主版本
+  最新的 `vX.Y.Z` 对应的提交（带注释的标签取 `^{}` 那一行），SHA 和注释一起改。
 - **GEO 数据**的版本和 SHA-256 钉在 `scripts/fetch_geodata.py` 里；改了之后用 `--categories` 重新生成附带的分类名
   清单（`src/openweir/host/geo_categories.py`），CI 用 `--check` 核对。
 - **macOS** 的产品最低版本固定为 26（D28）；构建器同时检查 PySide6 等依赖的实际 Mach-O 版本要求，只能提高该底线。**Nuitka** 的版本是 `scripts/build_app.py` 的 `NUITKA_VERSION`，CI 和
