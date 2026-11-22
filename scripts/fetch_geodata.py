@@ -19,6 +19,7 @@ import hashlib
 import shutil
 import sys
 import tempfile
+import time
 import urllib.request
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -36,6 +37,10 @@ MIRRORS = (
     "https://cdn.jsdelivr.net/gh/{repository}@{release}/{name}",
 )
 TIMEOUT_S = 120
+# Rounds over every mirror, with a doubling wait after each failed one: a CDN's passing failure
+# should not fail an installer build.
+ATTEMPTS = 3
+BACKOFF_S = 10.0
 
 
 @dataclass(frozen=True)
@@ -83,23 +88,32 @@ def _digest(path: Path) -> str:
 
 def _download(data: DataFile, target: Path) -> None:
     errors = []
-    for mirror in MIRRORS:
-        url = mirror.format(repository=REPOSITORY, release=RELEASE, name=data.name)
-        with tempfile.NamedTemporaryFile(dir=target.parent, delete=False) as temporary:
-            partial = Path(temporary.name)
-            try:
-                with urllib.request.urlopen(url, timeout=TIMEOUT_S) as response:
-                    shutil.copyfileobj(response, temporary, 1 << 20)
-            except OSError as error:
-                errors.append(f"{url}: {error}")
-                temporary.close()
-                partial.unlink()
-                continue
-        if partial.stat().st_size == data.size and _digest(partial) == data.sha256:
-            partial.replace(target)
-            return
-        partial.unlink()
-        errors.append(f"{url}: not the pinned {data.name}")
+    for attempt in range(1, ATTEMPTS + 1):
+        for mirror in MIRRORS:
+            url = mirror.format(repository=REPOSITORY, release=RELEASE, name=data.name)
+            with tempfile.NamedTemporaryFile(dir=target.parent, delete=False) as temporary:
+                partial = Path(temporary.name)
+                try:
+                    with urllib.request.urlopen(url, timeout=TIMEOUT_S) as response:
+                        shutil.copyfileobj(response, temporary, 1 << 20)
+                except OSError as error:
+                    errors.append(f"{url}: {error}")
+                    temporary.close()
+                    partial.unlink()
+                    continue
+            if partial.stat().st_size == data.size and _digest(partial) == data.sha256:
+                partial.replace(target)
+                return
+            partial.unlink()
+            errors.append(f"{url}: not the pinned {data.name}")
+        if attempt < ATTEMPTS:
+            wait = BACKOFF_S * 2 ** (attempt - 1)
+            print(
+                f"No mirror served {data.name} (attempt {attempt} of {ATTEMPTS}); "
+                f"trying again in {wait:.0f} s",
+                file=sys.stderr,
+            )
+            time.sleep(wait)
     raise RuntimeError("; ".join(errors))
 
 
