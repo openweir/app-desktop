@@ -116,21 +116,22 @@ type Host interface {
 	// TakeOver is Claim that lets an administrator take over another user's running tunnel
 	// too (decision D5b): stop brings it down first. Anyone else gets what Claim gives them.
 	TakeOver(caller peer.Identity, stop func() error) error
-	// Applied follows Start, Reload and Resume once the core took start: the service keeps
-	// it for the next sign-in and sets the owner's system proxy as its options say. It
-	// keeps nothing, and returns context.Canceled, unless current still holds under the
+	// Applied follows Start, Reload and ResumeContext once the core took start: the service
+	// keeps it for the next sign-in and sets the owner's system proxy as its options say.
+	// It keeps nothing, and returns context.Canceled, unless current still holds under the
 	// lock StopRequested takes to supersede earlier starts.
 	Applied(start *controlpb.StartRequest, current func() bool) error
 	// StopRequested authorizes caller again and keeps the stop intent before waiting
 	// for a busy core. Once caller is admitted it runs supersede, which ends every
-	// earlier Start, Reload and Resume. Neither it nor Applied waits for the OS or the
-	// core under that lock, so a Stop never waits behind them. ResumeAllowed rechecks the
-	// intent when an automatic resume executes.
+	// earlier Start, Reload and ResumeContext. Neither it nor Applied waits for the OS or
+	// the core under that lock, so a Stop never waits behind them. ResumeAllowed rechecks
+	// the intent when an automatic resume executes.
 	StopRequested(caller peer.Identity, supersede func()) error
 	ResumeAllowed() bool
 	RecoveryStatus() (controlpb.RecoveryState, string)
-	// Stopped follows Stop, after which the tunnel stays down; Suspended follows Suspend,
-	// after which it comes back at the owner's next sign-in. Both restore their proxy.
+	// Stopped follows Stop, after which the tunnel stays down; Suspended follows
+	// SuspendContext, after which it comes back at the owner's next sign-in. Both restore
+	// their proxy.
 	Stopped() error
 	Suspending(controlpb.Mode)
 	Suspended() error
@@ -434,12 +435,9 @@ func (d *Dispatcher) Running() bool {
 	return true
 }
 
-// Resume starts the core with the profile the Windows service kept, as Start does, when its
-// owner signs in again (docs/architecture.md §5.2). A core that runs is left alone.
-func (d *Dispatcher) Resume(start *controlpb.StartRequest) error {
-	return d.ResumeContext(context.Background(), start)
-}
-
+// ResumeContext starts the core with the profile the Windows service kept, as Start does,
+// when its owner signs in again or the machine wakes (docs/architecture.md §5.2). A core
+// that runs is left alone. ctx withdraws it only while it waits for its turn.
 func (d *Dispatcher) ResumeContext(ctx context.Context, start *controlpb.StartRequest) error {
 	return d.runLifecycle(ctx, "start", func(work context.Context) error { return d.resume(work, start) })
 }
@@ -464,12 +462,9 @@ func (d *Dispatcher) resume(ctx context.Context, start *controlpb.StartRequest) 
 	return d.commitApplied(ctx, start)
 }
 
-// Suspend stops the core when its owner signs out (decision D5). Unlike Stop, the tunnel
-// comes back at their next sign-in.
-func (d *Dispatcher) Suspend() error {
-	return d.SuspendContext(context.Background())
-}
-
+// SuspendContext stops the core when its owner signs out (decision D5) or the machine
+// sleeps. Unlike Stop, the tunnel comes back at their next sign-in or the wake. ctx
+// withdraws it only while it waits for its turn.
 func (d *Dispatcher) SuspendContext(ctx context.Context) error {
 	return d.runLifecycle(ctx, "stop", func(work context.Context) error {
 		if d.Running() && d.host != nil {

@@ -224,14 +224,14 @@ func TestHostKeepsWhatTheCoreRuns(t *testing.T) {
 	expectError(t, callAs(t, dispatcher, ctx, owner, request(5, systemProxyRequest(false))), 5, CodeSystemProxyFailed)
 	host.proxyErr = nil
 
-	if err := dispatcher.Suspend(); err != nil || host.suspended != 1 || dispatcher.Running() {
+	if err := dispatcher.SuspendContext(ctx); err != nil || host.suspended != 1 || dispatcher.Running() {
 		t.Fatalf("suspend: %v, %d suspended", err, host.suspended)
 	}
-	if err := dispatcher.Resume(host.applied[0]); err != nil || !dispatcher.Running() || len(host.applied) != 3 {
+	if err := dispatcher.ResumeContext(ctx, host.applied[0]); err != nil || !dispatcher.Running() || len(host.applied) != 3 {
 		t.Fatalf("resume: %v, applied %d", err, len(host.applied))
 	}
 	// Resuming a running core leaves it alone.
-	if err := dispatcher.Resume(host.applied[0]); err != nil || len(host.applied) != 3 {
+	if err := dispatcher.ResumeContext(ctx, host.applied[0]); err != nil || len(host.applied) != 3 {
 		t.Fatalf("second resume: %v, applied %d", err, len(host.applied))
 	}
 	expectOK(t, callAs(t, dispatcher, ctx, owner, request(6, stopRequest)))

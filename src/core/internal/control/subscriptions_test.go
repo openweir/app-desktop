@@ -72,6 +72,13 @@ func (c *clock) advance(d time.Duration) {
 	c.now = c.now.Add(d)
 }
 
+// count is how many subscriptions are live.
+func (s *subscriptions) count() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.byID)
+}
+
 func newTestSubscriptions(t *testing.T) (*subscriptions, *sampler, *clock) {
 	t.Helper()
 	engine := &sampler{}

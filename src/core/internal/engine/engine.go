@@ -237,8 +237,6 @@ func (e *Engine) Close() error {
 
 func (e *Engine) CoreVersion() string { return coreVerStr }
 
-func (e *Engine) TunMode() admission.TunMode { return e.tunMode }
-
 // newTemplate is the engine's routing template, or nil without hosts.
 func newTemplate(home string, options Options) *routingtemplate.Source {
 	if len(options.TemplateHosts) == 0 {

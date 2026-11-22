@@ -13,7 +13,6 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
-	"github.com/openweir/app-desktop/src/core/internal/admission"
 	"github.com/openweir/app-desktop/src/core/internal/control"
 	"github.com/openweir/app-desktop/src/core/internal/controlpb"
 	"github.com/openweir/app-desktop/src/core/internal/engine"
@@ -92,13 +91,6 @@ external-controller: 0.0.0.0:9090
 proxies: []
 rules: ['MATCH,DIRECT']
 `, mixedPort)
-}
-
-func TestDevelopmentServerRunsWithoutTUN(t *testing.T) {
-	core, _ := developmentServer(t)
-	if core.TunMode() != admission.TunNone {
-		t.Fatalf("the development engine runs in %v mode", core.TunMode())
-	}
 }
 
 func TestDevelopmentServerRejectsTUNAndSystemProxy(t *testing.T) {

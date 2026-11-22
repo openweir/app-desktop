@@ -347,9 +347,3 @@ func (s *subscriptions) close() {
 		<-pumpDone
 	}
 }
-
-func (s *subscriptions) count() int {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return len(s.byID)
-}
