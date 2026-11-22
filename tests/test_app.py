@@ -308,10 +308,10 @@ def test_settings_page_loads_without_qml_warnings(
 ) -> None:
     settings = loaded.view_models.settings
     loaded.view_models.shell.setPage("settings")
-    qtbot.waitUntil(lambda: settings.property("coreVersion") == "openweir-v1.0.0")
+    qtbot.waitUntil(lambda: settings.property("coreVersion") == "openweir-v1.0.1")
     shown = texts(loaded.window.contentItem())
     assert set(labels) <= shown
-    assert "openweir-v1.0.0" in shown
+    assert "openweir-v1.0.1" in shown
     assert loaded.warnings == []
 
 

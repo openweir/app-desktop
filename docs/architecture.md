@@ -244,7 +244,7 @@ OpenWeir 保留 `github.com/metacubex/mihomo` 导入路径，通过 go.mod repla
 [openweir/mihomo](https://github.com/openweir/mihomo) 的明确版本（D38）。内核和原生依赖版本以
 [`src/core/go.mod`](../src/core/go.mod) 与 go.sum 为准，状态和许可证清单使用实际替换版本。
 用户侧参数及示例见 [mihomo 配置指南](mihomo-fork.md)。
-本项目的提交在 `main` 分支上，基于上游的 `Alpha` 分支（D44、D51），Snell v1–v6 用上游的实现：v5 按 v4 连接，v6 的 `mode` 需与服务端一致，
+本项目的改动合并在 fork 的 `Alpha` 分支上，即上游的 `Alpha` 加上本项目的提交（D44、D52），Snell v1–v6 用上游的实现：v5 按 v4 连接，v6 的 `mode` 需与服务端一致，
 显式 `unsafe-raw` 模式不提供加密及 PSK 验证；v3–v6 的 UDP 经 TCP 承载，不支持 v5 QUIC proxy。
 Cronet Go 绑定使用 openweir 的 MetaCubeX/sing 适配版本；
 Cronet 原生库由 `openweir/cronet-go/all` 的模块依赖选定。

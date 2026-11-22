@@ -149,7 +149,7 @@ def test_english_view_models(qtbot: QtBot, view_models: ViewModels) -> None:
     shell, overview, proxies = view_models.shell, view_models.overview, view_models.proxies
     qtbot.waitUntil(lambda: prop(shell, "serviceAvailable"))
     assert prop(shell, "serviceText") == "Service running"
-    assert prop(shell, "serviceDetail") == "openweir-v1.0.0\nProtocol v1"
+    assert prop(shell, "serviceDetail") == "openweir-v1.0.1\nProtocol v1"
 
     qtbot.waitUntil(lambda: prop(overview, "connected"))
     assert [page.label for page in prop(shell, "pages").rows][:4] == [

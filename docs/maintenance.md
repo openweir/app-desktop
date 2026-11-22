@@ -345,7 +345,7 @@ exits.md 第 9 节的待实测项。
    要先删掉旧的草稿再重新运行。标签发布后不删除，也不移到别的提交：它就是这个版本的源代码。
 
    打标签前确认 `replace` 固定的是 `openweir/mihomo` 上一个已发布的内核版本，也就是 `openweir-v<内核版本>`
-   标签指向的提交（5.4 节）。这个标签由内核发版自动打出，以后变基强推 `main` 时它仍然取得到，不需要另打标签：
+   标签指向的提交（5.4 节）。这个标签由内核发版自动打出，不需要另打标签：
 
    ```bash
    git ls-remote --tags https://github.com/openweir/mihomo 'openweir-v*'   # 确认固定的提交在其中
@@ -403,11 +403,13 @@ exits.md 第 9 节的待实测项。
 
 ### 5.4 依赖升级
 
-- **mihomo 增强版**：固定到 openweir/mihomo `main` 分支（D51）上的内核发版提交，即 `openweir-v<内核版本>` 标签
-  指向的提交（`src/core/go.mod` 的 `replace`，第 4 节第 3 步），不使用浮动分支作为构建输入。`Alpha`、`Meta` 只是上游的
-  原样镜像，不放本项目的提交。发布过的版本固定的提交是那个版本对应的源代码（D43），由内核发版标签保留，`main`
-  随上游变基强推时它仍然取得到；强推用 `--force-with-lease`。内核版本号和应用版本号各自独立：要用新内核，先在 fork
-  的 `main` 上同时改 `VERSION` 和 `constant.Version` 发版，再把 `replace` 改到那个提交（`engine_test.go` 要求内核
+- **mihomo 增强版**：固定到 openweir/mihomo `Alpha` 分支（D52）上的内核发版提交，即 `openweir-v<内核版本>` 标签
+  指向的提交（`src/core/go.mod` 的 `replace`，第 4 节第 3 步），不使用浮动分支作为构建输入。fork 的 `Alpha` 是上游
+  `Alpha` 合并本项目的改动，以 `git merge upstream/Alpha` 跟进上游，不变基、不强推；`Meta` 是上游的原样镜像。发布过的
+  版本固定的提交是那个版本对应的源代码（D43），由内核发版标签保留。内核版本号和应用版本号各自独立：要用新内核，先在
+  fork 的 `Alpha` 上同时改 `VERSION` 和 `constant.Version` 发版，再把 `replace` 改到那个提交：
+  `go -C src/core mod edit -replace github.com/metacubex/mihomo=github.com/openweir/mihomo@<提交>`，然后
+  `go -C src/core mod tidy`，并把许可证清单里的伪版本改成新的（`scripts/gen_licenses.py`；`engine_test.go` 要求内核
   报告 `openweir-vX.Y.Z`）。界面显示的内核版本就是这个发版名（[ui.md](ui.md)），和路由器一致；`require` 里的
   `github.com/metacubex/mihomo` 写已包含的最新上游发布。mihomo 的运行时（`hub`、`executor`、`tunnel` 等
   包级状态）只在 engine 里用（`imports_test.go` 检查）；`admission`、`compose`、`vpngate` 用 mihomo 无状态的解析

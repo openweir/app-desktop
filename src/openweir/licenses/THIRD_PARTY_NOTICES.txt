@@ -147,7 +147,7 @@ github.com/oasisprotocol/deoxysii v0.0.0-20220228165953-2091330c22b7 -- MIT -- h
 github.com/openacid/low v0.1.21 -- MIT -- https://github.com/openacid/low [88]
 github.com/openweir/cronet-go v0.0.0-20261120115440-78366bd1e919 -- GPL-3.0-or-later -- https://github.com/openweir/cronet-go [66]
 github.com/openweir/cronet-go/all v0.0.0-20261120115440-78366bd1e919 -- GPL-3.0-or-later -- https://github.com/openweir/cronet-go [66]
-github.com/openweir/mihomo v1.19.34-0.20261120142920-7d3383e170ce -- GPL-3.0-only -- https://github.com/openweir/mihomo [34]
+github.com/openweir/mihomo v1.19.34-0.20261122175947-8d0770267d54 -- GPL-3.0-only -- https://github.com/openweir/mihomo [34]
 github.com/oschwald/maxminddb-golang v1.12.0 -- ISC -- https://github.com/oschwald/maxminddb-golang [89]
 github.com/pierrec/lz4/v4 v4.1.27 -- BSD-3-Clause -- https://github.com/pierrec/lz4 [90]
 github.com/pires/go-proxyproto v0.8.0 -- Apache-2.0 -- https://github.com/pires/go-proxyproto [91]
@@ -3012,7 +3012,7 @@ Apache License
    See the License for the specific language governing permissions and
    limitations under the License.
 
----- [34] used by: github.com/enfein/mieru/v3 v3.39.0, github.com/metacubex/randv2 v0.2.0, github.com/metacubex/sing-wireguard v0.0.0-20261002050126-e5fa1a607406, github.com/openweir/mihomo v1.19.34-0.20261120142920-7d3383e170ce, github.com/sina-ghaderi/poly1305 v0.0.0-20220724002748-c5926b03988b, github.com/sina-ghaderi/rabaead v0.0.0-20220730151906-ab6e06b96e8c
+---- [34] used by: github.com/enfein/mieru/v3 v3.39.0, github.com/metacubex/randv2 v0.2.0, github.com/metacubex/sing-wireguard v0.0.0-20261002050126-e5fa1a607406, github.com/openweir/mihomo v1.19.34-0.20261122175947-8d0770267d54, github.com/sina-ghaderi/poly1305 v0.0.0-20220724002748-c5926b03988b, github.com/sina-ghaderi/rabaead v0.0.0-20220730151906-ab6e06b96e8c
 
 GNU GENERAL PUBLIC LICENSE
                        Version 3, 29 June 2007
