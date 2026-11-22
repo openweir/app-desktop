@@ -10,7 +10,7 @@ rest.
 from __future__ import annotations
 
 import asyncio
-import contextlib
+import logging
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import replace
@@ -25,6 +25,8 @@ from openweir.models.settings import Settings
 
 if TYPE_CHECKING:
     from openweir.models.library.core import LibraryCore
+
+_log = logging.getLogger(__name__)
 
 
 @contextmanager
@@ -99,8 +101,12 @@ class Tunnel:
                     report = await core.host.start(config)
             except BaseException:
                 if prepared:
-                    with contextlib.suppress(HostError):
+                    try:
                         await core.host.stop()
+                    except HostError as error:
+                        # The tunnel stays up with no configuration until the next status
+                        # read takes it down (MacExtensionHost.get_status).
+                        _log.warning("the tunnel did not go down after a failed start: %s", error)
                 raise
             if resume is not None:
                 # Only a successful Start consumes the deferred recovery. A retry must

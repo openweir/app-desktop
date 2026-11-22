@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -174,5 +175,42 @@ func TestPreparationActivityRefreshesTheIdleBudget(t *testing.T) {
 	case <-failed: // the UI disappeared after its last message
 	case <-time.After(2 * time.Second):
 		t.Fatal("abandoned preparation did not expire")
+	}
+}
+
+func TestOnlyConfiguringMessagesRefreshTheGuard(t *testing.T) {
+	large := strings.Repeat("proxies: []\n", 1<<16)
+	for _, tc := range []struct {
+		name    string
+		request *controlpb.Request
+		want    bool
+	}{
+		{"get_status", &controlpb.Request{Method: &controlpb.Request_GetStatus{GetStatus: &controlpb.GetStatusRequest{}}}, false},
+		{"get_info", &controlpb.Request{Method: &controlpb.Request_GetInfo{GetInfo: &controlpb.GetInfoRequest{}}}, false},
+		{"poll_events", &controlpb.Request{Method: &controlpb.Request_PollEvents{PollEvents: &controlpb.PollEventsRequest{SubscriptionId: 7}}}, false},
+		{"reload", &controlpb.Request{Method: &controlpb.Request_Reload{Reload: &controlpb.ReloadRequest{}}}, false},
+		{"inspect_source", &controlpb.Request{Method: &controlpb.Request_InspectSource{InspectSource: &controlpb.InspectSourceRequest{Yaml: large}}}, true},
+		{"validate", &controlpb.Request{Method: &controlpb.Request_Validate{Validate: &controlpb.ValidateRequest{}}}, true},
+		{"start", &controlpb.Request{Method: &controlpb.Request_Start{Start: &controlpb.StartRequest{
+			Source: &controlpb.StartRequest_ConfigYaml{ConfigYaml: large},
+		}}}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tc.request.ProtocolVersion = product.ProtocolVersion
+			tc.request.Id = 3
+			tc.request.TimeoutMs = 1000
+			encoded, err := proto.Marshal(tc.request)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := configures(encoded); got != tc.want {
+				t.Fatalf("configures(%s) = %v, want %v", tc.name, got, tc.want)
+			}
+		})
+	}
+	for _, malformed := range [][]byte{nil, {0xff}, {0x0a, 0x05, 0x01}} {
+		if configures(malformed) {
+			t.Fatalf("configures(%x) = true", malformed)
+		}
 	}
 }

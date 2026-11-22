@@ -344,6 +344,158 @@ def test_prepare_start_brings_the_tunnel_up_for_the_core_to_answer() -> None:
     assert manager.include_all_networks == [True]
 
 
+def stopped_status() -> pb.Response:
+    return pb.Response(get_status=pb.GetStatusResponse(state=pb.RUN_STATE_STOPPED))
+
+
+@pytest.mark.parametrize("state", [pb.RUN_STATE_STOPPED, pb.RUN_STATE_FAILED])
+def test_a_tunnel_left_up_without_a_configuration_goes_down_at_the_next_status(
+    state: pb.RunState,
+) -> None:
+    """A UI that quit between prepare_start and Start leaves the tunnel up with the core
+    stopped: every packet enters it and goes nowhere. The UI started next sees a stopped
+    core, so neither its switch nor quitting would take the tunnel down."""
+    manager = FakeManager(lambda _: pb.Response(get_status=pb.GetStatusResponse(state=state)))
+    manager.tunnel = extension.TUNNEL_CONNECTED
+    host = MacExtensionHost(manager)
+
+    status = asyncio.run(host.get_status())
+
+    assert status == HostStatus("stopped", "rule", 0, 0, 0, False, False)
+    assert manager.tunnel == extension.TUNNEL_DISCONNECTED
+    assert manager.calls == ["send", "status", "send", "stop", "status"]
+    assert not host.core_available
+
+
+def test_a_running_core_or_a_tunnel_on_its_way_down_is_left_alone() -> None:
+    answers = [running_status(), stopped_status()]
+    manager = FakeManager(lambda _: answers.pop(0))
+    manager.tunnel = extension.TUNNEL_CONNECTED
+    host = MacExtensionHost(manager)
+
+    async def scenario() -> list[str]:
+        states = [(await host.get_status()).state]
+        # The extension still answers while the tunnel goes down.
+        manager.status = lambda: extension.TUNNEL_DISCONNECTING
+        states.append((await host.get_status()).state)
+        return states
+
+    assert asyncio.run(scenario()) == ["running", "stopped"]
+    assert "stop" not in manager.calls
+
+
+def test_the_tunnel_this_process_prepares_for_start_stays_up() -> None:
+    """Between prepare_start and Start the core is stopped on purpose (D27)."""
+    manager = FakeManager(
+        lambda request: (
+            stopped_status() if request.HasField("get_status") else pb.Response(empty=pb.Empty())
+        )
+    )
+    host = MacExtensionHost(manager)
+
+    async def scenario() -> str:
+        await host.prepare_start(RunOptions())
+        state = (await host.get_status()).state
+        await host.start(TunnelConfig("proxies: []\n"))
+        return state
+
+    assert asyncio.run(scenario()) == "stopped"
+    assert [call for call in manager.calls if call != "send"] == ["activate", "start"]
+    assert manager.tunnel == extension.TUNNEL_CONNECTED
+
+
+def test_a_status_read_while_start_runs_leaves_the_tunnel_up() -> None:
+    entered, release = threading.Event(), threading.Event()
+
+    def answer(request: pb.Request) -> pb.Response:
+        if request.HasField("start"):
+            entered.set()
+            release.wait(2)
+            return pb.Response(empty=pb.Empty())
+        return stopped_status()
+
+    manager = FakeManager(answer)
+    host = MacExtensionHost(manager)
+
+    async def scenario() -> str:
+        starting = asyncio.create_task(host.start(TunnelConfig("proxies: []\n")))
+        try:
+            assert await asyncio.to_thread(entered.wait, 1)
+            return (await host.get_status()).state
+        finally:
+            release.set()
+            await starting
+
+    assert asyncio.run(scenario()) == "stopped"
+    assert "stop" not in manager.calls
+    assert manager.tunnel == extension.TUNNEL_CONNECTED
+
+
+def test_a_start_that_spent_its_budget_still_takes_the_tunnel_down(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Bringing the tunnel up took nearly all of the budget it shares with Start; the stop
+    after the Start timed out gets a budget of its own."""
+    monkeypatch.setattr(extension, "ACTIVATE_TIMEOUT_S", 0.05)
+    monkeypatch.setattr(extension, "START_TIMEOUT_S", 0.05)
+    monkeypatch.setattr(
+        extension, "request_timeout", lambda _, timeout=None: 0.1 if timeout is None else timeout
+    )
+    release = threading.Event()
+
+    def answer(_: pb.Request) -> pb.Response:
+        release.wait(2)
+        return pb.Response(empty=pb.Empty())
+
+    manager = FakeManager(answer)
+    original = manager.start
+
+    def slow_start(timeout: float, include_all_networks: bool) -> None:
+        threading.Event().wait(0.15)
+        original(timeout, include_all_networks)
+
+    manager.start = slow_start
+    host = MacExtensionHost(manager)
+
+    async def scenario() -> None:
+        try:
+            await host.start(TunnelConfig("proxies: []\n"))
+        finally:
+            release.set()
+
+    with pytest.raises(HostError) as raised:
+        asyncio.run(scenario())
+    assert raised.value.code == "timeout"
+    assert [call for call in manager.calls if call != "send"] == ["activate", "start", "stop"]
+    assert manager.tunnel == extension.TUNNEL_DISCONNECTED
+
+
+def test_a_cancelled_start_takes_the_tunnel_down_before_it_ends() -> None:
+    entered, release = threading.Event(), threading.Event()
+
+    def answer(_: pb.Request) -> pb.Response:
+        entered.set()
+        release.wait(2)
+        return pb.Response(empty=pb.Empty())
+
+    manager = FakeManager(answer)
+    host = MacExtensionHost(manager)
+
+    async def scenario() -> None:
+        starting = asyncio.create_task(host.start(TunnelConfig("proxies: []\n")))
+        try:
+            assert await asyncio.to_thread(entered.wait, 1)
+            starting.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await starting
+            assert manager.tunnel == extension.TUNNEL_DISCONNECTED
+        finally:
+            release.set()
+
+    asyncio.run(scenario())
+    assert [call for call in manager.calls if call != "send"] == ["activate", "start", "stop"]
+
+
 @pytest.mark.parametrize(
     ("result", "code", "retryable"),
     [

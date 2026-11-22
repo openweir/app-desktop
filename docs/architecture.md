@@ -760,7 +760,9 @@ macOS 不监听任何 socket，控制消息全部走 Network Extension 自带的
   清单，其余需要内核的方法（包括 `Validate`、`InspectSource`）报 `not_running`（apple/README.md“Python 宿主”）。
 - **断开时的订阅与改动**（D27）：宿主的 `core_available` 这时为假。导入的订阅存为未读，改动不经校验存储，分流页
   隐藏要内核的部分（ui.md 第 3、9 节）。连接分两步：`prepare_start` 让隧道起来、扩展能回答，界面读未读的订阅、
-  定下分流，再发 `Start`；读不了正要使用的那份或 `Start` 被拒绝时，隧道断开。
+  定下分流，再发 `Start`；读不了正要使用的那份或 `Start` 被拒绝、超时、被取消时，隧道断开（另用一份停止预算）。
+  界面在两步之间退出或崩溃时，隧道连着而内核停止，所有流量进入隧道却无处可去：下一个界面读状态时，只要本进程
+  没有在连接，`MacExtensionHost.get_status` 就把这样的隧道断开；扩展也在两分钟没有配置消息后自行终止（9.1 节）。
 - **方法**：除 `Claim`、`SetSystemProxy` 外与 Windows 相同。隧道的启停走管理库，配置经 `Start` / `Reload` 走
   provider message；没有 attach 的隧道时，消息得到 `not_running`。`MacExtensionHost` 发出的 `RunOptions` 总是开着
   TUN、关着系统代理，不论设置怎么写（ui.md 第 8 节"接管方式"）。
@@ -869,8 +871,9 @@ macOS 不监听任何 socket，控制消息全部走 Network Extension 自带的
 致命堆栈；取消和已处理的操作失败不记作崩溃。Go 的 `crashlog.Open` 在创建 engine 前注册
 `debug.SetCrashOutput`，Windows 使用当前属主的受保护 home，macOS 在 provider 初始化时注册到自身容器，
 开发服务使用 dev-core home。零字节活动文件不算报告，正常退出清除；记录器失败不阻止连接。
-macOS attach 后如果尚无可运行配置且连续两分钟没有界面消息，启动保护会终止扩展，使系统拆除空隧道；
-解析多份订阅时，消息持续刷新空闲预算。正常 Start 或 detach 永久取消保护，已运行隧道无需界面心跳。
+macOS attach 后如果尚无可运行配置且连续两分钟没有配置消息（`InspectSource`、`Validate`、`Start`），启动保护会终止
+扩展，使系统拆除空隧道；解析多份订阅时，这些消息持续刷新空闲预算。状态查询、拉取等其他消息不算：重新打开的界面
+每秒查询状态，并不说明有配置要来。正常 Start 或 detach 永久取消保护，已运行隧道无需界面心跳。
 
 Windows 安装器为两个 OpenWeir 可执行文件设置独立的 WER mini dump 策略，卸载只移除本次安装拥有的键；
 原生服务转储在 SYSTEM/管理员专用目录，不混入用户可读的日志。macOS 原生报告由系统生成与维护。

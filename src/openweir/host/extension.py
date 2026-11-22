@@ -93,6 +93,10 @@ _DOWN_STATES = {
     TUNNEL_REASSERTING: "starting",
     TUNNEL_DISCONNECTING: "stopping",
 }
+# The tunnel's states that take in all traffic, whether a core runs behind it or not.
+_UP_STATES = frozenset({TUNNEL_CONNECTED, TUNNEL_REASSERTING})
+# The core's run states with no configuration running.
+_IDLE_CORE_STATES = frozenset({"stopped", "failed"})
 # The host errors of the other results; NOT_CONNECTED and NOT_CONFIGURED become TunnelDownError.
 _ERRORS = {
     TIMED_OUT: ("timeout", True),
@@ -373,14 +377,16 @@ class MacExtensionHost(ServiceHost):
         return maximum if deadline is None else min(maximum, remaining_seconds(deadline))
 
     @contextlib.asynccontextmanager
-    async def _serialized(self, timeout: float) -> AsyncIterator[None]:
+    async def _serialized(self, timeout: float) -> AsyncIterator[asyncio.Timeout]:
+        """One lifecycle operation at a time, all of it within ``timeout``; yields the
+        operation's timer, which the cleanup after a failed Start pushes back."""
         deadline = asyncio.get_running_loop().time() + timeout
         try:
-            async with asyncio.timeout_at(deadline + 2), self._lifecycle:
+            async with asyncio.timeout_at(deadline + 2) as timer, self._lifecycle:
                 remaining_seconds(deadline)
                 token = self._operation_deadline.set(deadline)
                 try:
-                    yield
+                    yield timer
                 finally:
                     self._operation_deadline.reset(token)
         except TimeoutError as error:
@@ -449,13 +455,19 @@ class MacExtensionHost(ServiceHost):
         except ManagerError as error:
             raise _host_error(error, "tunnel_failed") from error
 
-    async def _down_state(self) -> str:
+    async def _tunnel_state(self) -> int:
+        """The tunnel's TUNNEL_ status; TUNNEL_INVALID when the manager cannot tell."""
         try:
             async with asyncio.timeout(5):
-                status = await _blocking(self._manager.status)
+                return await _blocking(self._manager.status)
         except ManagerError, TimeoutError:
-            return "stopped"
-        return _DOWN_STATES.get(status, "stopped")
+            return TUNNEL_INVALID
+
+    async def _down_state(self) -> str:
+        return _DOWN_STATES.get(await self._tunnel_state(), "stopped")
+
+    async def _down_status(self) -> HostStatus:
+        return HostStatus(await self._down_state(), "rule", 0, 0, 0, False, False)
 
     async def get_info(self) -> HostInfo:
         try:
@@ -468,9 +480,35 @@ class MacExtensionHost(ServiceHost):
 
     async def get_status(self) -> HostStatus:
         try:
-            return await super().get_status()
+            status = await super().get_status()
         except TunnelDownError:
-            return HostStatus(await self._down_state(), "rule", 0, 0, 0, False, False)
+            return await self._down_status()
+        if status.state in _IDLE_CORE_STATES and await self._took_down_unconfigured():
+            return await self._down_status()
+        return status
+
+    async def _took_down_unconfigured(self) -> bool:
+        """Take the tunnel down when it is up with no configuration running and this process
+        is not bringing it up for a Start: a UI quit or crashed after prepare_start, or a
+        failed Start could not take it down. All traffic enters such a tunnel and goes
+        nowhere, while the status reads stopped, so quitting would leave it up too. The
+        extension times it out after two minutes without a configuring message; this does
+        it at the next status read. True once the tunnel is down."""
+        if self._prepared or self._lifecycle.locked():
+            return False
+        if await self._tunnel_state() not in _UP_STATES:
+            return False
+        try:
+            async with self._serialized(STOP_TIMEOUT_S):
+                # A Start may have come and gone while this waited for its turn.
+                if self._prepared:
+                    return False
+                if (await super().get_status()).state not in _IDLE_CORE_STATES:
+                    return False
+                await self._stop()
+        except HostError:
+            return False  # the next status read tries again
+        return True
 
     async def prepare_start(self, options: RunOptions) -> None:
         """Bring the tunnel up, with the VPN configuration including all networks or not as
@@ -497,17 +535,30 @@ class MacExtensionHost(ServiceHost):
             + START_TIMEOUT_S
             + request_timeout(pb.Request(start=pb.StartRequest()))
         )
-        async with self._serialized(budget):
+        async with self._serialized(budget) as timer:
             if not self._prepared:
                 await self._prepare_start(config.options)
             self._prepared = False
             try:
                 return await super().start(config)
-            except HostError as error:
-                if error.code != "already_running":
-                    with contextlib.suppress(HostError):
-                        await self._stop()
+            except BaseException as error:
+                # Whether the core refused it, the budget ran out or the caller gave up.
+                if not (isinstance(error, HostError) and error.code == "already_running"):
+                    await self._stop_after_failed_start(timer)
                 raise
+
+    async def _stop_after_failed_start(self, timer: asyncio.Timeout) -> None:
+        """Take the tunnel down with a budget of its own: the Start may have spent the one
+        they share. When this fails too, the next get_status takes it down."""
+        deadline = asyncio.get_running_loop().time() + STOP_TIMEOUT_S
+        if not timer.expired():  # an expired timer cancels nothing more
+            timer.reschedule(max(timer.when() or 0.0, deadline + 2))
+        token = self._operation_deadline.set(deadline)
+        try:
+            with contextlib.suppress(HostError):
+                await self._stop()
+        finally:
+            self._operation_deadline.reset(token)
 
     async def stop(self) -> None:
         """Take the tunnel down; the extension stops the core as it detaches."""

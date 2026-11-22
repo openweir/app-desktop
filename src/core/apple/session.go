@@ -19,6 +19,8 @@ import (
 	"github.com/openweir/app-desktop/src/core/internal/geodata"
 	"github.com/openweir/app-desktop/src/core/internal/operation"
 	"github.com/openweir/app-desktop/src/core/internal/peer"
+	"google.golang.org/protobuf/encoding/protowire"
+	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
 // session is one attached tunnel: an engine in fd mode and its dispatcher.
@@ -29,7 +31,9 @@ type session struct {
 	ctx        context.Context
 	cancel     context.CancelFunc
 	configured func()
-	contact    func()
+	// contact refreshes the initial configuration guard; handle calls it for the
+	// configuring methods only.
+	contact func()
 }
 
 var (
@@ -123,12 +127,52 @@ func handle(request []byte) []byte {
 	if current == nil {
 		return control.EncodeFailure(0, control.CodeNotRunning, "the extension has no tunnel attached")
 	}
-	current.contact()
+	if configures(request) {
+		current.contact()
+	}
 	response := current.dispatcher.Handle(current.ctx, peer.Identity{}, request)
 	if current.engine.State() == controlpb.RunState_RUN_STATE_RUNNING {
 		current.configured()
 	}
 	return response
+}
+
+// configuring holds the Request fields of the methods that work toward the first
+// configuration: reading the profiles stored while no core could (D27), validating, and
+// Start itself. Status reads, polls and the other queries are not among them: a UI that
+// came back after its predecessor brought the tunnel up polls the status every second,
+// which says nothing about a configuration on its way.
+var configuring = requestFields("inspect_source", "validate", "start")
+
+func requestFields(names ...protoreflect.Name) map[protowire.Number]bool {
+	fields := (&controlpb.Request{}).ProtoReflect().Descriptor().Fields()
+	numbers := make(map[protowire.Number]bool, len(names))
+	for _, name := range names {
+		numbers[fields.ByName(name).Number()] = true
+	}
+	return numbers
+}
+
+// configures reports whether request calls one of the configuring methods. It reads the
+// top-level tags only, rather than decode a configuration that may be megabytes long; the
+// dispatcher still decodes and checks the whole request.
+func configures(request []byte) bool {
+	for len(request) > 0 {
+		number, kind, n := protowire.ConsumeTag(request)
+		if n < 0 {
+			return false
+		}
+		if configuring[number] {
+			return true
+		}
+		request = request[n:]
+		n = protowire.ConsumeFieldValue(number, kind, request)
+		if n < 0 {
+			return false
+		}
+		request = request[n:]
+	}
+	return false
 }
 
 // network is admission.FDNetwork in the shape the extension's network settings take.

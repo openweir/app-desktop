@@ -17,7 +17,8 @@ Xcode 工程由 XcodeGen 从 `project.yml` 生成，包含两个 target（docs/a
 构建时校验本地化资源；系统授权提示按 [维护清单](../docs/maintenance.md) 验收（D36）。
 
 provider 初始化时即为 Go 注册本地崩溃日志，保存到扩展自己的 `OpenWeir/core/crashes`；未配置的 TUN 在连续两分钟
-没有界面消息后终止，避免 UI 崩溃后遗留空隧道，批量解析期间的消息会刷新预算。系统身份的容器及原生系统报告由管理员提取，不假定它与用户 App Group 相同，
+没有配置消息（`InspectSource`、`Validate`、`Start`）后终止，避免 UI 崩溃后遗留空隧道，批量解析期间的这些消息会刷新
+预算；状态查询和拉取不算，否则重新打开的界面每秒查询状态，空隧道就一直留着。系统身份的容器及原生系统报告由管理员提取，不假定它与用户 App Group 相同，
 也不为读日志启动隧道。管理库、扩展与 Nuitka UI 的 dSYM 按 UUID 校验并独立保留，见 D37 与维护文档。
 
 ## 工程结构
@@ -294,7 +295,11 @@ mihomo home 在扩展容器的 `Application Support/OpenWeir/core`，`startTunne
   `extension_needs_reboot`），再 `start`（`include_all_networks` 取自 `RunOptions.include_all_networks`，即设置页的
   "包含所有网络"），然后 `send(Start)`；内核拒绝配置时把隧道停掉，不让流量进入没有内核的
   隧道。有断开时存下的未读订阅时，`prepare_start` 先做 `activate` 和 `start`，界面读完这些订阅（`InspectSource`、
-  `Validate`）再发 `Start`（D27，ui.md 第 3 节）；其间流量停在没有配置的隧道里。**停止**：`stop`，扩展 detach 时停止内核。关闭宿主不动隧道。
+  `Validate`）再发 `Start`（D27，ui.md 第 3 节）；其间流量停在没有配置的隧道里。`Start` 失败、超时或被取消时，
+  另用一份 `STOP_TIMEOUT_S` 的预算停掉隧道，再报原来的错误。**停止**：`stop`，扩展 detach 时停止内核。关闭宿主不动隧道。
+- **遗留的空隧道**：扩展回答内核停止或失败、隧道却连着，而本进程既不在 `prepare_start` 与 `Start` 之间、也没有
+  启停在进行时，`get_status` 在启停锁里再确认一次，然后停掉隧道，报告隧道的状态。这是上一个界面在两步之间退出、
+  或失败后没能停掉的隧道：它吞掉所有流量，状态却是"未连接"，退出时也不会去断开。
 - **隧道未连接**（`NOT_CONNECTED`、`NOT_CONFIGURED`，或扩展回答没有 attach）：`get_status` 按隧道状态报
   stopped / starting / stopping，`get_info` 用 Info.plist 里的内核版本，列表和轮询返回空，GEO 分类用安装包的清单，
   其余需要内核的方法报 `not_running`；订阅随扩展一起消失，之后重新订阅。`core_available` 在扩展回答后为真，
