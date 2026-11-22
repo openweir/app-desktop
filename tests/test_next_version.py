@@ -4,6 +4,7 @@ from, and writing it into pyproject.toml."""
 from __future__ import annotations
 
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -40,7 +41,7 @@ def test_bump_rejects_invalid(bad: str) -> None:
         nv.bump(bad, [])
 
 
-def _repo(tmp_path: Path) -> callable:
+def _repo(tmp_path: Path) -> Callable[..., None]:
     def git(*args: str) -> None:
         subprocess.run(["git", *args], cwd=tmp_path, check=True, capture_output=True)
 
@@ -65,11 +66,49 @@ def test_next_version_from_tags(tmp_path: Path) -> None:
     assert nv.next_version(tmp_path) == "1.5.0"
 
 
-def test_next_version_needs_a_tag(tmp_path: Path) -> None:
+def test_before_the_first_release_the_version_is_pyprojects(tmp_path: Path) -> None:
     git = _repo(tmp_path)
-    git("commit", "-q", "--allow-empty", "-m", "feat: first")
-    with pytest.raises(RuntimeError, match="no stable"):
-        nv.next_version(tmp_path)
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "openweir"\nversion = "0.1.0"\n', encoding="utf-8"
+    )
+    git("add", "pyproject.toml")
+    git("commit", "-q", "-m", "feat: first")
+    git("tag", "v0.1.0-preview.3")  # a preview is no release
+    git("commit", "-q", "--allow-empty", "-m", "feat!: second")
+    assert nv.next_version(tmp_path) == "0.1.0"
+    # Once the first release is tagged, the commits after it count.
+    git("tag", "v0.1.0")
+    git("commit", "-q", "--allow-empty", "-m", "fix: third")
+    assert nv.next_version(tmp_path) == "0.1.1"
+
+
+def test_a_shallow_clone_without_tags_is_an_error(tmp_path: Path) -> None:
+    origin = tmp_path / "origin"
+    origin.mkdir()
+    git = _repo(origin)
+    (origin / "pyproject.toml").write_text(
+        '[project]\nname = "openweir"\nversion = "0.1.0"\n', encoding="utf-8"
+    )
+    git("add", "pyproject.toml")
+    git("commit", "-q", "-m", "feat: first")
+    git("tag", "v1.4.0")
+    git("commit", "-q", "--allow-empty", "-m", "fix: second")
+    clone = tmp_path / "clone"
+    subprocess.run(
+        ["git", "clone", "-q", "--depth", "1", "--no-tags", origin.as_uri(), str(clone)],
+        check=True,
+        capture_output=True,
+    )
+    with pytest.raises(RuntimeError, match="shallow clone"):
+        nv.next_version(clone)
+
+
+@pytest.mark.parametrize("bad", ["1.0", "v0.1.0", "0.1.0.dev1"])
+def test_pyproject_must_name_a_release_version(tmp_path: Path, bad: str) -> None:
+    pyproject = tmp_path / "pyproject.toml"
+    pyproject.write_text(f'[project]\nversion = "{bad}"\n', encoding="utf-8")
+    with pytest.raises(ValueError, match="invalid release version"):
+        nv.project_version(pyproject)
 
 
 def test_write_version(tmp_path: Path) -> None:

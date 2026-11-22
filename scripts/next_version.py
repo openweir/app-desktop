@@ -1,7 +1,8 @@
 """The next release version, from git: the newest stable vX.Y.Z tag reachable from HEAD and
 the conventional commits after it (docs/release.md). A breaking change (type!: or a
 BREAKING CHANGE: footer) raises the major version, a feat the minor, anything else the patch;
-a tagged HEAD keeps its own version. Mirrors openwrt's internal/release/nextversion.go.
+a tagged HEAD keeps its own version. Mirrors openwrt's internal/release/nextversion.go. Until
+the first release is tagged, the version is pyproject.toml's (the first release is 0.1.0).
 
     uv run --no-project python scripts/next_version.py           # print it
     uv run --no-project python scripts/next_version.py --write   # also set it in pyproject.toml
@@ -15,6 +16,7 @@ import argparse
 import re
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -57,12 +59,25 @@ def _git(cwd: Path, *args: str) -> str:
     ).stdout
 
 
+def project_version(pyproject: Path = PYPROJECT) -> str:
+    """[project] version in pyproject.toml."""
+    with pyproject.open("rb") as stream:
+        version = tomllib.load(stream)["project"]["version"]
+    if not isinstance(version, str) or VERSION.match(version) is None:
+        raise ValueError(f"invalid release version {version!r} in {pyproject}")
+    return version
+
+
 def next_version(cwd: Path = ROOT) -> str:
     """The next version from the repository at cwd."""
     tags = _git(cwd, "tag", "--merged", "HEAD", "--list", "v*", "--sort=-v:refname").split()
     latest = next((t for t in tags if STABLE_TAG.match(t)), None)
     if latest is None:
-        raise RuntimeError("no stable vX.Y.Z tag is reachable; fetch tags with full history")
+        # A shallow clone may just lack the tags; a full one has no release yet, so the first
+        # is the version pyproject.toml names.
+        if _git(cwd, "rev-parse", "--is-shallow-repository").strip() == "true":
+            raise RuntimeError("no stable vX.Y.Z tag in a shallow clone; fetch full history")
+        return project_version(cwd / "pyproject.toml")
     log = _git(cwd, "log", "--format=%B%x00", f"{latest}..HEAD")
     messages = [m.strip() for m in log.split("\0") if m.strip()]
     return bump(latest[1:], messages)
@@ -78,7 +93,7 @@ def write_version(version: str, pyproject: Path = PYPROJECT) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(description=(__doc__ or "").partition("\n")[0])
     parser.add_argument("--write", action="store_true", help="also set it in pyproject.toml")
     args = parser.parse_args()
     version = next_version()

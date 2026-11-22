@@ -23,7 +23,7 @@ Windows 安装器采用自定义 Win32 界面（D39），由 MSVC 编译为 NSIS
 
 | 项目 | 约定 |
 | --- | --- |
-| 标签 | `v<版本>`，版本由 `scripts/next_version.py` 从 git 算出（最新的稳定 `vX.Y.Z` 标签加其后的约定式提交：`!` 或 `BREAKING CHANGE:` 升主版本，`feat` 升次版本，其余升修订号），CI 构建前写入 `pyproject.toml`，形如 `1.0.0`（三段数字）。预发布和草稿不提供给更新 |
+| 标签 | `v<版本>`，版本由 `scripts/next_version.py` 从 git 算出（最新的稳定 `vX.Y.Z` 标签加其后的约定式提交：`!` 或 `BREAKING CHANGE:` 升主版本，`feat` 升次版本，其余升修订号；还没有稳定标签时，即第一个正式版之前，取 `pyproject.toml` 里的版本 0.1.0；浅克隆里找不到标签时报错，不回退），CI 构建前写入 `pyproject.toml`，形如 `1.0.0`（三段数字）。预发布和草稿不提供给更新 |
 | 标题与说明 | `OpenWeir <版本>`；说明取自 `.github/release-notes.md`，`{{version}}` 换成版本；说明先英文后中文，两段的"更新内容"都在草稿里手写 |
 | macOS 安装包 | `OpenWeir-<版本>-macos-universal.dmg`：由 `scripts/build_dmg.py` 制作，挂载后是一个固定的窗口，左边 `OpenWeir.app`、右边“应用程序”的快捷方式（apple/README.md 的“磁盘映像”）；磁盘映像用 Developer ID（Team 为 `OPENWEIR_APPLE_TEAM_ID`）签名、公证并 staple |
 | Windows 安装包 | `OpenWeir-<版本>-windows-x64-setup.exe`：NSIS 安装器（architecture.md 第 9 节）。安装器、卸载器和装进去的程序用 Azure Artifact Signing 做 Authenticode 签名并加时间戳，签名者是 `OpenWeir`（D42）；更新时核对校验和与签名者（第 3 节第 4 步）。1.0.0 不签名（D29） |
