@@ -148,7 +148,7 @@ _CORE_TYPES = {
     "Shadowsocks": "type: ss, cipher: aes-128-gcm, password: sample",
 }
 SAMPLE_CONFIG = (
-    "mixed-port: 7890\nmode: rule\nproxies:\n"
+    "mixed-port: 9347\nmode: rule\nproxies:\n"
     + "".join(
         f"  - {{name: {name}, {_CORE_TYPES[kind]}, server: node{i}.example.net, port: 443}}\n"
         for i, (name, (kind, _)) in enumerate(NODES.items())
@@ -192,7 +192,7 @@ def _quoted(name: str) -> str:
 
 
 LONG_CONFIG = (
-    "mixed-port: 7890\nmode: rule\nproxies:\n"
+    "mixed-port: 9347\nmode: rule\nproxies:\n"
     + "".join(
         f"  - {{name: {_quoted(name)}, {_CORE_TYPES[kind]}, "
         f"server: node{i}.example.net, port: 443}}\n"
@@ -443,7 +443,7 @@ STARTUP_LOG = (
     ("info", "Start initial configuration in progress"),
     ("info", "Initial configuration complete, total time: 48ms"),
     ("info", "Sniffer is loaded and working"),
-    ("info", "Mixed(http+socks) proxy listening at: 127.0.0.1:7890"),
+    ("info", "Mixed(http+socks) proxy listening at: 127.0.0.1:9347"),
     (
         "info",
         "[TUN] Tun adapter listening at: utun4([198.18.0.1/30],[]), mtu: 9000, auto route: true, auto redir: false, ip stack: Mixed",

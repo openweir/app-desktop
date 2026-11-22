@@ -97,7 +97,7 @@ def test_service_host_sends_compositions_and_reads_the_report() -> None:
             return pb.Response(empty=pb.Empty())
         return pb.Response(composition=REPORT)
 
-    options = RunOptions(mixed_port=7890)
+    options = RunOptions(mixed_port=9347)
     composed = TunnelConfig(overrides=("mode: global\n",), options=options, composition=COMPOSITION)
 
     async def scenario() -> list[CompositionReport | None]:
@@ -140,7 +140,7 @@ def test_service_host_sends_compositions_and_reads_the_report() -> None:
     )
     assert list(validate.validate.overrides) == ["mode: global\n"]
     assert start.start.WhichOneof("source") == "composition"
-    assert start.start.options.mixed_port == 7890
+    assert start.start.options.mixed_port == 9347
     assert reload.reload.WhichOneof("source") == "config_yaml"
     assert reload.reload.config_yaml == "mode: rule\n"
 

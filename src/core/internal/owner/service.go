@@ -625,7 +625,8 @@ func (s *Service) proxyOn(port uint16) error {
 		if err != nil {
 			return fmt.Errorf("read the owner's proxy settings: %w", err)
 		}
-		if err := s.home.savePreviousProxy(previous); err != nil {
+		// What an earlier version left on its old port (D53) is not the owner's own.
+		if err := s.home.savePreviousProxy(sysproxy.Owned(previous)); err != nil {
 			return err
 		}
 	}
@@ -675,7 +676,8 @@ func (s *Service) proxyOffLocked() error {
 	if err != nil {
 		return err
 	}
-	if err := s.platform.WriteProxy(session, previous); err != nil {
+	// An earlier version may have kept its own settings as the owner's (D53).
+	if err := s.platform.WriteProxy(session, sysproxy.Owned(previous)); err != nil {
 		return fmt.Errorf("restore the owner's proxy settings: %w", err)
 	}
 	return s.home.dropPreviousProxy()
@@ -692,7 +694,7 @@ func (s *Service) restoreStrayProxy(sid string, session uint32) {
 	if err != nil || !saved {
 		return
 	}
-	if err := s.platform.WriteProxy(session, previous); err != nil {
+	if err := s.platform.WriteProxy(session, sysproxy.Owned(previous)); err != nil {
 		s.log.Warn("restore a former owner's proxy settings", "error", err)
 		return
 	}

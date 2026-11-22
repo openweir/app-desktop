@@ -398,7 +398,7 @@ def test_a_switch_the_core_refuses_keeps_the_routing_and_says_why(
     assert isinstance(host, SimulatedHost)
 
     async def refuse(config: TunnelConfig) -> CompositionReport | None:
-        raise HostError("apply_failed", "listen tcp 127.0.0.1:7890: bind: address already in use")
+        raise HostError("apply_failed", "listen tcp 127.0.0.1:9347: bind: address already in use")
 
     monkeypatch.setattr(host, "reload", refuse)
     routing.setMode("profile")
@@ -406,7 +406,7 @@ def test_a_switch_the_core_refuses_keeps_the_routing_and_says_why(
     assert prop(routing, "mode") == "plan"
     assert prop(routing, "hasError")
     assert prop(routing, "summary") == (
-        "配置未能生效：listen tcp 127.0.0.1:7890: bind: address already in use"  # noqa: RUF001
+        "配置未能生效：listen tcp 127.0.0.1:9347: bind: address already in use"  # noqa: RUF001
     )
     assert routing.snapshot().mode == "plan"
 

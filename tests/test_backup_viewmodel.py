@@ -246,7 +246,7 @@ def test_export_then_restore_on_an_empty_machine(
     expected = library_data(first)
     restored = library_data(second)
     assert restored == expected
-    assert second.vms.settings_store.current.mixed_port == 7890  # this machine's own
+    assert second.vms.settings_store.current.mixed_port == 9347  # this machine's own
 
     library = second.vms.library
     profiles = second.call(library.current())

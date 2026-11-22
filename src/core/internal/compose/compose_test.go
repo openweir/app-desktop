@@ -329,6 +329,10 @@ func TestBaseSection(t *testing.T) {
 	if _, ok := config["proxies"]; ok {
 		t.Fatal("the nodes belong in the providers")
 	}
+	// OpenWeir's port (D53) when RunOptions.mixed_port leaves the configuration's.
+	if port, _ := config["mixed-port"].(int); port != 9347 {
+		t.Fatalf("mixed-port = %v, want 9347", config["mixed-port"])
+	}
 }
 
 func TestPlanErrors(t *testing.T) {

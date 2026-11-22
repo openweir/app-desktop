@@ -59,7 +59,7 @@ def test_a_click_elsewhere_ends_the_editing_and_saves(qtbot: QtBot, loaded: Load
     assert loaded.focus_ring(field) is not None  # a field shows it whenever it has the focus
     QMetaObject.invokeMethod(field, "selectAll")
     loaded.type(qtbot, "7891")
-    assert mixed_port(loaded) == 7890  # nothing is saved while the user types
+    assert mixed_port(loaded) == 9347  # nothing is saved while the user types
 
     loaded.click(qtbot, label(loaded))
     assert not field.hasActiveFocus()
@@ -110,7 +110,7 @@ def test_a_refused_port_stays_with_its_error(qtbot: QtBot, loaded: Loaded) -> No
     assert port_error(loaded) == RANGE_ERROR
     assert field.property("text") == "80"  # the error is about what the field shows
     assert field.property("error")
-    assert mixed_port(loaded) == 7890
+    assert mixed_port(loaded) == 9347
 
 
 def test_esc_puts_the_saved_port_back(qtbot: QtBot, loaded: Loaded) -> None:
@@ -121,11 +121,11 @@ def test_esc_puts_the_saved_port_back(qtbot: QtBot, loaded: Loaded) -> None:
     assert field.hasActiveFocus()  # Enter saves without leaving the field
 
     loaded.key(qtbot, Qt.Key.Key_Escape)
-    assert field.property("text") == "7890"
+    assert field.property("text") == "9347"
     assert port_error(loaded) == ""
     assert not field.property("error")
     assert not field.hasActiveFocus()
-    assert mixed_port(loaded) == 7890
+    assert mixed_port(loaded) == 9347
 
 
 def test_enter_and_tab_save_the_port(qtbot: QtBot, loaded: Loaded) -> None:
@@ -160,11 +160,11 @@ def test_its_edit_menu_keeps_the_field_editing(qtbot: QtBot, loaded: Loaded) -> 
     assert loaded.overlay_items(lambda i: kind(i) == "AppMenuItem" and i.property("text") == "全选")
     assert not field.hasActiveFocus()
     assert loaded.focus_ring(field) is not None
-    assert mixed_port(loaded) == 7890
+    assert mixed_port(loaded) == 9347
 
     loaded.key(qtbot, Qt.Key.Key_Escape)
     assert field.hasActiveFocus()
-    assert mixed_port(loaded) == 7890
+    assert mixed_port(loaded) == 9347
     loaded.click(qtbot, label(loaded))
     qtbot.waitUntil(lambda: mixed_port(loaded) == 7891)
 

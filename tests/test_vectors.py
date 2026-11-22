@@ -74,7 +74,7 @@ REQUESTS = {
             composition=COMPOSITION,
             format=pb.EXPORT_FORMAT_GENERATED,
             overrides=["mode: rule\n"],
-            options=pb.RunOptions(mixed_port=7890, tun_stack=pb.TUN_STACK_GVISOR),
+            options=pb.RunOptions(mixed_port=9347, tun_stack=pb.TUN_STACK_GVISOR),
         ),
     ),
 }

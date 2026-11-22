@@ -428,7 +428,7 @@ UI 只保存和传递覆写原文，解析与合并在内核里做；模拟宿�
 | `launch_at_login` | 布尔 | `false` | 本机 | 登录时打开界面；Windows 同时自动连接。以系统里的登录项为准，界面每次读到系统的状态就写回这里 |
 | `tun` | 布尔 | `true` | 本机 | 设置页「接管方式」的 TUN 开关：连接时是否开启 TUN。macOS 上总是开启，不看这一项 |
 | `system_proxy` | 布尔 | `true` | 本机 | 设置页「接管方式」的系统代理开关：连接时是否设置系统代理。只有 Windows 服务设置系统代理 |
-| `mixed_port` | 1024–65535 | 7890 | 本机 | 混合端口，总是覆盖配置里的 `mixed-port` |
+| `mixed_port` | 1024–65535 | 9347 | 本机 | 混合端口，总是覆盖配置里的 `mixed-port`。没改过端口的安装升级后也改用 9347（D53） |
 | `allow_lan` | 布尔 | `false` | 本机 | 允许局域网连接（architecture.md §8"局域网暴露"） |
 | `tun_stack` | `profile`、`system`、`mips`、`gvisor`、`mixed` | `mips` | 本机 | "TUN 协议栈"（D3）：`profile` 是"跟随配置"，用配置里的 `tun.stack`；其余写进 `RunOptions.tun_stack`，盖过配置和覆写（architecture.md §3.1、§3.4）。默认 `mips`，即 mihomo 自己的默认栈 |
 | `include_all_networks` | 布尔 | `false` | 本机 | 仅 macOS（D19）："包含所有网络"，把系统默认绕开隧道的流量也送进隧道，局域网流量除外。写进 VPN 配置的 `includeAllNetworks` 和 `excludeLocalNetworks`，下次连接时生效；打开后 TUN 协议栈不能用 `system` 和 `mixed`（architecture.md §3.4） |
@@ -449,7 +449,7 @@ UI 只保存和传递覆写原文，解析与合并在内核里做；模拟宿�
     「正在断开…」，宿主报告 `starting`、`stopping` 时也一样；操作完成后等下一次刷新读到隧道的新状态才结束，
     开关不会先跳回原位。连不上时开关回到关闭，第二行用 `danger` 写原因，留到下一次操作。已连接时概览页标题栏
     写接管方式和运行时长：「TUN 与系统代理 · 已运行 2:14:36」，只开一项时写「TUN」或「系统代理」，两项都没开时
-    写「混合端口 7890」。
+    写「混合端口 9347」。
   - **Windows 唤醒恢复**：`GetStatus` 的 `recovery_state`、`recovery_error` 映射到 `HostStatus`，由概览和托盘共用。
     sleeping、waiting_network、connecting 时标题写「正在恢复连接」，开关保持开启且可关闭，行内说明当前阶段和取消方式。
     关闭发送真正的 Stop，即使此刻内核已经临时停止，也会取消服务的恢复意图。failed 时开关关闭、标题写「恢复连接失败」，

@@ -449,7 +449,7 @@ def test_service_host_sends_the_config_with_validate_start_and_reload() -> None:
         return pb.Response(empty=pb.Empty())
 
     options = RunOptions(
-        tun_enabled=True, system_proxy_enabled=False, mixed_port=7890, tun_stack="mixed"
+        tun_enabled=True, system_proxy_enabled=False, mixed_port=9347, tun_stack="mixed"
     )
     overrides = ("mode: global\n", "prepend-rules: [MATCH,DIRECT]\n")
     config = TunnelConfig("proxies: []\n", overrides, options)
@@ -473,7 +473,7 @@ def test_service_host_sends_the_config_with_validate_start_and_reload() -> None:
         config_yaml="proxies: []\n", overrides=list(overrides)
     )
     expected_options = pb.RunOptions(
-        tun_enabled=True, mixed_port=7890, tun_stack=pb.TUN_STACK_MIXED
+        tun_enabled=True, mixed_port=9347, tun_stack=pb.TUN_STACK_MIXED
     )
     assert start.start.config_yaml == "proxies: []\n"
     assert start.start.options == expected_options
@@ -643,7 +643,7 @@ def test_service_host_claims_before_acting_but_not_to_read(
                 await host.stop()
                 await host.close_all_connections()
                 assert "claim" not in seen
-                assert await host.validate(TunnelConfig("mixed-port: 7890\n")) is None
+                assert await host.validate(TunnelConfig("mixed-port: 9347\n")) is None
                 assert seen[-4:] == ["validate", "claim", "claim", "validate"]
             finally:
                 await host.close()

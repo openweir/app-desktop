@@ -40,7 +40,7 @@ def nodes_profile(network: Network) -> str:
     """Two nodes in a selector. It also asks for what the development service must refuse
     or clear: a TUN, LAN access, a redirect port and an external controller."""
     return f"""\
-mixed-port: 7890
+mixed-port: 9347
 allow-lan: true
 bind-address: "*"
 redir-port: 7892
@@ -70,7 +70,7 @@ rules:
 
 # Only DIRECT: no proxies, no groups. The same requests as nodes_profile.
 DIRECT_PROFILE = """\
-mixed-port: 7890
+mixed-port: 9347
 allow-lan: true
 external-controller: 127.0.0.1:19090
 tun:

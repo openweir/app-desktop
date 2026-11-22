@@ -31,7 +31,9 @@ UPDATE_CHECK_HOURS = (24, 72, 168)
 TUN_STACK_CHOICES = ("profile", *TUN_STACKS)
 # The stacks that do not work while the macOS tunnel includes all networks (D19).
 ALL_NETWORKS_BREAKS = ("system", "mixed")
-DEFAULT_MIXED_PORT = 7890
+# OpenWeir's mixed port, "WEIR" on a phone keypad, as the panel's template and the other clients
+# write it (D53). An installation that never changed the port moves to it from Clash's 7890.
+DEFAULT_MIXED_PORT = 9347
 MIN_MIXED_PORT = 1024
 MAX_MIXED_PORT = 65535
 

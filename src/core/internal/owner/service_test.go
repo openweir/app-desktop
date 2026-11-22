@@ -195,9 +195,9 @@ func elevated(sid string, session uint32) peer.Identity {
 
 func profile(systemProxy bool) *controlpb.StartRequest {
 	return &controlpb.StartRequest{
-		Source:    &controlpb.StartRequest_ConfigYaml{ConfigYaml: "mixed-port: 7890\n"},
+		Source:    &controlpb.StartRequest_ConfigYaml{ConfigYaml: "mixed-port: 9347\n"},
 		Overrides: []string{"mode: rule\n"},
-		Options:   &controlpb.RunOptions{SystemProxyEnabled: systemProxy, MixedPort: 7890, TunEnabled: true},
+		Options:   &controlpb.RunOptions{SystemProxyEnabled: systemProxy, MixedPort: 9347, TunEnabled: true},
 	}
 }
 
@@ -499,7 +499,7 @@ func TestSystemProxyIsTheOwners(t *testing.T) {
 	if err := service.Applied(profile(true), current); err != nil {
 		t.Fatal(err)
 	}
-	if m.proxies[alice] != sysproxy.Core(7890) || !service.SystemProxyEnabled() {
+	if m.proxies[alice] != sysproxy.Core(9347) || !service.SystemProxyEnabled() {
 		t.Fatalf("alice's proxy = %+v", m.proxies[alice])
 	}
 	if m.proxies[bob] != (sysproxy.Settings{Flags: sysproxy.Direct}) {
@@ -534,7 +534,7 @@ func TestSystemProxyIsTheOwners(t *testing.T) {
 	if err := service.Applied(profile(true), current); err != nil {
 		t.Fatal(err)
 	}
-	if !core.running || m.proxies[alice] != sysproxy.Core(7890) {
+	if !core.running || m.proxies[alice] != sysproxy.Core(9347) {
 		t.Fatalf("running %v, proxy %+v after sign-in", core.running, m.proxies[alice])
 	}
 	// The service stopping gives them back too, and its next start takes them again.
@@ -543,7 +543,7 @@ func TestSystemProxyIsTheOwners(t *testing.T) {
 		t.Fatalf("proxy %+v after the service stopped", m.proxies[alice])
 	}
 	service, core, _ = start(t, root, m)
-	if !core.running || m.proxies[alice] != sysproxy.Core(7890) {
+	if !core.running || m.proxies[alice] != sysproxy.Core(9347) {
 		t.Fatalf("running %v, proxy %+v after the service started", core.running, m.proxies[alice])
 	}
 	core.running = false
@@ -552,6 +552,57 @@ func TestSystemProxyIsTheOwners(t *testing.T) {
 	}
 	if _, saved, _ := (kept{home}).previousProxy(); saved || m.proxies[alice] != theirs {
 		t.Fatalf("saved %v, proxy %+v after Stop", saved, m.proxies[alice])
+	}
+}
+
+// The system proxy an earlier version pointed at its old port (7890 before 9347, D53) is the
+// service's own, not the owner's: the next connect points it at the port in use, and turning
+// it off gives the owner no proxy rather than one to a port nothing opens. So for settings
+// an earlier version kept as the owner's.
+func TestAStaleSystemProxyOfOursIsReplaced(t *testing.T) {
+	root, m := t.TempDir(), newMachine()
+	if err := SaveRecord(root, Record{SID: alice, Session: 1}); err != nil {
+		t.Fatal(err)
+	}
+	m.sessions[1], m.proxies[alice] = alice, sysproxy.Core(7890)
+	service, core, home := start(t, root, m)
+	core.running = true
+	if err := service.Applied(profile(true), current); err != nil {
+		t.Fatal(err)
+	}
+	if m.proxies[alice] != sysproxy.Core(9347) {
+		t.Fatalf("alice's proxy = %+v after connecting", m.proxies[alice])
+	}
+	unset := sysproxy.Settings{Flags: sysproxy.Direct}
+	if previous, saved, _ := (kept{home}).previousProxy(); !saved || previous != unset {
+		t.Fatalf("kept %+v (%v) as alice's own", previous, saved)
+	}
+	if err := service.SetSystemProxy(false); err != nil {
+		t.Fatal(err)
+	}
+	if m.proxies[alice] != unset {
+		t.Fatalf("alice's proxy = %+v after turning it off", m.proxies[alice])
+	}
+
+	if err := (kept{home}).savePreviousProxy(sysproxy.Core(7890)); err != nil {
+		t.Fatal(err)
+	}
+	if err := service.SetSystemProxy(true); err != nil {
+		t.Fatal(err)
+	}
+	if err := service.SetSystemProxy(false); err != nil {
+		t.Fatal(err)
+	}
+	if m.proxies[alice] != unset {
+		t.Fatalf("alice's proxy = %+v restored from what an earlier version kept", m.proxies[alice])
+	}
+	for _, settings := range []sysproxy.Settings{
+		{Flags: sysproxy.Direct | sysproxy.Proxy, Server: "127.0.0.1:7890"}, // a Clash client's
+		{Flags: sysproxy.Direct | sysproxy.Proxy, Server: "proxy.example:7890", Bypass: sysproxy.Bypass},
+	} {
+		if sysproxy.Ours(settings) {
+			t.Errorf("%+v taken for the service's own", settings)
+		}
 	}
 }
 
@@ -606,7 +657,7 @@ func TestAdministratorTakesOver(t *testing.T) {
 	if err := service.TakeOver(as(bob, 2), core.stop); !errors.Is(err, control.ErrOwnedByOtherUser) {
 		t.Fatalf("a take-over without an administrator's rights: %v", err)
 	}
-	if core.stops != 0 || !core.running || m.restarts != 0 || m.proxies[alice] != sysproxy.Core(7890) {
+	if core.stops != 0 || !core.running || m.restarts != 0 || m.proxies[alice] != sysproxy.Core(9347) {
 		t.Fatalf("%d stops, running %v, %d restarts", core.stops, core.running, m.restarts)
 	}
 	core.stopErr = errors.New("stuck")
@@ -684,7 +735,7 @@ func TestTakeOverKeepsTheProxyForTheNextSignIn(t *testing.T) {
 	if err := service.TakeOver(elevated(bob, 2), core.stop); !errors.Is(err, control.ErrRestarting) {
 		t.Fatalf("take-over = %v", err)
 	}
-	if _, saved, _ := (kept{home}).previousProxy(); !saved || m.proxies[alice] != sysproxy.Core(7890) {
+	if _, saved, _ := (kept{home}).previousProxy(); !saved || m.proxies[alice] != sysproxy.Core(9347) {
 		t.Fatalf("saved %v, alice's proxy %+v", saved, m.proxies[alice])
 	}
 	service, _, _ = start(t, root, m)

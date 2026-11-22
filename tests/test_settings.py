@@ -55,7 +55,7 @@ def test_defaults_without_rows(tmp_path: Path, database: Database) -> None:
     assert store.current == Settings()
     assert rows(tmp_path) == {}  # nothing is written until a change
     # Connecting takes over with both (D26), as far as the host does.
-    assert store.current.run_options() == RunOptions(True, True, mixed_port=7890, tun_stack="mips")
+    assert store.current.run_options() == RunOptions(True, True, mixed_port=9347, tun_stack="mips")
 
 
 def test_update_writes_and_notifies(tmp_path: Path, database: Database) -> None:
@@ -93,7 +93,7 @@ def test_run_options_carry_the_stack_and_all_networks(database: Database) -> Non
         assert store.update(tun_stack=stack).run_options().tun_stack == stack
     options = store.update(include_all_networks=True).run_options()
     assert options == RunOptions(
-        True, True, mixed_port=7890, tun_stack="mixed", include_all_networks=True
+        True, True, mixed_port=9347, tun_stack="mixed", include_all_networks=True
     )
 
 

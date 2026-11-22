@@ -561,7 +561,7 @@ def test_export_diagnostics(qtbot: QtBot, tmp_path: Path) -> None:
     assert "WARN  dial failed" in files["mihomo.log"]
 
     settings = json.loads(files["settings.json"])
-    assert settings["settings"]["mixed_port"] == 7890
+    assert settings["settings"]["mixed_port"] == 9347
     assert [p["kind"] for p in settings["profiles"]] == ["subscription", "subscription", "file"]
     assert [p["has_override"] for p in settings["profiles"]] == [False, True, False]
     assert settings["profiles"][0]["active"]

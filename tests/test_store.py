@@ -46,7 +46,7 @@ def test_profiles_round_trip(tmp_path: Path) -> None:
     store = ProfileStore(tmp_path)
     assert store.load() == ProfileList()
     store.write_config("a1", "proxies: []\n")
-    store.write_config("b2", "mixed-port: 7890\n")
+    store.write_config("b2", "mixed-port: 9347\n")
     store.save(ProfileList((SUBSCRIPTION, LOCAL), "a1", frozenset({"a1"})))
     store.close()
 

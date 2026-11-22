@@ -276,7 +276,7 @@ type proxyFailureMachine struct {
 }
 
 func (m *proxyFailureMachine) WriteProxy(session uint32, settings sysproxy.Settings) error {
-	if settings == sysproxy.Core(7890) {
+	if settings == sysproxy.Core(9347) {
 		if m.block.Swap(false) {
 			close(m.entered)
 			<-m.release

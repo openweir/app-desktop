@@ -182,7 +182,7 @@ func TestSharedVectors(t *testing.T) {
 		t.Fatalf("converted %q with %+v", fake.converted, fake.conversion)
 	}
 	if exported := fake.exported; exported == nil || !sameComposition(exported.Composition) || len(exported.Overrides) != 1 ||
-		exported.Options.MixedPort != 7890 || exported.Options.Stack != "gvisor" ||
+		exported.Options.MixedPort != 9347 || exported.Options.Stack != "gvisor" ||
 		fake.format != controlpb.ExportFormat_EXPORT_FORMAT_GENERATED {
 		t.Fatalf("exported %+v as %v", fake.exported, fake.format)
 	}

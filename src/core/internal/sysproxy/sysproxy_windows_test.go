@@ -26,7 +26,7 @@ func TestWriteAndRestore(t *testing.T) {
 			t.Errorf("after restoring: %+v, %v; want %+v", after, err, before)
 		}
 	})
-	ours := Core(7890)
+	ours := Core(9347)
 	if err := write(ours); err != nil {
 		t.Fatal(err)
 	}
@@ -34,7 +34,7 @@ func TestWriteAndRestore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Flags&Proxy == 0 || got.Server != "127.0.0.1:7890" || got.Bypass != Bypass {
+	if got.Flags&Proxy == 0 || got.Server != "127.0.0.1:9347" || got.Bypass != Bypass {
 		t.Fatalf("read %+v after writing %+v", got, ours)
 	}
 }

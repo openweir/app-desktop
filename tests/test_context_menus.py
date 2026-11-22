@@ -28,7 +28,7 @@ ApplicationWindow {
     AppTextField { objectName: "secret"; width: 300; x: 20; y: 70; echoMode: TextInput.Password }
     CodeEditor {
         objectName: "viewer"; width: 300; height: 160; x: 20; y: 120
-        readOnly: true; text: "mixed-port: 7890"
+        readOnly: true; text: "mixed-port: 9347"
     }
 }"""
 
@@ -143,7 +143,7 @@ def trigger(window: QQuickWindow, text: str) -> None:
 def test_a_fields_menu_offers_what_its_state_allows(qtbot: QtBot, editors: Editors) -> None:
     window, field = editors.window, editors.field
     field.forceActiveFocus()
-    type_text(window, "7890")  # typed, so that there is something to undo
+    type_text(window, "9347")  # typed, so that there is something to undo
     select(field, 0, 2)
     point = right_click(qtbot, window, field, QPointF(40, 10))
     assert shown_items(window) == [
@@ -161,12 +161,12 @@ def test_a_fields_menu_offers_what_its_state_allows(qtbot: QtBot, editors: Edito
     assert box.height() == 2 * 4 + 6 * 32 + 2 * 9
     assert box.width() >= 180
     # The field keeps its selection while the menu has the focus.
-    assert field.property("selectedText") == "78"
+    assert field.property("selectedText") == "93"
 
     trigger(window, "剪切")
     qtbot.waitUntil(lambda: field.hasActiveFocus())
-    assert field.property("text") == "90"
-    assert QGuiApplication.clipboard().text() == "78"
+    assert field.property("text") == "47"
+    assert QGuiApplication.clipboard().text() == "93"
 
 
 def test_an_empty_field_has_little_to_offer(qtbot: QtBot, editors: Editors) -> None:
@@ -180,7 +180,7 @@ def test_the_menu_takes_the_field_and_gives_it_back(qtbot: QtBot, editors: Edito
     """A right-click focuses the field first, as a native one does; Esc closes the menu and
     the field has the focus again."""
     window, field = editors.window, editors.field
-    field.setProperty("text", "7890")
+    field.setProperty("text", "9347")
     right_click(qtbot, window, field, QPointF(40, 10))
     QTest.keyClick(window, Qt.Key.Key_Escape)
     qtbot.wait(250)
@@ -193,7 +193,7 @@ def test_a_read_only_editor_copies_only(qtbot: QtBot, editors: Editors) -> None:
     right_click(qtbot, window, editors.viewer, QPointF(60, 20))
     assert shown_items(window) == [("复制", False), ("全选", True)]
     trigger(window, "全选")
-    qtbot.waitUntil(lambda: area.property("selectedText") == "mixed-port: 7890")
+    qtbot.waitUntil(lambda: area.property("selectedText") == "mixed-port: 9347")
     qtbot.wait(250)  # the menu fades out
 
     right_click(qtbot, window, editors.viewer, QPointF(60, 20))

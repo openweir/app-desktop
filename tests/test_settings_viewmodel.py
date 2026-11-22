@@ -133,7 +133,7 @@ def test_unwritable_settings_are_reported(
 def test_port_and_lan_reload_the_running_tunnel(qtbot: QtBot, view_models: ViewModels) -> None:
     settings, host = view_models.settings, view_models.host
     assert isinstance(host, SimulatedHost)
-    assert prop(settings, "mixedPort") == 7890
+    assert prop(settings, "mixedPort") == 9347
 
     for text in ("80", "70000", "", "abc"):
         settings.setMixedPort(text)
@@ -161,8 +161,8 @@ def test_a_port_the_core_cannot_open_is_not_kept(qtbot: QtBot, view_models: View
     qtbot.waitUntil(lambda: prop(settings, "portError") != "")
     message = "配置未能生效：listen tcp 127.0.0.1:1080: bind: address already in use"  # noqa: RUF001
     assert prop(settings, "portError") == message
-    assert prop(settings, "mixedPort") == 7890
-    assert view_models.settings_store.current.mixed_port == 7890
+    assert prop(settings, "mixedPort") == 9347
+    assert view_models.settings_store.current.mixed_port == 9347
 
 
 def test_port_while_stopped_is_only_stored(qtbot: QtBot, view_models: ViewModels) -> None:

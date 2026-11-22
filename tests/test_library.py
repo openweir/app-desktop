@@ -436,7 +436,7 @@ def test_switching_while_running_reloads_and_keeps_tun(tmp_path: Path) -> None:
     assert scene.host.config is not None
     assert scene.host.config.config_yaml == OTHER_CONFIG
     # The switches stay as the tunnel runs them; the port comes from the settings.
-    assert scene.host.config.options == RunOptions(True, True, mixed_port=7890, tun_stack="mips")
+    assert scene.host.config.options == RunOptions(True, True, mixed_port=9347, tun_stack="mips")
     assert scene.store.load().active == "sample-b"
 
 
@@ -507,7 +507,7 @@ def test_a_text_the_tunnel_refused_reloads_at_the_next_update(
     reload = scene.host.reload
 
     async def refuse(config: TunnelConfig) -> CompositionReport | None:
-        raise HostError("apply_failed", "listen tcp 127.0.0.1:7890: bind: address already in use")
+        raise HostError("apply_failed", "listen tcp 127.0.0.1:9347: bind: address already in use")
 
     monkeypatch.setattr(scene.host, "reload", refuse)
     scene.now += 10 * 3600  # A is due

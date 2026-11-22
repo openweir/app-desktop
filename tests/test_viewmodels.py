@@ -195,9 +195,9 @@ def test_overview_actions(qtbot: QtBot, view_models: ViewModels) -> None:
     qtbot.waitUntil(lambda: not prop(overview, "busy"))
     assert prop(overview, "connected")
     assert host.config is not None
-    assert host.config.options == RunOptions(False, False, mixed_port=7890, tun_stack="mips")
+    assert host.config.options == RunOptions(False, False, mixed_port=9347, tun_stack="mips")
     # With neither, connecting opens the mixed port only.
-    assert prop(overview, "statusDetail").startswith("混合端口 7890 · 已运行 ")
+    assert prop(overview, "statusDetail").startswith("混合端口 9347 · 已运行 ")
 
     # The tray's 连接 / 断开 toggles the same way.
     overview.toggleConnection()
@@ -210,7 +210,7 @@ def test_a_failed_connection_returns_the_switch(qtbot: QtBot, view_models: ViewM
     qtbot.waitUntil(lambda: prop(overview, "connected"))
     overview.setConnected(False)
     qtbot.waitUntil(lambda: not prop(overview, "busy"))
-    host.busy_ports.add(7890)
+    host.busy_ports.add(9347)
     overview.setConnected(True)
     qtbot.waitUntil(lambda: not prop(overview, "busy"))
     assert not prop(overview, "connectionOn")
@@ -242,8 +242,8 @@ def test_development_service_opens_the_mixed_port_only(qtbot: QtBot, tmp_path: P
         qtbot.waitUntil(lambda: prop(overview, "connected") and not prop(overview, "busy"))
         assert prop(overview, "connectionDetail") == ""
         assert host.config is not None
-        assert host.config.options == RunOptions(mixed_port=7890, tun_stack="mips")
-        assert prop(overview, "statusDetail").startswith("混合端口 7890 · 已运行 ")
+        assert host.config.options == RunOptions(mixed_port=9347, tun_stack="mips")
+        assert prop(overview, "statusDetail").startswith("混合端口 9347 · 已运行 ")
     finally:
         built.shutdown()
 

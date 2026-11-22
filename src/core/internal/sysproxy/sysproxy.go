@@ -37,3 +37,23 @@ func Core(port uint16) Settings {
 		Bypass: Bypass,
 	}
 }
+
+// Ours reports whether settings are what Core writes, on any port: the service's own, left
+// behind on a port the core no longer opens (7890 before 9347, D53), never a user's.
+func Ours(settings Settings) bool {
+	host, port, err := net.SplitHostPort(settings.Server)
+	if err != nil || host != "127.0.0.1" {
+		return false
+	}
+	number, err := strconv.ParseUint(port, 10, 16)
+	return err == nil && number != 0 && settings == Core(uint16(number))
+}
+
+// Owned is what to keep as a user's own settings, and to give back: settings of the
+// service's own become no proxy, so that the user never gets a proxy to a closed port back.
+func Owned(settings Settings) Settings {
+	if Ours(settings) {
+		return Settings{Flags: Direct}
+	}
+	return settings
+}

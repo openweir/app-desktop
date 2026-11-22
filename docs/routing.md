@@ -538,7 +538,7 @@ D 编号也在那里。
 
 写在 `src/core/internal/compose/base.yaml`，嵌入内核，随版本更新，不在界面上编辑；需要调整的用户用全局覆写。
 
-- **通用**：`mode: rule`、`log-level: info`、`mixed-port: 7890`（`RunOptions.mixed_port` 非 0 时替换）、
+- **通用**：`mode: rule`、`log-level: info`、`mixed-port: 9347`（D53；`RunOptions.mixed_port` 非 0 时替换）、
   `unified-delay`、`tcp-concurrent`，`profile` 保存节点选择和 fake-ip 映射。
 - **GEO 数据**：`geodata-mode: true`、`geodata-loader: memconservative`（按需读文件，内存占用小）、
   `geo-auto-update: true`、`geo-update-interval: 24`；`geox-url` 是 meta-rules-dat 的 `latest` 发布（与 mihomo

@@ -4,7 +4,8 @@
 # security items after it (docs/architecture.md §3.2).
 mode: rule
 log-level: info
-mixed-port: 7890
+# OpenWeir's port, "WEIR" on a phone keypad (D53); RunOptions.mixed_port replaces it.
+mixed-port: 9347
 unified-delay: true
 tcp-concurrent: true
 profile:
