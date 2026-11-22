@@ -72,6 +72,7 @@ SHARED_BUILD = frozenset(
         "scripts/symbols.py",
         "scripts/gen_icons.py",
         "scripts/gen_licenses.py",
+        "scripts/gomod.py",
     }
 )
 ENGINE = "src/core/internal/engine/"

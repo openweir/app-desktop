@@ -66,7 +66,7 @@ Developer ID 证书签名并校验。脚本依次：
 
 1. 用 `scripts/fetch_geodata.py` 取得钉住的 `GeoSite.dat`、`GeoIP.dat`、`geoip.metadb`、`ASN.mmdb`（缓存在 `build/geodata/`），
    `project.yml` 把它们放进扩展的 `Contents/Resources`（见“GEO 数据”）；
-2. 把 `src/core/apple` 分别编成 arm64 和 amd64 的 C archive，各链接同架构 Cronet，再合并为通用 archive（`GOPROXY=https://goproxy.cn,direct`），`-ldflags -X` 把版本号写进
+2. 把 `src/core/apple` 分别编成 arm64 和 amd64 的 C archive，各链接同架构 Cronet，再合并为通用 archive（构建前先取齐所需的 Go 模块，失败重试；没设 `GOPROXY` 的本机用 `https://goproxy.cn,direct`，CI 用 Go 默认的代理，见 `scripts/gomod.py`），`-ldflags -X` 把版本号写进
    `product.Version`（`GetInfo` 的服务版本），连同 cgo 生成的 `libopenweir.h` 和一份 module map 包成
    `OpenWeirCore.xcframework`。module map 把模块命名为 `OpenWeirCore`，并自动链接 Go 的 `net` 包要用的 `libresolv`；
 3. 用 XcodeGen 生成工程，`xcodebuild` 构建 Release。扩展的可执行文件在签名前由 Xcode 做 `strip -x`

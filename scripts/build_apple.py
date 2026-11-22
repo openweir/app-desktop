@@ -41,7 +41,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from openweir import product  # noqa: E402
-from scripts import macos  # noqa: E402
+from scripts import gomod, macos  # noqa: E402
 from scripts.macos import BuildError  # noqa: E402
 
 APPLE = ROOT / "apple"
@@ -62,7 +62,6 @@ APP_PROFILE = f"{PRODUCT['displayName']} Developer ID"
 TUNNEL_PROFILE = f"{PRODUCT['displayName']} Tunnel Developer ID"
 ARCHITECTURES = macos.ARCHITECTURES  # D2: every macOS binary is universal
 DEPLOYMENT_TARGET = "15.0"  # as in apple/project.yml
-GOPROXY = "https://goproxy.cn,direct"
 GO_VERSION_VARIABLE = "github.com/openweir/app-desktop/src/core/internal/product.Version"
 # All four TUN stacks, as on Windows (D3); fd mode defaults to gVisor (docs/architecture.md §3.4).
 GO_TAGS = "with_gvisor,with_naive"
@@ -140,15 +139,15 @@ def build_go(tags: str, version: str) -> None:
     for arch in ARCHITECTURES:
         directory = go / arch
         directory.mkdir()
-        environment = os.environ | {
-            "GOPROXY": GOPROXY,
-            "CGO_ENABLED": "1",
-            "GOOS": "darwin",
-            "GOARCH": macos.GO_ARCHITECTURES[arch],
-            "MACOSX_DEPLOYMENT_TARGET": DEPLOYMENT_TARGET,
-            "CGO_CFLAGS": f"-arch {arch} {minimum}",
-            "CGO_LDFLAGS": f"-arch {arch} {minimum}",
-        }
+        environment = gomod.environment(
+            CGO_ENABLED="1",
+            GOOS="darwin",
+            GOARCH=macos.GO_ARCHITECTURES[arch],
+            MACOSX_DEPLOYMENT_TARGET=DEPLOYMENT_TARGET,
+            CGO_CFLAGS=f"-arch {arch} {minimum}",
+            CGO_LDFLAGS=f"-arch {arch} {minimum}",
+        )
+        gomod.download("./apple", tags, environment)
         command: list[str | Path] = [
             "go",
             "-C",

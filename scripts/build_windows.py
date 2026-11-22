@@ -51,7 +51,15 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from openweir import product  # noqa: E402
-from scripts import build_app, build_apple, build_installer_ui, cronet, fetch_geodata, symbols  # noqa: E402
+from scripts import (  # noqa: E402
+    build_app,
+    build_apple,
+    build_installer_ui,
+    cronet,
+    fetch_geodata,
+    gomod,
+    symbols,
+)
 from scripts.build_apple import BuildError  # noqa: E402
 
 BUILD = ROOT / "build" / "windows"
@@ -137,12 +145,7 @@ def build_service(version: str, arch: str = "x64", signed: bool = False) -> Path
     release is, it accepts only a UI with OpenWeir's signature."""
     output = build_directory(arch) / "service" / SERVICE
     output.unlink(missing_ok=True)
-    environment = os.environ | {
-        "GOPROXY": build_apple.GOPROXY,
-        "GOOS": "windows",
-        "GOARCH": target(arch)[0],
-        "CGO_ENABLED": "0",
-    }
+    environment = gomod.environment(GOOS="windows", GOARCH=target(arch)[0], CGO_ENABLED="0")
     variables = f"-X {build_apple.GO_VERSION_VARIABLE}={version}"
     if signed:
         product.require_signing(PRODUCT, "windowsSigner", "windowsSignerEku")
@@ -163,6 +166,7 @@ def build_service(version: str, arch: str = "x64", signed: bool = False) -> Path
         output,
         "./service",
     ]
+    gomod.download("./service", GO_TAGS, environment)
     build_apple._run(command, env=environment)
     return output
 

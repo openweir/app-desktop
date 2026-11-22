@@ -46,7 +46,7 @@ from openweir.models.backup_google import (  # noqa: E402
     CLIENT_SECRET_ENV,
     configured_client,
 )
-from scripts import build_apple, macos, symbols  # noqa: E402
+from scripts import build_apple, gomod, macos, symbols  # noqa: E402
 from scripts.build_apple import BuildError, Profile  # noqa: E402
 
 BUILD = ROOT / "build" / "app"
@@ -191,10 +191,8 @@ def _output(command: list[str | Path], environment: dict[str, str] | None = None
 
 def core_version() -> str:
     """mihomo's version as the core reports it (engine.moduleVersion), from go.mod."""
-    environment = os.environ | {"GOPROXY": build_apple.GOPROXY}
     template = "{{if .Replace}}{{.Replace.Version}}{{else}}{{.Version}}{{end}}"
-    command: list[str | Path] = ["go", "-C", CORE, "list", "-m", "-f", template, MIHOMO_MODULE]
-    return _output(command, environment).strip()
+    return gomod.go("list", "-m", "-f", template, MIHOMO_MODULE).strip()
 
 
 def google_client(directory: Path) -> list[str]:

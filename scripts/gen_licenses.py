@@ -18,7 +18,6 @@ import argparse
 import hashlib
 import html
 import json
-import os
 import platform
 import re
 import struct
@@ -35,6 +34,8 @@ from packaging.utils import canonicalize_name
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+from scripts import gomod  # noqa: E402
+
 CORE = ROOT / "src" / "core"
 INPUTS = ROOT / "package" / "licenses"
 QT_INPUT = INPUTS / "qt.json"
@@ -45,7 +46,6 @@ OUTPUT = ROOT / "src" / "openweir" / "licenses"
 MANIFEST = OUTPUT / "third_party.json"
 NOTICES = OUTPUT / "THIRD_PARTY_NOTICES.txt"
 FONTS = ROOT / "src" / "openweir" / "ui" / "fonts"
-GOPROXY = "https://goproxy.cn,direct"
 
 # Go builds that ship (docs/architecture.md §3.4): the service and the extension's library.
 GO_TARGETS = (
@@ -321,7 +321,7 @@ class _Module:
 
 
 def _go(*args: str, env: dict[str, str] | None = None) -> str:
-    environment = {**os.environ, "GOPROXY": GOPROXY, "GOFLAGS": "-mod=mod", **(env or {})}
+    environment = gomod.environment(GOFLAGS="-mod=mod", **(env or {}))
     done = subprocess.run(
         ["go", "-C", str(CORE), *args],
         env=environment,

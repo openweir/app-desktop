@@ -348,11 +348,19 @@ def test_a_signed_release_links_the_service_with_signed_release(
     monkeypatch.setattr(
         build_windows.build_apple, "_run", lambda command, **_: commands.append(command)
     )
+    downloads: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        build_windows.gomod,
+        "download",
+        lambda package, tags, env: downloads.append((package, tags)),
+    )
     # As the release environment sets them (D47).
     signing = {"windowsSigner": "OpenWeir Ltd", "windowsSignerEku": "1.3.6.1.4.1.311.97.1"}
     data = {**build_windows.PRODUCT, "signing": {**build_windows.PRODUCT["signing"], **signing}}
     monkeypatch.setattr(build_windows, "PRODUCT", data)
     build_windows.build_service("1.2.3", "x64", signed)
+    # The modules are fetched, with retries, before the build (scripts/gomod.py).
+    assert downloads == [("./service", build_windows.GO_TAGS)]
     (ldflags,) = [str(part) for part in commands[0] if str(part).startswith("-ldflags=")]
     assert f"-X {build_windows.build_apple.GO_VERSION_VARIABLE}=1.2.3" in ldflags
     assert (f"-X {build_windows.SIGNED_RELEASE_VARIABLE}=true" in ldflags) is signed

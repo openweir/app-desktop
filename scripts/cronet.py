@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import json
-import os
-import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-CORE = Path(__file__).resolve().parents[1] / "src" / "core"
+from scripts import gomod
+
+CORE = gomod.CORE
 MODULE = "github.com/sagernet/cronet-go/lib/"
 
 
@@ -31,14 +31,7 @@ def library(system: str, arch: str) -> NativeLibrary:
     module = MODULE + f"{system}_{arch}"
 
     def query(*arguments: str) -> dict[str, str]:
-        result = subprocess.run(
-            ["go", "-C", str(CORE), *arguments],
-            check=True,
-            capture_output=True,
-            text=True,
-            env=os.environ | {"GOPROXY": "https://goproxy.cn,direct"},
-        )
-        return json.loads(result.stdout)
+        return json.loads(gomod.go(*arguments))
 
     selected = query("list", "-m", "-json", module)
     name = "libcronet.a" if system == "darwin" else "libcronet.dll"
