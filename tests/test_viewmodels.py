@@ -215,7 +215,7 @@ def test_a_failed_connection_returns_the_switch(qtbot: QtBot, view_models: ViewM
     qtbot.waitUntil(lambda: not prop(overview, "busy"))
     assert not prop(overview, "connectionOn")
     assert prop(overview, "connectionFailed")
-    assert prop(overview, "connectionDetail").startswith("配置未能生效")
+    assert prop(overview, "connectionDetail") == "未能打开端口或 TUN：mixed-port 7890"  # noqa: RUF001
     assert prop(overview, "statusDetail") == ""  # the reason is the switch's
     host.busy_ports.clear()
     overview.setConnected(True)

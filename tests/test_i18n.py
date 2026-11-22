@@ -208,3 +208,10 @@ def test_english_failures() -> None:
     # The core's own English is left out where the code says it all.
     too_large = HostError("response_too_large", "the list_rules answer takes 11135024 bytes")
     assert failure_text(too_large) == "Too much data; it exceeds the transfer limit"
+    proxy = HostError("started_without_system_proxy", "set the owner's system proxy: denied")
+    assert failure_text(proxy) == "Connected, but couldn’t change the system proxy"  # noqa: RUF001
+    provider = HostError("provider_update_failed", "update provider ads: EOF")
+    assert failure_text(provider) == "Couldn’t update the proxy or rule provider"  # noqa: RUF001
+    # What did not open is data, named in the UI's words.
+    inbound = HostError("inbound_failed", "mixed-port 9347, TUN")
+    assert failure_text(inbound) == "Couldn’t open a port or the TUN: mixed-port 9347, TUN"  # noqa: RUF001

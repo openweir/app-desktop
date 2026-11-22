@@ -734,4 +734,4 @@ def test_development_service_refuses_switching_on(tmp_path: Path) -> None:
     scene.host.busy_ports.add(1080)
     with pytest.raises(HostError) as failed:
         run(lambda: scene.library.tunnel.apply_settings(Settings(mixed_port=1080)))
-    assert failed.value.code == "apply_failed"
+    assert failed.value.code == "inbound_failed"

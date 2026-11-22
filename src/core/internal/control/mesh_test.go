@@ -72,10 +72,13 @@ func TestLoginMesh(t *testing.T) {
 	// Tailscale that took too long is worth another try.
 	fake.err = errors.New("Tailscale gave no login URL in time")
 	failed := call(t, dispatcher, loginMesh(4, "家里"))
-	expectError(t, failed, 4, CodeOperationFailed)
+	expectError(t, failed, 4, CodeMeshLoginFailed)
 	if !failed.GetError().GetRetryable() {
 		t.Fatalf("error = %v", failed.GetError())
 	}
+	// A deadline is a timeout, not a refusal.
+	fake.err = fmt.Errorf("tailscale: %w", context.DeadlineExceeded)
+	expectError(t, call(t, dispatcher, loginMesh(5, "家里")), 5, CodeTimeout)
 }
 
 // The mesh methods ask the running core, on every host.

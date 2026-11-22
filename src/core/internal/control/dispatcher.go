@@ -42,6 +42,16 @@ const (
 	CodeServiceRestarting    = "service_restarting"
 	CodeResponseTooLarge     = "response_too_large"
 	codeInternal             = "internal_error"
+
+	// What failed, for the failures that used to be operation_failed with English the UI
+	// could only show as it is (docs/architecture.md §4.3).
+	CodeInboundFailed             = "inbound_failed"
+	CodeSystemProxyFailed         = "system_proxy_failed"
+	CodeStartedWithoutSystemProxy = "started_without_system_proxy"
+	CodeProviderUpdateFailed      = "provider_update_failed"
+	CodeMeshLoginFailed           = "mesh_login_failed"
+	CodeClaimFailed               = "claim_failed"
+	CodeTakeOverFailed            = "take_over_failed"
 )
 
 // The Windows service's answers to callers that are not its owner (docs/architecture.md §5.4).
@@ -340,7 +350,7 @@ func (d *Dispatcher) hostMethod(ctx context.Context, request *controlpb.Request)
 			return engineFailure(err)
 		}
 		if err == nil && d.host != nil {
-			err = d.host.Stopped()
+			err = coded(CodeSystemProxyFailed, d.host.Stopped())
 		}
 		if intent, ok := ctx.Value(intentKey{}).(requestIntent); ok {
 			err = errors.Join(err, intent.stopError)
@@ -366,14 +376,14 @@ func (d *Dispatcher) claim(ctx context.Context, caller peer.Identity, takeOver b
 	}
 	var err error
 	if takeOver {
-		err = d.host.TakeOver(caller, func() error {
+		err = coded(CodeTakeOverFailed, d.host.TakeOver(caller, func() error {
 			if err := d.engine.Stop(); err != nil {
 				return err
 			}
 			return d.operationActive(ctx)
-		})
+		}))
 	} else {
-		err = d.host.Claim(caller)
+		err = coded(CodeClaimFailed, d.host.Claim(caller))
 	}
 	if err != nil {
 		return hostFailure(err)
@@ -569,7 +579,7 @@ func (d *Dispatcher) systemProxy(enabled bool) *controlpb.Response {
 	if response := d.systemProxyServed(); response != nil {
 		return response
 	}
-	return d.result(d.host.SetSystemProxy(enabled))
+	return d.result(coded(CodeSystemProxyFailed, d.host.SetSystemProxy(enabled)))
 }
 
 // systemProxyServed is nil when this host can turn the system proxy on, and the refusal
@@ -645,7 +655,7 @@ func (d *Dispatcher) coreMethod(ctx context.Context, caller peer.Identity, reque
 		if update.GetName() == "" {
 			return failure(CodeInvalidRequest, "update_provider needs a provider name")
 		}
-		return d.result(d.engine.UpdateProvider(update.GetKind(), update.GetName()))
+		return d.result(coded(CodeProviderUpdateFailed, d.engine.UpdateProvider(update.GetKind(), update.GetName())))
 	case *controlpb.Request_ListRules:
 		rules := d.engine.ListRules()
 		return &controlpb.Response{Result: &controlpb.Response_ListRules{ListRules: &controlpb.ListRulesResponse{Rules: rules}}}
@@ -796,15 +806,10 @@ func (d *Dispatcher) loginMesh(ctx context.Context, login *controlpb.LoginMeshRe
 		return failure(CodeInvalidRequest, "login_mesh needs the outbound's name")
 	}
 	url, err := d.engine.LoginMesh(ctx, login.GetName())
-	switch {
-	case err == nil:
-		return &controlpb.Response{Result: &controlpb.Response_LoginMesh{LoginMesh: &controlpb.LoginMeshResponse{LoginUrl: url}}}
-	case errors.Is(err, engine.ErrNotRunning), errors.Is(err, engine.ErrInvalidArgument):
-		return engineFailure(err)
+	if err != nil {
+		return engineFailure(coded(CodeMeshLoginFailed, err))
 	}
-	response := failure(CodeOperationFailed, err.Error())
-	response.GetError().Retryable = true
-	return response
+	return &controlpb.Response{Result: &controlpb.Response_LoginMesh{LoginMesh: &controlpb.LoginMeshResponse{LoginUrl: url}}}
 }
 
 func (d *Dispatcher) matchRule(match *controlpb.MatchRuleRequest) *controlpb.Response {
@@ -889,9 +894,37 @@ func (d *Dispatcher) result(err error) *controlpb.Response {
 	return empty()
 }
 
+// codedError tags an error that no sentinel describes with the code of what failed, so
+// that the UI can say it in its own words rather than show the English of a library or
+// the OS.
+type codedError struct {
+	code string
+	err  error
+}
+
+func (e codedError) Error() string { return e.err.Error() }
+
+func (e codedError) Unwrap() error { return e.err }
+
+// coded marks err, if any, as code's. A sentinel it wraps, such as a deadline or a core
+// that is not running, still decides the code.
+func coded(code string, err error) error {
+	if err == nil {
+		return nil
+	}
+	return codedError{code: code, err: err}
+}
+
 // engineFailure maps engine errors to protocol codes. The message drops the sentinel's
 // own text so the UI can show mihomo's error as it is.
 func engineFailure(err error) *controlpb.Response {
+	var inbound *engine.InboundError
+	if errors.As(err, &inbound) {
+		// The ports and the TUN that did not open, as data the UI words itself.
+		response := failure(CodeInboundFailed, strings.Join(inbound.Missing, ", "))
+		response.GetError().Retryable = true
+		return response
+	}
 	for _, known := range []struct {
 		sentinel  error
 		code      string
@@ -913,7 +946,12 @@ func engineFailure(err error) *controlpb.Response {
 			return response
 		}
 	}
-	response := failure(CodeOperationFailed, err.Error())
+	code := CodeOperationFailed
+	var marked codedError
+	if errors.As(err, &marked) {
+		code = marked.code
+	}
+	response := failure(code, err.Error())
 	response.GetError().Retryable = true
 	return response
 }

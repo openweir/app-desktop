@@ -678,7 +678,7 @@ class SimulatedHost:
         except HostError as error:
             # Like the core: a port that did not open fails the start; a refused config
             # leaves it stopped.
-            self._failed = error.code == "apply_failed"
+            self._failed = error.code in ("apply_failed", "inbound_failed")
             raise
         self._running = True
         self.recovery_state, self.recovery_error = "none", ""
@@ -1066,9 +1066,9 @@ class SimulatedHost:
             self.effective["tun"] = {**(tun if isinstance(tun, dict) else {}), "stack": stack}
         report = compose(config.composition)[1] if config.composition is not None else None
         if config.options.mixed_port in self.busy_ports:
-            address = f"127.0.0.1:{config.options.mixed_port}"
-            message = f"listen tcp {address}: bind: address already in use"
-            raise HostError("apply_failed", message, retryable=True)
+            # The core names the port, for the UI to say in its own words.
+            message = f"mixed-port {config.options.mixed_port}"
+            raise HostError("inbound_failed", message, retryable=True)
         self.config = config
         self.report = report
         self._tcp_delays.clear()  # the core keeps TCP results until the next configuration

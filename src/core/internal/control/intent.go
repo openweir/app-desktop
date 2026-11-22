@@ -64,7 +64,9 @@ func (d *Dispatcher) commitApplied(ctx context.Context, start *controlpb.StartRe
 	current := func() bool { return d.currentIntent(ctx) }
 	var err error
 	if d.host != nil && current() {
-		err = d.host.Applied(start, current)
+		// The core runs the profile by now: a failure here leaves the tunnel up without
+		// the system proxy its options ask for, which the UI says as such.
+		err = coded(CodeStartedWithoutSystemProxy, d.host.Applied(start, current))
 	}
 	if current() {
 		return err
@@ -74,7 +76,7 @@ func (d *Dispatcher) commitApplied(ctx context.Context, start *controlpb.StartRe
 	}
 	if d.host != nil {
 		if err := d.host.Stopped(); err != nil {
-			return err
+			return coded(CodeSystemProxyFailed, err)
 		}
 	}
 	return context.Canceled

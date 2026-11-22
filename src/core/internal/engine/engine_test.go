@@ -14,11 +14,13 @@ import (
 	"regexp"
 	"runtime"
 	"runtime/pprof"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/metacubex/mihomo/config"
 	C "github.com/metacubex/mihomo/constant"
 
 	"github.com/openweir/app-desktop/src/core/internal/admission"
@@ -182,6 +184,11 @@ func TestStartFailsWhenThePortIsTaken(t *testing.T) {
 	_, err = engine.Start(directProfile(port, "http://127.0.0.1:1/"))
 	if !errors.Is(err, ErrApplyFailed) || !isListenError(err) {
 		t.Fatalf("Start on a taken port = %v, want ErrApplyFailed with the listen error", err)
+	}
+	// The port goes back to the UI as data it shows in its own words.
+	var inbound *InboundError
+	if !errors.As(err, &inbound) || len(inbound.Missing) != 1 || inbound.Missing[0] != fmt.Sprintf("mixed-port %d", port) {
+		t.Fatalf("Start on a taken port = %#v, want the mixed port named", err)
 	}
 	status := engine.Status()
 	if status.GetState() != controlpb.RunState_RUN_STATE_FAILED || status.GetLastError() == nil {
@@ -490,4 +497,19 @@ func openDescriptors() int {
 		}
 	}
 	return -1
+}
+
+// What hub.ApplyConfig could not open, it only logs; the engine names it, as data.
+func TestCheckAppliedNamesWhatDidNotOpen(t *testing.T) {
+	cfg := &config.Config{General: &config.General{}}
+	cfg.General.MixedPort = porttest.Free(t) // a stopped core has no port open
+	cfg.General.Tun.Enable = true
+	var inbound *InboundError
+	if err := checkApplied(cfg); !errors.As(err, &inbound) {
+		t.Fatalf("checkApplied = %v", err)
+	}
+	want := []string{fmt.Sprintf("mixed-port %d", cfg.General.MixedPort), "TUN"}
+	if !slices.Equal(inbound.Missing, want) || inbound.Err != nil {
+		t.Fatalf("missing %v, want %v", inbound.Missing, want)
+	}
 }

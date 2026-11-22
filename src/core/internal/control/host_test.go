@@ -3,6 +3,8 @@ package control
 import (
 	"context"
 	"errors"
+	"fmt"
+	"net"
 	"strings"
 	"testing"
 
@@ -26,6 +28,7 @@ type fakeHost struct {
 	recovery      controlpb.RecoveryState
 	recoveryError string
 	proxyErr      error
+	stopErr       error
 	// tookOver lists who asked to take over; the owner package decides who may.
 	tookOver []string
 }
@@ -98,7 +101,7 @@ func TestStatusIncludesTheHostsRecoveryState(t *testing.T) {
 func (h *fakeHost) Stopped() error {
 	h.stopped++
 	h.systemProxy = false
-	return nil
+	return h.stopErr
 }
 
 func (h *fakeHost) Suspended() error {
@@ -218,7 +221,7 @@ func TestHostKeepsWhatTheCoreRuns(t *testing.T) {
 		t.Fatal("the system proxy is off")
 	}
 	host.proxyErr = errors.New("no session")
-	expectError(t, callAs(t, dispatcher, ctx, owner, request(5, systemProxyRequest(false))), 5, CodeOperationFailed)
+	expectError(t, callAs(t, dispatcher, ctx, owner, request(5, systemProxyRequest(false))), 5, CodeSystemProxyFailed)
 	host.proxyErr = nil
 
 	if err := dispatcher.Suspend(); err != nil || host.suspended != 1 || dispatcher.Running() {
@@ -302,4 +305,81 @@ func TestRefusalOfALargeRequest(t *testing.T) {
 	if development(t).Refusal(peer.Identity{UserID: "501"}) != nil {
 		t.Fatal("the development server refuses large requests")
 	}
+}
+
+// The host's failures used to come back as operation_failed with English the UI could only
+// show as it was. Each now has a code the UI words itself; a start whose system proxy
+// failed says that the tunnel is up.
+func TestHostFailuresHaveTheirOwnCodes(t *testing.T) {
+	host := &fakeHost{owner: "S-1-5-21-1"}
+	dispatcher := New(Options{Engine: core, HostMethods: true, Host: host})
+	t.Cleanup(func() {
+		dispatcher.Close()
+		_ = core.Stop()
+	})
+	owner, admin := peer.Identity{UserID: "S-1-5-21-1"}, peer.Identity{UserID: "S-1-5-21-2", Administrator: true}
+	ctx := context.Background()
+	port := porttest.Free(t)
+	withProxy := &controlpb.RunOptions{SystemProxyEnabled: true, MixedPort: uint32(port)}
+
+	host.proxyErr = errors.New("set the owner's system proxy: Access is denied.")
+	started := callAs(t, dispatcher, ctx, owner, request(1, startRequest(profileYAML(port), withProxy)))
+	expectError(t, started, 1, CodeStartedWithoutSystemProxy)
+	if !dispatcher.Running() || !started.GetError().GetRetryable() {
+		t.Fatalf("running %v after %v", dispatcher.Running(), started.GetError())
+	}
+	reloaded := callAs(t, dispatcher, ctx, owner, request(2, reloadRequest(profileYAML(port), withProxy)))
+	expectError(t, reloaded, 2, CodeStartedWithoutSystemProxy)
+	expectError(t, callAs(t, dispatcher, ctx, owner, request(3, systemProxyRequest(true))), 3, CodeSystemProxyFailed)
+	host.proxyErr = nil
+
+	host.stopErr = errors.New("restore the owner's proxy settings: the owner is not signed in")
+	expectError(t, callAs(t, dispatcher, ctx, owner, request(4, stopRequest)), 4, CodeSystemProxyFailed)
+	if dispatcher.Running() {
+		t.Fatal("the core runs after a stop whose proxy failed")
+	}
+	host.stopErr = nil
+
+	host.claimErr = errors.New("record the owner: disk full")
+	expectError(t, callAs(t, dispatcher, ctx, admin, request(5, claimRequest)), 5, CodeClaimFailed)
+	expectError(t, callAs(t, dispatcher, ctx, admin, request(6, takeOverRequest)), 6, CodeTakeOverFailed)
+	// A refusal stays a refusal, wrapped or not.
+	host.claimErr = fmt.Errorf("taking over needs an administrator's rights: %w", ErrOwnedByOtherUser)
+	expectError(t, callAs(t, dispatcher, ctx, admin, request(7, takeOverRequest)), 7, CodeOwnedByOtherUser)
+}
+
+// A port another program holds is named, for the UI to say in its own words.
+func TestPortInUseIsNamed(t *testing.T) {
+	dispatcher := development(t)
+	taken, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer taken.Close()
+	port := taken.Addr().(*net.TCPAddr).Port
+	response := call(t, dispatcher, request(1, startRequest(profileYAML(port), nil)))
+	expectError(t, response, 1, CodeInboundFailed)
+	if got, want := response.GetError().GetMessage(), fmt.Sprintf("mixed-port %d", port); got != want || !response.GetError().GetRetryable() {
+		t.Fatalf("error = %v, want message %q", response.GetError(), want)
+	}
+}
+
+// providerEngine fails to update its providers.
+type providerEngine struct {
+	unlinked
+	err error
+}
+
+func (e providerEngine) UpdateProvider(controlpb.ProviderKind, string) error { return e.err }
+
+func TestProviderUpdateFailure(t *testing.T) {
+	update := func(r *controlpb.Request) {
+		r.Method = &controlpb.Request_UpdateProvider{UpdateProvider: &controlpb.UpdateProviderRequest{Name: "ads"}}
+	}
+	failed := call(t, New(Options{Engine: providerEngine{err: errors.New("update provider ads: EOF")}}), request(1, update))
+	expectError(t, failed, 1, CodeProviderUpdateFailed)
+	if !failed.GetError().GetRetryable() {
+		t.Fatalf("error = %v", failed.GetError())
+	}
+	expectError(t, call(t, New(Options{Engine: providerEngine{err: engine.ErrNotRunning}}), request(2, update)), 2, CodeNotRunning)
 }

@@ -296,7 +296,7 @@ mihomo 自带三种组网出站：`tailscale`、`zerotier`、`easytier`。它们
   只读，不持有 engine 的操作锁；内核没在运行时 `not_running`。每个出站读状态最多等 2 秒。
 - **`LoginMesh`（58）**：`name` 是出站名称，返回 `login_url`。Tailscale 调 `StartLoginInteractive`，等到有
   `AuthURL`（最多 20 秒）；ZeroTier 返回当前的 SSO 链接，没有时 `invalid_request`；EasyTier `invalid_request`。
-  已登录的 Tailscale 也可以调用，用来换账户。超时 `operation_failed`（`retryable`）。
+  已登录的 Tailscale 也可以调用，用来换账户。没给出链接时 `mesh_login_failed`，期限到时 `timeout`（都可重试）。
 - 字段号 56 是 VPN Gate 的，这里从 57 开始。
 
 ### 10.6 安全项

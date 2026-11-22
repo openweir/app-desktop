@@ -897,6 +897,30 @@
         <translation>The configuration did not take effect</translation>
     </message>
     <message>
+        <source>未能打开端口或 TUN</source>
+        <translation>Couldn’t open a port or the TUN</translation>
+    </message>
+    <message>
+        <source>无法更改系统代理</source>
+        <translation>Couldn’t change the system proxy</translation>
+    </message>
+    <message>
+        <source>已连接，但无法更改系统代理</source>
+        <translation>Connected, but couldn’t change the system proxy</translation>
+    </message>
+    <message>
+        <source>无法更新代理集合或规则集合</source>
+        <translation>Couldn’t update the proxy or rule provider</translation>
+    </message>
+    <message>
+        <source>无法取得组网的登录链接</source>
+        <translation>Couldn’t get the mesh network’s login link</translation>
+    </message>
+    <message>
+        <source>服务无法切换到当前用户</source>
+        <translation>The service couldn’t switch to the current user</translation>
+    </message>
+    <message>
         <source>链接无效</source>
         <translation>Invalid URL</translation>
     </message>

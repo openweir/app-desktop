@@ -465,10 +465,17 @@ Windows 上 UI 断线后按退避间隔重连，并重新建立订阅。
 | `invalid_config` | 配置无法解析，或被准入流水线拒绝；`message` 是 mihomo 的原始错误文本。拼装出错时以 `plan: ` 或 `subscription "名称": ` 开头 | 否 |
 | `not_running` | 需要运行中的内核 | 否 |
 | `already_running` | 内核已在运行时调用 `Start`（切换配置走 `Reload`） | 否 |
-| `apply_failed` | 配置已应用，但端口或 TUN 没有打开；原因在 mihomo 日志里 | 是 |
+| `apply_failed` | 配置没有生效：macOS 扩展没能把 TUN 交给 mihomo；`message` 是原因 | 是 |
+| `inbound_failed` | 端口或 TUN 没有打开：`Start`、`Reload` 前试开的新端口被占用，或应用后 mihomo 没能打开（原因只在它的日志里）。`message` 只列出它们，如 `mixed-port 9347, TUN`，由界面措辞。`Start` 时内核停在失败状态；`Reload` 试开失败时保留原来的配置，应用后才失败时其余部分照常生效 | 是 |
+| `system_proxy_failed` | Windows 服务没能写属主的系统代理，或没能写回他原来的设置（`SetSystemProxy`；`Stop` 时隧道已经断开） | 是 |
+| `started_without_system_proxy` | `Start` 或 `Reload` 已经生效，隧道在运行，但系统代理没能按 `RunOptions` 更改 | 是 |
+| `provider_update_failed` | mihomo 没能更新 provider；`message` 是它的原文 | 是 |
+| `mesh_login_failed` | 组网出站没有给出登录链接 | 是 |
+| `claim_failed` | 认领时服务没能记下新属主 | 是 |
+| `take_over_failed` | 接管时没能停下另一个用户的隧道，或没能记下新属主 | 是 |
 | `unknown_subscription` | 订阅不存在、已过期，或属于其他调用者 | 否 |
 | `too_many_subscriptions` | 同时存在的订阅超过上限 | 是 |
-| `operation_failed` | 内核操作失败，如测速超时、provider 更新失败 | 是 |
+| `operation_failed` | 其他内核操作失败，如测速超时、WARP 注册被拒；`message` 是原文，界面显示在「操作失败：」之后 | 是 |
 | `timeout` | 请求排队、传输或执行期限已到 | 是 |
 | `cancelled` | 排队请求被取消，或连接操作被后来的断开意图取代 | 是 |
 | `core_unresponsive` | 内核操作未在期限内结束，宿主正在回收，不能继续使用这个运行时 | 是 |

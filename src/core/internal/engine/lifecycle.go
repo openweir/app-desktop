@@ -155,6 +155,27 @@ type inboundPort struct {
 	udp        bool // the inbound also listens for UDP on the port
 }
 
+// InboundError names the inbounds of a configuration that did not open: ports by their key
+// and number ("mixed-port 7890"), and "TUN". Missing is data the UI shows in its own words;
+// Err is why, when the engine knows it rather than only mihomo's log.
+type InboundError struct {
+	Missing []string
+	Err     error
+}
+
+func (e *InboundError) Error() string {
+	if e.Err != nil {
+		return e.Err.Error()
+	}
+	return fmt.Sprintf("could not open %s; the mihomo log has the cause", strings.Join(e.Missing, ", "))
+}
+
+func (e *InboundError) Unwrap() error { return e.Err }
+
+func (p inboundPort) unopened(err error) error {
+	return &InboundError{Missing: []string{fmt.Sprintf("%s %d", p.name, p.want)}, Err: err}
+}
+
 // inboundPorts pairs the ports cfg asks for with the ones open now.
 func inboundPorts(cfg *config.Config) []inboundPort {
 	general := cfg.General
@@ -186,13 +207,13 @@ func probePorts(cfg *config.Config) error {
 		address := inboundAddress(general.BindAddress, port.want, general.AllowLan)
 		tcp, err := net.Listen("tcp", address)
 		if err != nil {
-			return err
+			return port.unopened(err)
 		}
 		tcp.Close()
 		if port.udp {
 			udp, err := net.ListenPacket("udp", address)
 			if err != nil {
-				return err
+				return port.unopened(err)
 			}
 			udp.Close()
 		}
@@ -222,10 +243,10 @@ func checkApplied(cfg *config.Config) error {
 		}
 	}
 	if general.Tun.Enable && !listener.GetTunConf().Enable {
-		missing = append(missing, "the TUN")
+		missing = append(missing, "TUN")
 	}
 	if len(missing) != 0 {
-		return fmt.Errorf("could not open %s; the mihomo log has the cause", strings.Join(missing, ", "))
+		return &InboundError{Missing: missing}
 	}
 	return nil
 }

@@ -379,7 +379,7 @@ def test_mixed_port_and_lan(app: App) -> None:
         settings.setMixedPort(str(busy))
         app.until(lambda: app.prop(settings, "portError"))
         assert app.prop(settings, "portError") == (
-            f"配置未能生效：listen tcp 127.0.0.1:{busy}: bind: address already in use"  # noqa: RUF001
+            f"未能打开端口或 TUN：mixed-port {busy}"  # noqa: RUF001
         )
         assert app.prop(settings, "mixedPort") == port
         assert app.curl(url) == "direct"
@@ -412,7 +412,7 @@ def test_mixed_port_and_lan(app: App) -> None:
         overview.setConnected(True)
         app.until(lambda: app.prop(overview, "connectionFailed"))
         assert app.prop(overview, "connectionDetail") == (
-            f"配置未能生效：listen tcp 127.0.0.1:{busy}: bind: address already in use"  # noqa: RUF001
+            f"未能打开端口或 TUN：mixed-port {busy}"  # noqa: RUF001
         )
         assert not app.prop(overview, "connectionOn")
         app.until(lambda: app.prop(overview, "statusTitle") == "连接失败")

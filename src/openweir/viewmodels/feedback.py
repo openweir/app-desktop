@@ -34,8 +34,18 @@ _MESSAGES = {
     "extension_needs_reboot": QT_TRANSLATE_NOOP(
         "Feedback", "网络扩展尚未就绪，请按系统提示完成设置后重试"
     ),
-    # A port or the TUN did not open, e.g. a mixed port another program holds.
+    # The macOS extension could not hand mihomo its TUN; the detail is why.
     "apply_failed": QT_TRANSLATE_NOOP("Feedback", "配置未能生效"),
+    # Ports, such as a mixed port another program holds, or the TUN; the detail names them.
+    "inbound_failed": QT_TRANSLATE_NOOP("Feedback", "未能打开端口或 TUN"),
+    # The Windows service could not write the owner's system proxy, or put theirs back.
+    "system_proxy_failed": QT_TRANSLATE_NOOP("Feedback", "无法更改系统代理"),
+    # Start or Reload took effect, but the system proxy could not follow.
+    "started_without_system_proxy": QT_TRANSLATE_NOOP("Feedback", "已连接，但无法更改系统代理"),
+    "provider_update_failed": QT_TRANSLATE_NOOP("Feedback", "无法更新代理集合或规则集合"),
+    "mesh_login_failed": QT_TRANSLATE_NOOP("Feedback", "无法取得组网的登录链接"),
+    # The Windows service could not take on the user who connects (docs/architecture.md §5.4).
+    "claim_failed": QT_TRANSLATE_NOOP("Feedback", "服务无法切换到当前用户"),
     "invalid_url": QT_TRANSLATE_NOOP("Feedback", "链接无效"),
     "invalid_name": QT_TRANSLATE_NOOP("Feedback", "请输入名称"),
     "invalid_update_interval": QT_TRANSLATE_NOOP("Feedback", "更新间隔必须为正整数小时"),
@@ -67,6 +77,7 @@ _MESSAGES = {
 _WITH_DETAIL = {
     "invalid_config",
     "apply_failed",
+    "inbound_failed",
     "download_failed",
     "http_error",
     "file_unreadable",
