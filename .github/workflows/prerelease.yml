@@ -11,6 +11,11 @@ name: Preview
 
 on:
   workflow_call:
+    inputs:
+      version:
+        description: The version CI computed (scripts/next_version.py)
+        required: true
+        type: string
 
 jobs:
   publish:
@@ -26,11 +31,6 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       HEAD_SHA: ${{ github.sha }}
     steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-
       # The Windows installers are kept for a day and the disk image for a week (ci.yml).
       - name: Installers from the CI run
         uses: actions/download-artifact@v7
@@ -41,10 +41,12 @@ jobs:
 
       - name: Name the files after the preview version
         id: files
+        env:
+          VERSION: ${{ inputs.version }}
         run: |
           shopt -s nullglob
-          # The version comes from git: the newest vX.Y.Z tag and the conventional commits after it.
-          version=$(python3 scripts/next_version.py --write)
+          # CI's changes job computed it from git (scripts/next_version.py).
+          version="$VERSION"
           # Previews of a version count from 1: the next number after this version's newest preview.
           last=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName \
             --jq "[.[].tagName | select(startswith(\"v$version-preview.\")) | ltrimstr(\"v$version-preview.\") | select(test(\"^[0-9]+\$\")) | tonumber] | max // 0")

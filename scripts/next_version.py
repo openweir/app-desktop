@@ -4,10 +4,12 @@ BREAKING CHANGE: footer) raises the major version, a feat the minor, anything el
 a tagged HEAD keeps its own version. Mirrors openwrt's internal/release/nextversion.go. Until
 the first release is tagged, the version is pyproject.toml's (the first release is 0.1.0).
 
-    uv run --no-project python scripts/next_version.py           # print it
-    uv run --no-project python scripts/next_version.py --write   # also set it in pyproject.toml
+    uv run --no-project python scripts/next_version.py               # print it
+    uv run --no-project python scripts/next_version.py --write       # also set it in pyproject.toml
+    uv run --no-project python scripts/next_version.py --set 1.2.3   # set this one, read no git
 
-CI checks out with fetch-depth: 0 so the tags and history are there.
+CI computes it once, in ci.yml's changes job, which checks out with fetch-depth: 0 so the tags
+and history are there; the jobs that build or publish it take it from there and --set it.
 """
 
 from __future__ import annotations
@@ -92,13 +94,22 @@ def write_version(version: str, pyproject: Path = PYPROJECT) -> None:
     pyproject.write_text(new, encoding="utf-8")
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=(__doc__ or "").partition("\n")[0])
-    parser.add_argument("--write", action="store_true", help="also set it in pyproject.toml")
-    args = parser.parse_args()
-    version = next_version()
-    if args.write:
-        write_version(version)
+    action = parser.add_mutually_exclusive_group()
+    action.add_argument("--write", action="store_true", help="also set it in pyproject.toml")
+    action.add_argument(
+        "--set", metavar="X.Y.Z", help="set this version, computed earlier, in pyproject.toml"
+    )
+    args = parser.parse_args(argv)
+    if args.set is not None:
+        if VERSION.match(args.set) is None:
+            parser.error(f"invalid release version {args.set!r}")
+        version = args.set
+    else:
+        version = next_version()
+    if args.write or args.set is not None:
+        write_version(version, PYPROJECT)
     print(version)
     return 0
 

@@ -37,8 +37,11 @@ Release 上有三个安装包和 SHA256SUMS，共四个文件（1.0.0 另有源�
 ### 1.1 发布工作流
 
 不用手动打标签，也不用单独触发：推送到 `main` 后，CI（`ci.yml`）全部检查通过，最后的 `release` job 调用
-`.github/workflows/release.yml`（`workflow_call`，所以跑的是这个提交里的工作流文件）。它先由 **qualify** job 用
-`scripts/next_version.py` 算出版本；这个提交已不是 `main` 的最新提交、这个版本已经发布过，就什么也不做；版本比已发布的旧则失败。
+`.github/workflows/release.yml`（`workflow_call`，所以跑的是这个提交里的工作流文件）。版本只算一次：CI 的 `changes` job
+（完整历史）运行 `scripts/next_version.py`，把结果作为输入 `version` 交给 `release.yml`（和 `prerelease.yml`），CI 自己
+构建安装包的 job 也用它；各构建 job 用 `next_version.py --set` 把它写进 `pyproject.toml`，不再各自读 git。
+`release.yml` 先由 **qualify** job 核对这个版本：这个提交已不是 `main` 的最新提交、这个版本已经发布过，就什么也不做；
+版本比已发布的旧则失败。
 之后的 job 都在 `release` Environment 里，由它的审批人批准后才开始：先批准 macOS 和两个 Windows 架构的构建 job，它们成功后再批准创建 Release 的 job。
 
 1. **macOS universal** 和 **Windows x64 / ARM64** 三个构建任务分别构建、签名、公证（macOS）安装包，Windows 的安装包还在
@@ -55,7 +58,7 @@ Release 上有三个安装包和 SHA256SUMS，共四个文件（1.0.0 另有源�
    调用 signtool 和 Artifact Signing 的 dlib 完成，时间戳来自 `http://timestamp.acs.microsoft.com`；签什么、怎么核对见
    architecture.md 第 10 节。签名失败、核对不过，job 就失败，不会产出未签名的安装包。
 2. **release** job（`contents: write`）：
-   - 确认版本与 qualify 算出的一致，版本是三段数字（界面只认这种，第 2 节）；
+   - 取 qualify 输出的版本，确认是三段数字（界面只认这种，第 2 节）；
    - 取回三个安装包 artifact，用构建 job 写的 `.sha256` 核对三个安装包；`.sha256` 文件不上传；
    - 用 `sha256sum` 为三个安装包写 `SHA256SUMS`；
    - `gh release create v<版本> --draft --target <提交>` 创建**草稿**，上传这四个文件；同一版本之前 main 推送留下的草稿先删掉。

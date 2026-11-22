@@ -123,28 +123,16 @@ def test_write_version(tmp_path: Path) -> None:
     assert 'version = "9"' in text
 
 
-@pytest.mark.parametrize(
-    ("workflow", "jobs"),
-    [
-        ("prerelease.yml", ["publish"]),
-        ("release.yml", ["macos", "windows", "release"]),
-        ("ci.yml", ["apple", "windows-installer"]),
-    ],
-)
-def test_workflows_compute_the_version(workflow: str, jobs: list[str]) -> None:
-    """Jobs that name or build a version check out full history and write it first."""
-    doc = yaml.load(
-        (ROOT / ".github" / "workflows" / workflow).read_text(encoding="utf-8"),
-        Loader=yaml.BaseLoader,
-    )
-    for job in jobs:
-        steps = doc["jobs"][job]["steps"]
-        checkout = next(s for s in steps if s.get("uses", "").startswith("actions/checkout"))
-        assert checkout["with"]["fetch-depth"] == "0", (workflow, job)
-        assert any("scripts/next_version.py --write" in s.get("run", "") for s in steps), (
-            workflow,
-            job,
-        )
+def test_set_writes_a_given_version(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    pyproject = tmp_path / "pyproject.toml"
+    pyproject.write_text('[project]\nversion = "0.1.0"\n', encoding="utf-8")
+    monkeypatch.setattr(nv, "PYPROJECT", pyproject)
+    monkeypatch.setattr(nv, "next_version", lambda: pytest.fail("--set reads no git"))
+    assert nv.main(["--set", "2.3.4"]) == 0
+    assert nv.project_version(pyproject) == "2.3.4"
+    with pytest.raises(SystemExit):
+        nv.main(["--set", "v2.3.4"])
+    assert nv.project_version(pyproject) == "2.3.4"
 
 
 def _load(name: str) -> dict:
@@ -152,6 +140,44 @@ def _load(name: str) -> dict:
         (ROOT / ".github" / "workflows" / name).read_text(encoding="utf-8"),
         Loader=yaml.BaseLoader,
     )
+
+
+def _step(steps: list[dict], text: str) -> dict:
+    (found,) = [s for s in steps if text in s.get("run", "")]
+    return found
+
+
+def test_ci_computes_the_version_once() -> None:
+    """CI's changes job computes the version from full history; the builds, the preview and
+    the release take it from there rather than computing it again."""
+    ci = _load("ci.yml")["jobs"]
+    changes = ci["changes"]
+    checkout = next(s for s in changes["steps"] if s.get("uses", "").startswith("actions/checkout"))
+    assert checkout["with"]["fetch-depth"] == "0"
+    assert changes["outputs"]["version"] == "${{ steps.version.outputs.version }}"
+    (step,) = [s for s in changes["steps"] if s.get("id") == "version"]
+    assert "python3 scripts/next_version.py" in step["run"]
+    builds = [
+        ("ci.yml", "apple", "${{ needs.changes.outputs.version }}"),
+        ("ci.yml", "windows-installer", "${{ needs.changes.outputs.version }}"),
+        ("release.yml", "macos", "${{ needs.qualify.outputs.version }}"),
+        ("release.yml", "windows", "${{ needs.qualify.outputs.version }}"),
+    ]
+    for workflow, job, source in builds:
+        steps = _load(workflow)["jobs"][job]["steps"]
+        step = _step(steps, "scripts/next_version.py")
+        assert 'scripts/next_version.py --set "$VERSION"' in step["run"], (workflow, job)
+        assert step["env"]["VERSION"] == source, (workflow, job)
+        # Set before the project is installed, so the installed metadata carries it.
+        assert steps.index(step) < steps.index(_step(steps, "uv sync --frozen")), (workflow, job)
+    for job in ("preview", "release"):
+        assert ci[job]["with"]["version"] == "${{ needs.changes.outputs.version }}"
+    for workflow in ("prerelease.yml", "release.yml"):
+        assert _load(workflow)["on"]["workflow_call"]["inputs"]["version"]["required"] == "true"
+        text = (ROOT / ".github" / "workflows" / workflow).read_text(encoding="utf-8")
+        assert "fetch-depth" not in text
+        assert "next_version.py --write" not in text
+    assert "next_version.py --write" not in yaml.safe_dump(ci)
 
 
 def test_ci_publishes_as_its_last_jobs() -> None:
@@ -164,7 +190,7 @@ def test_ci_publishes_as_its_last_jobs() -> None:
         ("remove-previews", "remove-previews.yml", "main"),
     ]:
         assert jobs[job]["uses"] == f"./.github/workflows/{workflow}"
-        assert jobs[job]["needs"] == ["result"]
+        assert jobs[job]["needs"][-1] == "result"
         assert f"refs/heads/{branch}" in jobs[job]["if"]
         on = _load(workflow)["on"]
         assert "workflow_call" in on
@@ -175,7 +201,7 @@ def test_ci_publishes_as_its_last_jobs() -> None:
 
 def test_release_builds_wait_for_qualify() -> None:
     jobs = _load("release.yml")["jobs"]
-    assert "--write" not in jobs["qualify"]["steps"][-1]["run"]
+    assert "inputs.version" in jobs["qualify"]["steps"][-1]["env"]["VERSION"]
     for job in ("macos", "windows"):
         assert jobs[job]["needs"] == "qualify"
         assert jobs[job]["environment"] == "release"

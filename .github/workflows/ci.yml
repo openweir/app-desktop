@@ -25,11 +25,21 @@ jobs:
     outputs:
       jobs: ${{ steps.select.outputs.jobs }}
       protocol: ${{ steps.select.outputs.protocol }}
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           persist-credentials: false
+      # The version every build and publication of this run carries, computed once from the
+      # full history: the newest vX.Y.Z tag and the conventional commits after it, or
+      # pyproject.toml's before the first release (scripts/next_version.py).
+      - name: Version from git
+        id: version
+        run: |
+          version=$(python3 scripts/next_version.py)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Version: $version" >> "$GITHUB_STEP_SUMMARY"
       - name: Select checks from the complete change range
         env:
           GH_TOKEN: ${{ github.token }}
@@ -275,13 +285,13 @@ jobs:
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
-      # The version comes from git: the newest vX.Y.Z tag and the conventional commits after it.
-      - name: Version from git
+      # The version the changes job computed, into pyproject.toml before anything is built.
+      - name: Version
         shell: bash
-        run: uv run --no-project python scripts/next_version.py --write
+        env:
+          VERSION: ${{ needs.changes.outputs.version }}
+        run: uv run --no-project python scripts/next_version.py --set "$VERSION"
       - uses: actions/setup-go@v7
         with:
           go-version-file: src/core/go.mod
@@ -477,15 +487,15 @@ jobs:
       NUITKA_CACHE_DIR: ${{ github.workspace }}\build\nuitka-cache-${{ matrix.arch }}
     steps:
       - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
         with:
           enable-cache: true
-      # The version comes from git: the newest vX.Y.Z tag and the conventional commits after it.
-      - name: Version from git
+      # The version the changes job computed, into pyproject.toml before anything is built.
+      - name: Version
         shell: bash
-        run: uv run --no-project python scripts/next_version.py --write
+        env:
+          VERSION: ${{ needs.changes.outputs.version }}
+        run: uv run --no-project python scripts/next_version.py --set "$VERSION"
       - uses: actions/setup-go@v7
         with:
           go-version-file: src/core/go.mod
@@ -683,20 +693,24 @@ jobs:
   preview:
     name: Publish preview
     if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
-    needs: [result]
+    needs: [changes, result]
     permissions:
       contents: write
       actions: write
     uses: ./.github/workflows/prerelease.yml
+    with:
+      version: ${{ needs.changes.outputs.version }}
 
   release:
     name: Publish release
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [result]
+    needs: [changes, result]
     permissions:
       contents: write
       id-token: write
     uses: ./.github/workflows/release.yml
+    with:
+      version: ${{ needs.changes.outputs.version }}
     secrets: inherit
 
   remove-previews:

@@ -209,6 +209,7 @@ def test_workflow_wires_every_job_and_preserves_a_full_run_entry() -> None:
     assert jobs["changes"]["outputs"] == {
         "jobs": "${{ steps.select.outputs.jobs }}",
         "protocol": "${{ steps.select.outputs.protocol }}",
+        "version": "${{ steps.version.outputs.version }}",  # test_next_version.py
     }
     assert set(jobs["result"]["needs"]) == ci.JOBS | {"changes"}
     assert jobs["result"]["if"] == "always()"

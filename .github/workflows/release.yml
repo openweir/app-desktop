@@ -5,13 +5,19 @@ name: Release
 # from scripts/build_windows.py, signed with Azure Artifact Signing (D42), with their SHA-256.
 # The last jobs of CI (ci.yml) call this on a push to main once every check has passed, so it
 # runs this commit's copy of the workflow. The version comes from git (scripts/next_version.py):
-# the newest vX.Y.Z tag and the conventional commits after it. The builds run in the release
+# the newest vX.Y.Z tag and the conventional commits after it, or pyproject.toml's before the
+# first release; CI computes it once and passes it in. The builds run in the release
 # environment: its reviewers approve each run before the jobs get the signing secrets, the Azure
 # sign-in and the Google OAuth client. A last job puts all three installers and SHA256SUMS into
 # a draft GitHub Release v<version> at this commit (docs/release.md §1), which a person
 # publishes; publishing creates the tag, which is the source (D43).
 on:
   workflow_call:
+    inputs:
+      version:
+        description: The version CI computed (scripts/next_version.py)
+        required: true
+        type: string
 
 env:
   UV_HTTP_RETRIES: "5"
@@ -31,17 +37,19 @@ jobs:
       version: ${{ steps.plan.outputs.version }}
       publish: ${{ steps.plan.outputs.publish }}
     steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - name: Version from git
+      - name: Whether the version is new
         id: plan
         env:
           GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
-          version=$(python3 scripts/next_version.py)
+          # The updater reads only X.Y.Z tags (docs/release.md §2).
+          if [[ ! "$VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "::error::Version '$VERSION' is not X.Y.Z"
+            exit 1
+          fi
+          version="$VERSION"
           tag="v$version"
           echo "version=$version" >> "$GITHUB_OUTPUT"
           main=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)
@@ -81,13 +89,17 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          fetch-depth: 0
           persist-credentials: false
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
-      # The version comes from git: the newest vX.Y.Z tag and the conventional commits after it.
-      - name: Version from git
-        shell: bash
-        run: uv run --no-project python scripts/next_version.py --write
+      # The version qualify passed on, into pyproject.toml before anything is built.
+      - name: Version
+        id: version
+        env:
+          VERSION: ${{ needs.qualify.outputs.version }}
+        run: |
+          uv run --no-project python scripts/next_version.py --set "$VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "dmg=OpenWeir-$VERSION-macos-universal.dmg" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-go@v7
         with:
           go-version-file: src/core/go.mod
@@ -102,19 +114,6 @@ jobs:
         with:
           path: build/geodata
           key: geodata-${{ hashFiles('scripts/fetch_geodata.py') }}
-      - name: Version
-        id: version
-        env:
-          RELEASE_VERSION: ${{ needs.qualify.outputs.version }}
-        run: |
-          version="$(uv run --no-project python -c \
-            'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
-          if [[ "$version" != "$RELEASE_VERSION" ]]; then
-            echo "::error::Version $version does not match $RELEASE_VERSION that qualify computed"
-            exit 1
-          fi
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "dmg=OpenWeir-$version-macos-universal.dmg" >> "$GITHUB_OUTPUT"
 
       # A keychain of its own holds the certificate; the two profiles go where Xcode and
       # scripts/build_apple.py look for them by name. The build checks the rest: the identity
@@ -332,13 +331,19 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          fetch-depth: 0
           persist-credentials: false
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
-      # The version comes from git: the newest vX.Y.Z tag and the conventional commits after it.
-      - name: Version from git
+      # The version qualify passed on, into pyproject.toml before anything is built.
+      - name: Version
+        id: version
         shell: bash
-        run: uv run --no-project python scripts/next_version.py --write
+        env:
+          VERSION: ${{ needs.qualify.outputs.version }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          uv run --no-project python scripts/next_version.py --set "$VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "installer=OpenWeir-$VERSION-windows-$ARCH-setup.exe" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-go@v7
         with:
           go-version-file: src/core/go.mod
@@ -351,20 +356,6 @@ jobs:
         with:
           path: build/geodata
           key: geodata-${{ hashFiles('scripts/fetch_geodata.py') }}
-      - name: Version
-        id: version
-        shell: bash
-        env:
-          RELEASE_VERSION: ${{ needs.qualify.outputs.version }}
-        run: |
-          version="$(uv run --no-project python -c \
-            'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
-          if [[ "$version" != "$RELEASE_VERSION" ]]; then
-            echo "::error::Version $version does not match $RELEASE_VERSION that qualify computed"
-            exit 1
-          fi
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "installer=OpenWeir-$version-windows-${{ matrix.arch }}-setup.exe" >> "$GITHUB_OUTPUT"
 
       - name: Google OAuth client
         shell: bash
@@ -551,22 +542,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          fetch-depth: 0
           persist-credentials: false
-      # The version comes from git: the newest vX.Y.Z tag and the conventional commits after it.
-      - name: Version from git
-        run: python3 scripts/next_version.py --write
       - name: Version
         id: version
         env:
           RELEASE_VERSION: ${{ needs.qualify.outputs.version }}
         run: |
-          version="$(python3 -c \
-            'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
-          if [[ "$version" != "$RELEASE_VERSION" ]]; then
-            echo "::error::Version $version does not match $RELEASE_VERSION that qualify computed"
-            exit 1
-          fi
+          version="$RELEASE_VERSION"
           # The updater reads only X.Y.Z tags (docs/release.md §2).
           if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "::error::Version $version is not X.Y.Z"
