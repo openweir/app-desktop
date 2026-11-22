@@ -11,7 +11,7 @@
 
 ### 1.1 CI 覆盖
 
-`.github/workflows/ci.yml` 在每个 PR 和 main 推送时判断改动范围，运行受影响的任务。main 使用成功的祖先 CI 作为基线，
+`.github/workflows/ci.yml` 在每个 PR 和 main、develop 推送时判断改动范围，运行受影响的任务。main 使用成功的祖先 CI 作为基线，
 避免前一次未验证的代码被后续文档提交掩盖；无法确定范围时运行全部任务。手动触发或完整重跑始终跑全量。选择脚本 `scripts/ci_changes.py` 自己改了（与 PR 的 base、推送的成功基线或上一个 head 不同）时，工作流不采用它的选择，直接跑全量。
 
 | job | 平台 | 内容 |
@@ -26,6 +26,11 @@
 | `windows-arm64-upgrade` | Windows ARM64 | 安装 x64 版后原位升级 ARM64，检查服务、GUI、同架构文件、数据保留及卸载 |
 | `tun` | Linux | 在网络命名空间里建真实的 TUN：自管模式和 fd 模式，四种栈，fd 模式另测 `includeAllNetworks` |
 | `result` | Linux | 汇总为 `CI result`；被选中的任务失败、取消或意外跳过都不能通过 |
+| `preview` | Linux | 只在 develop 推送、`result` 通过后：调用 `prerelease.yml`，把三个安装包发成预览版（release.md 1.2）。develop 推送只要构建一个安装包就构建全部三个 |
+| `release`、`remove-previews` | Linux | 只在 main 推送、`result` 通过后：调用 `release.yml` 建草稿 Release（第 4 节），调用 `remove-previews.yml` 删掉已发布版本的预览版 |
+
+版本只在 `changes` job 里算一次（`scripts/next_version.py`，要完整历史），作为输出交给构建安装包的 job 和发布用的两个
+工作流。
 
 Windows 上的客户端校验（命名管道、文件 ID、锁住映像、服务的可执行文件只在有管理员权限时通过）、管理员权限的判断、
 home 目录的 ACL 和 WinINet 代理设置的读写在 `go` job 的 Windows runner 上测；界面以 `runas` 启动程序、取回退出码在
@@ -316,14 +321,27 @@ exits.md 第 9 节的待实测项。
 
 ## 4. 发布
 
-发布物的约定、发布工作流和检查更新的细节见 [release.md](release.md)。步骤：
+发布物的约定、发布工作流和检查更新的细节见 [release.md](release.md)。版本号不用手改，也不用手动打标签：
+`scripts/next_version.py` 从 git 算出版本（最新的稳定 `vX.Y.Z` 标签加其后的约定式提交；第一个正式版之前没有标签，取
+`pyproject.toml` 的 0.1.0），标签由 GitHub 在发布草稿时创建。前提是仓库设置里有 `release` Environment：有必需的审批人，
+部署分支只允许 `main`，签名用的机密和变量都放在这里（release.md 1.1、本文 2.8 节）。步骤：
 
-1. **改版本**：`pyproject.toml` 的 `version`，三段数字（`X.Y.Z`）。`uv lock` 更新锁文件里的版本；macOS 构建的版本
-   号由 `scripts/build_apple.py` 从 `pyproject.toml` 读取。合并到 main，CI 全绿。
-2. **试运行**：在 Actions 里手动运行 Release 工作流（`workflow_dispatch`，选 main）。它在 `release` Environment
-   里，审批后构建三个安装包（Windows x64 / ARM64 用 Artifact Signing 签名，macOS 签名与公证），存为 workflow artifact，不建 Release。下载 artifact，在测试 Mac 和
-   Windows 虚拟机上装一遍；macOS 的磁盘映像打开后应与 `package/dmg/preview.png` 一致。Environment 里没有
-   Google OAuth 客户端的两个机密（2.8 节）时，各构建任务分别给出警告，安装包里没有 Google Drive 备份。
+1. **在 develop 上准备**：提交用约定式提交（`feat:` 升次版本，`fix:` 等其他类型升修订号，`!` 或 `BREAKING CHANGE:`
+   升主版本）。每次推送 develop、CI 全绿后发一个预览版（release.md 1.2），先在测试 Mac 和 Windows 虚拟机上试它。
+   确认 `src/core/go.mod` 的 `replace` 固定的是 `openweir/mihomo` 上一个已发布的内核版本，也就是 `openweir-v<内核版本>`
+   标签指向的提交（5.4 节）。这个标签由内核发版自动打出，以后变基强推 `main` 时它仍然取得到，不需要另打标签：
+
+   ```bash
+   git ls-remote --tags https://github.com/openweir/mihomo 'openweir-v*'   # 确认固定的提交在其中
+   ```
+2. **合并到 main 并推送**。CI 全绿后，最后的 `release` job 调用 `release.yml`：qualify 核对 CI 算出的版本（这个提交已
+   不是 `main` 的最新提交、版本已经发布过，就什么也不做；比已发布的旧则失败）。然后在这次运行的页面上审批
+   `release` Environment：先批准 macOS 和两个 Windows 架构的构建任务（Windows x64 / ARM64 用 Artifact Signing 签名，
+   macOS 签名与公证），它们成功后再批准 release job。release job 核对安装包，写 `SHA256SUMS`，把这四个文件放进
+   **草稿** Release `v<版本>`（不上传源代码包，D43）；同一版本之前的草稿被替换。审批期间 `main` 又有推送时，这次运行
+   不建草稿，由新的那次去建；等审批的发布不会挡住新推送的 CI。Environment 里没有 Google OAuth 客户端的两个机密
+   （2.8 节）时照常构建，安装包里没有 Google Drive 备份：各构建任务给出警告并写进运行摘要，草稿说明最前面多一行
+   `NO GOOGLE DRIVE BACKUP` 注释。
 
    Windows 两个任务的日志里核对：「Signing tools」两个 NuGet 包的 SHA-256 对上，`dotnet --list-runtimes` 有 10.x 的
    `Microsoft.NETCore.App`（ARM64 上是 `C:\Program Files\dotnet\x64` 下的 x64 版）；「Sign in to Azure」没有选订阅，
@@ -333,28 +351,19 @@ exits.md 第 9 节的待实测项。
    timestamped`、`Successfully verified`；「Check the signatures」的证书 `Subject` 是
    `CN=OpenWeir, O=OpenWeir, L=Sheridan, S=Wyoming, C=US`，`EnhancedKeyUsageList` 里有代码签名和
    `1.3.6.1.4.1.311.97.0`，时间戳证书是微软的；「Install, upgrade and uninstall」
-   以 `-Signed` 通过（签名、`signed=true`、界面没被拒）。下载 artifact 后在测试机上按 2.1 节核对签名。
-3. **打标签**：`v<版本>`，必须与 `pyproject.toml` 的版本一致。
-
-   ```bash
-   git tag v1.0.0 && git push origin v1.0.0
-   ```
-
-   标签触发同一个工作流：先批准 macOS 和两个 Windows 架构的构建任务，它们成功后再批准 release job。release job 核对安装包，
-   写 `SHA256SUMS`，把这四个文件放进一个**草稿** Release（不上传源代码包，D43）。同一个标签已有 Release 时这一步失败，
-   要先删掉旧的草稿再重新运行。标签发布后不删除，也不移到别的提交：它就是这个版本的源代码。
-
-   打标签前确认 `replace` 固定的是 `openweir/mihomo` 上一个已发布的内核版本，也就是 `openweir-v<内核版本>`
-   标签指向的提交（5.4 节）。这个标签由内核发版自动打出，不需要另打标签：
-
-   ```bash
-   git ls-remote --tags https://github.com/openweir/mihomo 'openweir-v*'   # 确认固定的提交在其中
-   ```
-4. **草稿**：从草稿下载三个安装包，在测试机上再装一遍；在"更新内容"下写这个版本的变化，删掉模板里的注释行。
-5. **发布**，二选一：
+   以 `-Signed` 通过（签名、`signed=true`、界面没被拒）。公证、staple、signtool 签名和 NuGet 下载失败时会自动重试
+   （日志里有 `attempt 1 of 3` 的警告），三次都失败才让任务失败。
+3. **草稿**：从草稿下载三个安装包，在测试 Mac 和 Windows 虚拟机上装一遍：macOS 的磁盘映像打开后应与
+   `package/dmg/preview.png` 一致，Windows 按 2.1 节核对签名。在"更新内容"下写这个版本的变化，删掉模板里的注释行
+   （包括可能有的 `NO GOOGLE DRIVE BACKUP` 一行）。草稿有错就直接删掉，修好后再推送 `main`。
+4. **发布**，二选一：
    - **正式发布**，保留"Set as the latest release"：已安装的 OpenWeir 检查更新时会提示这个版本；
    - **预发布**，勾"Set as a pre-release"：检查更新不会提示它（界面只看 `releases/latest`，它跳过草稿和预发布），
      只能从 Releases 页面手动下载。
+
+   发布时 GitHub 在草稿的目标提交上创建 `v<版本>` 标签。标签发布后不删除，也不移到别的提交：它就是这个版本的源代码，
+   之后的版本从它算起。正式发布后 `remove-previews.yml` 删掉这个版本的预览版。
+5. **合并回 develop**：把 `main` 合并回 `develop`（快进即可）。两者指向同一提交时 develop 的 CI 不跑检查，也不发预览版。
 
 检查更新提示的版本：`releases/latest` 的标签去掉 `v` 后是三段数字，并且比当前版本新；Release 里有本机平台的安装包
 和 `SHA256SUMS`。下载后核对 SHA-256；macOS 还核对签名、公证和 Team ID；Windows 还核对签名、签名者 `OpenWeir`
@@ -404,7 +413,7 @@ exits.md 第 9 节的待实测项。
 ### 5.4 依赖升级
 
 - **mihomo 增强版**：固定到 openweir/mihomo `Alpha` 分支（D52）上的内核发版提交，即 `openweir-v<内核版本>` 标签
-  指向的提交（`src/core/go.mod` 的 `replace`，第 4 节第 3 步），不使用浮动分支作为构建输入。fork 的 `Alpha` 是上游
+  指向的提交（`src/core/go.mod` 的 `replace`，第 4 节第 1 步），不使用浮动分支作为构建输入。fork 的 `Alpha` 是上游
   `Alpha` 合并本项目的改动，以 `git merge upstream/Alpha` 跟进上游，不变基、不强推；`Meta` 是上游的原样镜像。发布过的
   版本固定的提交是那个版本对应的源代码（D43），由内核发版标签保留。内核版本号和应用版本号各自独立：要用新内核，先在
   fork 的 `Alpha` 上同时改 `VERSION` 和 `constant.Version` 发版，再把 `replace` 改到那个提交：

@@ -189,22 +189,24 @@ app 做一次映像。改了布局后运行 `uv run python scripts/gen_dmg_backg
 
 ## 发布工作流
 
-`.github/workflows/release.yml` 由 `v*` 标签和手动触发（`workflow_dispatch`），job 使用 `release`
-Environment，Ember-Moth 批准后才拿到机密。标签必须是 `v<pyproject.toml 的版本>`。步骤：
+`.github/workflows/release.yml` 由 CI 在 `main` 的推送全部检查通过后调用（`workflow_call`，docs/release.md §1.1），
+job 使用 `release` Environment，Ember-Moth 批准后才拿到机密。版本由 CI 从 git 算出（`scripts/next_version.py`），
+构建前写进 `pyproject.toml`。步骤：
 
 1. 建临时钥匙串，导入证书和签发它的 Developer ID G2 中间证书（`apple/certificates/DeveloperIDG2CA.cer`，不依赖
    runner 镜像带不带它），核对 `MACOS_CERTIFICATE_NAME` 属于 `OPENWEIR_APPLE_TEAM_ID`，且是有效的身份；找不到时列出钥匙串里
    每个身份和它无效的原因；两份描述文件
    装进 `~/Library/Developer/Xcode/UserData/Provisioning Profiles`，Xcode 和 `build_apple.py` 按名称找；
 2. `scripts/build_app.py` 构建、签名、校验；
-3. 用 `notarytool`（App Store Connect API Key）公证 app 并 staple，`spctl` 评估；
+3. 用 `notarytool`（App Store Connect API Key）公证 app 并 staple（`scripts/notarize.py`，失败时重试），`spctl` 评估；
 4. `scripts/build_dmg.py` 做 `OpenWeir-<版本>-macos-universal.dmg`（见“磁盘映像”），签名、公证、staple，生成
    `OpenWeir-<版本>-macos-universal.dmg.sha256`；
 5. 两个文件作为 workflow artifact `openweir-<版本>-macos-universal` 上传，保留 30 天；
 6. 无论成败都删除钥匙串、描述文件和 API Key。
 
-公证由 `scripts/notarize.py` 完成，它只在 GitHub Actions 里运行。对 `v*` 标签，工作流最后的 release job 把两个平台的
-安装包放进一个草稿 GitHub Release（docs/release.md §1.1）；发布的步骤见 docs/maintenance.md 第 4 节。
+公证由 `scripts/notarize.py` 完成，它只在 GitHub Actions 里运行：没拿到结论时接着等或重新提交，staple 也重试，各至多
+3 次。工作流最后的 release job 把两个平台的安装包放进一个草稿 GitHub Release（docs/release.md §1.1）；发布的步骤见
+docs/maintenance.md 第 4 节。
 
 ## GEO 数据
 

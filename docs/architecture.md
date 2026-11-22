@@ -907,7 +907,8 @@ Windows 安装器为两个 OpenWeir 可执行文件设置独立的 WER mini dump
   `OpenWeir` 的且带证书配置文件的 EKU、签名带时间戳；任何一步失败，makensis 和整个构建都失败。
 - 需要的证书：Apple Developer ID；Windows 用 Azure Artifact Signing 的 Public Trust 证书配置文件（D42），证书由服务
   每天签发，不经手私钥。
-- **发布工作流** `.github/workflows/release.yml`：`v*` 标签或手动触发，在 `release` Environment 里经审批后运行；
+- **发布工作流** `.github/workflows/release.yml`：`main` 的推送 CI 全部通过后由 CI 调用（`workflow_call`），在 `release`
+  Environment 里经审批后运行；
   macOS 上建临时钥匙串、签名、`notarytool` 公证、staple，产出 `OpenWeir-<版本>-macos-universal.dmg` 和它的 `.sha256`；
   Windows 上以 `--skip-installer --sign` 构建安装目录，再经 `azure/login` 用 GitHub OIDC 以托管标识登录 Azure（不选订阅），
   立即取一次签名用的访问令牌，然后以 `--installer-only --sign` 签名并编译安装包，用 `signtool verify /pa /v` 和
