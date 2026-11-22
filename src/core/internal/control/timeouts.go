@@ -18,23 +18,42 @@ const (
 
 type connectionKey struct{}
 
-// minimumWork is the least time a mutation needs left as it starts. The watchdog takes one
-// that outlives its deadline for a hung core, and the UI may pass a deadline only a
-// millisecond away, so a mutation with less time left than this never starts and times
+// minimumWork is the least time serialized work needs left as it starts. The watchdog takes
+// a mutation that outlives its deadline for a hung core, and the UI may pass a deadline
+// only a millisecond away, so work with less time left than this never starts and times
 // out instead.
 const minimumWork = time.Second
 
-// tooLate says whether work that the watchdog times without grace should no longer start.
-func tooLate(work context.Context) bool {
+// minimumApply is what Start and Reload, and the service's resume, need left as they enter
+// the core: applying a profile opens the ports, the TUN and the DNS server, and loads
+// providers, which may download. One that starts with seconds left would only run out its
+// deadline inside mihomo, and the watchdog would replace the host, taking the tunnel down
+// with it. Tests shorten it.
+var minimumApply = 20 * time.Second
+
+// minimum is the least time method needs left to start.
+func minimum(method string) time.Duration {
+	switch method {
+	case "start", "reload":
+		return minimumApply
+	}
+	return minimumWork
+}
+
+// tooLate says whether serialized work should no longer start with the time it has left.
+func tooLate(work context.Context, least time.Duration) bool {
 	deadline, ok := work.Deadline()
-	return ok && time.Until(deadline) < minimumWork
+	return ok && time.Until(deadline) < least
 }
 
 // hostBudget is bounded independently of anything the caller asks for. The core gets a
-// smaller budget, and the UI leaves another margin around this host budget.
+// smaller budget, and the UI leaves another margin around this host budget. The last chunk
+// of a GEO upload reads, hashes and parses up to 256 MiB, as long as a large configuration
+// takes to admit.
 func hostBudget(method string) time.Duration {
 	switch method {
-	case "validate", "start", "reload", "inspect_source", "preview_group", "match_rule", "convert_to_plan", "export_plan":
+	case "validate", "start", "reload", "inspect_source", "preview_group", "match_rule", "convert_to_plan", "export_plan",
+		"upload_geo":
 		return 55 * time.Second
 	case "stop", "claim", "set_system_proxy", "login_mesh":
 		return 25 * time.Second
@@ -77,6 +96,25 @@ func serialized(request *controlpb.Request) bool {
 	}
 }
 
+// discardable serialized requests take the operation lock, but nothing they do is left half
+// done when they return after their caller gave up: the checks and previews that run
+// mihomo's parser, the GEO reads that wait for the engine's lifecycle lock, and a GEO
+// upload, which persists nothing once its deadline passed. One that runs late keeps the
+// lock until it returns and its answer is dropped. The watchdog takes it for a hung core
+// only once it outlived its method's host budget, whatever shorter deadline the caller
+// gave it: a parse does not speed up for a caller in a hurry, and replacing the host
+// would take the tunnel down for a read.
+func discardable(request *controlpb.Request) bool {
+	switch request.Method.(type) {
+	case *controlpb.Request_Validate, *controlpb.Request_InspectSource, *controlpb.Request_PreviewGroup,
+		*controlpb.Request_MatchRule, *controlpb.Request_ConvertToPlan, *controlpb.Request_ExportPlan,
+		*controlpb.Request_ListGeoCategories, *controlpb.Request_GetGeoUpdate, *controlpb.Request_UploadGeo:
+		return true
+	default:
+		return false
+	}
+}
+
 func (d *Dispatcher) fail(failure operation.Failure) {
 	d.unresponsive.Store(true)
 	d.failOnce.Do(func() {
@@ -86,20 +124,32 @@ func (d *Dispatcher) fail(failure operation.Failure) {
 	})
 }
 
+// schedule is how a request with budget runs: the executor it waits for, the margin kept
+// from its budget for the answer, how long past its deadline the work may run before the
+// watchdog takes it for a hung core, and the least time it needs left to start at all.
+func (d *Dispatcher) schedule(request *controlpb.Request, budget time.Duration) (executor *operation.Executor, margin, grace, least time.Duration) {
+	margin = min(5*time.Second, budget/5)
+	if !serialized(request) {
+		return d.reads, margin, margin, 0
+	}
+	method := methodName(request)
+	if discardable(request) {
+		grace = max(margin, hostBudget(method)-(budget-margin))
+	}
+	return d.operations, margin, grace, minimum(method)
+}
+
 func (d *Dispatcher) execute(callerCtx context.Context, caller peer.Identity, request *controlpb.Request) *controlpb.Response {
 	_, stopping := request.Method.(*controlpb.Request_Stop)
 	if d.unresponsive.Load() && !stopping {
 		return engineFailure(operation.ErrUnresponsive)
 	}
+	method := methodName(request)
 	budget := requestBudget(request)
-	margin := min(5*time.Second, budget/5)
-	executor, grace := d.reads, margin
-	if serialized(request) {
-		executor, grace = d.operations, 0
-	}
-	// A mutation without the time to run is refused outright, so a Stop that could not
+	executor, margin, grace, least := d.schedule(request, budget)
+	// Serialized work without the time to run is refused outright, so a Stop that could not
 	// stop the core does not keep its intent either.
-	if budget <= 0 || grace == 0 && budget-margin < minimumWork {
+	if budget <= 0 || budget-margin < least {
 		return engineFailure(context.DeadlineExceeded)
 	}
 	// Keep the connection's lifetime for subscriptions. The operation deadline must not
@@ -121,13 +171,13 @@ func (d *Dispatcher) execute(callerCtx context.Context, caller peer.Identity, re
 	}
 	ctx = context.WithValue(ctx, connectionKey{}, callerCtx)
 	ctx = context.WithValue(ctx, intentKey{}, intent)
-	response, err := operation.Run(executor, ctx, methodName(request), budget-margin, grace,
+	response, err := operation.Run(executor, ctx, method, budget-margin, grace,
 		func(work context.Context) (*controlpb.Response, error) {
 			if d.unresponsive.Load() {
 				return nil, operation.ErrUnresponsive
 			}
-			// Waiting for its turn may have used up a mutation's time.
-			if grace == 0 && tooLate(work) {
+			// Waiting for its turn may have used up serialized work's time.
+			if least != 0 && tooLate(work, least) {
 				return nil, context.DeadlineExceeded
 			}
 			return d.dispatch(work, caller, request), nil
@@ -184,7 +234,7 @@ func (d *Dispatcher) runLifecycle(ctx context.Context, method string, run func(c
 				return struct{}{}, context.Canceled
 			case d.unresponsive.Load():
 				return struct{}{}, operation.ErrUnresponsive
-			case tooLate(work):
+			case tooLate(work, minimum(method)):
 				return struct{}{}, context.DeadlineExceeded
 			}
 			return struct{}{}, run(work)

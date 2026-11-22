@@ -77,6 +77,18 @@ func New(concurrency int, hung func(Failure)) *Executor {
 
 func (e *Executor) Unresponsive() bool { return e.bad.Load() }
 
+// Wait returns once no work holds a slot. With its callers cancelled first, so that nothing
+// new starts, that is once the work in flight returned. Wait does not bound work that
+// outlives its deadline: the watchdog does, by poisoning the executor for its host.
+func (e *Executor) Wait() {
+	for range cap(e.slots) {
+		e.slots <- struct{}{}
+	}
+	for range cap(e.slots) {
+		<-e.slots
+	}
+}
+
 // Poison closes admission before notifying the host. It does not release a worker's
 // locks or pretend that an uninterruptible library call has stopped.
 func (e *Executor) Poison(method string, cause error) {
@@ -92,8 +104,9 @@ func (e *Executor) Poison(method string, cause error) {
 // deadline bounded by both. A started transaction finishes independently of a lost
 // connection; its own deadline remains enforced by the watchdog. Cancelled queued work
 // never starts. A timed-out worker cannot be followed by another operation on this executor.
-// grace is zero for non-cancellable mutations. Context-aware reads may use a short grace
-// to unwind after their deadline, before the host is considered stuck.
+// grace is zero for non-cancellable mutations, whose late return poisons the executor.
+// Work whose late result can be dropped has a grace: it keeps its slot until it returns,
+// its caller gets the deadline error, and only outliving the grace counts as stuck.
 func Run[T any](e *Executor, caller context.Context, method string, limit, grace time.Duration, work func(context.Context) (T, error)) (T, error) {
 	var zero T
 	if e.Unresponsive() {

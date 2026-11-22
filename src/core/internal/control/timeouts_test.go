@@ -150,8 +150,18 @@ func TestMutationWithoutTimeToRunNeverStarts(t *testing.T) {
 	}
 }
 
+// applyWithin lets Start and Reload enter the core with as little as least left, so that a
+// test need not wait out the realistic minimum.
+func applyWithin(t *testing.T, least time.Duration) {
+	t.Helper()
+	saved := minimumApply
+	minimumApply = least
+	t.Cleanup(func() { minimumApply = saved })
+}
+
 // Waiting for its turn can use up most of a mutation's time, too.
 func TestMutationThatWaitedTooLongNeverStarts(t *testing.T) {
+	applyWithin(t, minimumWork)
 	blocked := &blockedCore{entered: make(chan struct{}), release: make(chan struct{})}
 	d := New(Options{Engine: blocked})
 	defer d.Close()
@@ -224,6 +234,7 @@ func TestClosingDispatcherCancelsQueuedRequests(t *testing.T) {
 }
 
 func TestHungStartCannotPersistLateOrAdmitAnotherMutation(t *testing.T) {
+	applyWithin(t, minimumWork)
 	blocked := &blockedCore{entered: make(chan struct{}), release: make(chan struct{})}
 	host := &deadlineHost{}
 	hung := make(chan operation.Failure, 1)
@@ -281,4 +292,157 @@ func TestRequestDeadlineDoesNotExpireItsSubscription(t *testing.T) {
 	if response.GetPollEvents() == nil {
 		t.Fatalf("subscription died with its request: %v", response)
 	}
+}
+
+// slowParser takes 1.3 s to read a subscription, as a large one may, and counts the
+// serialized work running at once.
+type slowParser struct {
+	unlinked
+	running, most, parsed atomic.Int32
+}
+
+func (p *slowParser) enter() func() {
+	if now := p.running.Add(1); now > p.most.Load() {
+		p.most.Store(now)
+	}
+	return func() { p.running.Add(-1) }
+}
+
+func (p *slowParser) InspectSource([]byte, string) (*controlpb.InspectSourceResponse, error) {
+	defer p.enter()()
+	time.Sleep(1300 * time.Millisecond)
+	p.parsed.Add(1)
+	return &controlpb.InspectSourceResponse{}, nil
+}
+
+func (p *slowParser) SelectProxy(string, string) error {
+	defer p.enter()()
+	return nil
+}
+
+func inspectSource(r *controlpb.Request) {
+	r.Method = &controlpb.Request_InspectSource{InspectSource: &controlpb.InspectSourceRequest{Yaml: "proxies: []"}}
+}
+
+func selectProxy(r *controlpb.Request) {
+	r.Method = &controlpb.Request_SelectProxy{SelectProxy: &controlpb.SelectProxyRequest{Group: "g", Proxy: "p"}}
+}
+
+// A read that finishes after its caller's deadline used to poison the dispatcher, and the
+// host replaced itself, tunnel and all: the service, or the macOS extension. Its answer is
+// dropped instead, and it keeps the operation lock until it returns.
+func TestLateReadIsDroppedWithoutReplacingTheHost(t *testing.T) {
+	parser := &slowParser{}
+	hung := make(chan operation.Failure, 1)
+	d := New(Options{Engine: parser, OnUnresponsive: func(f operation.Failure) { hung <- f }})
+	defer d.Close()
+	r := request(9, inspectSource)
+	r.TimeoutMs = 1400 // 1.12 s for the core: the parse returns 0.18 s late
+	expectError(t, call(t, d, r), 9, CodeTimeout)
+	// A mutation waits for the late parse rather than run beside it.
+	expectOK(t, call(t, d, request(10, selectProxy)))
+	if parser.parsed.Load() != 1 || parser.most.Load() != 1 {
+		t.Fatalf("parsed %d, ran %d at once", parser.parsed.Load(), parser.most.Load())
+	}
+	select {
+	case failure := <-hung:
+		t.Fatalf("the host was replaced for %s", failure.Method)
+	case <-time.After(300 * time.Millisecond):
+	}
+	if d.unresponsive.Load() || call(t, d, request(11, getInfo)).GetGetInfo() == nil {
+		t.Fatal("the dispatcher stopped answering after a late read")
+	}
+}
+
+// What counts as hung depends on the method, not on how little time its caller gave it.
+func TestSchedule(t *testing.T) {
+	d := New(Options{Engine: unlinked{}})
+	defer d.Close()
+	upload := func(r *controlpb.Request) {
+		r.Method = &controlpb.Request_UploadGeo{UploadGeo: &controlpb.UploadGeoRequest{Complete: true}}
+	}
+	listGroups := func(r *controlpb.Request) {
+		r.Method = &controlpb.Request_ListGroups{ListGroups: &controlpb.ListGroupsRequest{}}
+	}
+	for _, test := range []struct {
+		name          string
+		method        func(*controlpb.Request)
+		budget        time.Duration
+		reads         bool
+		grace, least  time.Duration
+		watchdogAfter time.Duration
+	}{
+		{"short inspect", inspectSource, 1400 * time.Millisecond, false, 55*time.Second - 1120*time.Millisecond, time.Second, 55 * time.Second},
+		{"full inspect", inspectSource, 55 * time.Second, false, 5 * time.Second, time.Second, 55 * time.Second},
+		{"GEO upload", upload, 13 * time.Second, false, 55*time.Second - 10400*time.Millisecond, time.Second, 55 * time.Second},
+		{"GEO categories", listGeoCategories, 2 * time.Second, false, 12*time.Second - 1600*time.Millisecond, time.Second, 12 * time.Second},
+		{"start", startRequest("proxies: []", nil), 55 * time.Second, false, 0, 20 * time.Second, 50 * time.Second},
+		{"reload", reloadRequest("proxies: []", nil), 30 * time.Second, false, 0, 20 * time.Second, 25 * time.Second},
+		{"stop", stopRequest, 25 * time.Second, false, 0, time.Second, 20 * time.Second},
+		{"select", selectProxy, 12 * time.Second, false, 0, time.Second, 9600 * time.Millisecond},
+		{"list groups", listGroups, 12 * time.Second, true, 2400 * time.Millisecond, 0, 12 * time.Second},
+	} {
+		executor, margin, grace, least := d.schedule(request(1, test.method), test.budget)
+		if (executor == d.reads) != test.reads || grace != test.grace || least != test.least {
+			t.Errorf("%s: reads %v, grace %v, least %v", test.name, executor == d.reads, grace, least)
+		}
+		if after := test.budget - margin + grace; after != test.watchdogAfter {
+			t.Errorf("%s: the watchdog fires after %v, want %v", test.name, after, test.watchdogAfter)
+		}
+	}
+	if hostBudget("upload_geo") != hostBudget("validate") {
+		t.Error("the last GEO chunk has an ordinary read's budget")
+	}
+}
+
+// Start and Reload apply a whole profile. With seconds left they never enter the core,
+// where running out the deadline would replace the host.
+func TestApplyNeedsARealisticBudget(t *testing.T) {
+	blocked := &blockedCore{entered: make(chan struct{}), release: make(chan struct{})}
+	close(blocked.release)
+	d := New(Options{Engine: blocked})
+	defer d.Close()
+	for id, method := range []func(*controlpb.Request){startRequest("proxies: []", nil), reloadRequest("proxies: []", nil)} {
+		r := request(uint64(id+1), method)
+		r.TimeoutMs = 15_000
+		expectError(t, call(t, d, r), uint64(id+1), CodeTimeout)
+	}
+	if blocked.starts.Load() != 0 || d.unresponsive.Load() {
+		t.Fatal("a start with 12 s left entered the core")
+	}
+	r := request(3, startRequest("proxies: []", nil))
+	r.TimeoutMs = 26_000 // 20.8 s for the core
+	expectOK(t, call(t, d, r))
+	if blocked.starts.Load() != 1 {
+		t.Fatal("a start with time enough did not run")
+	}
+}
+
+// Detaching the macOS tunnel closes the engine, which waits for the lifecycle lock that a
+// Start in the core holds. Wait lets the host wait for that work without timing it.
+func TestWaitReturnsOnceTheWorkInTheCoreDid(t *testing.T) {
+	blocked := &blockedCore{entered: make(chan struct{}), release: make(chan struct{})}
+	d := New(Options{Engine: blocked})
+	first := make(chan []byte, 1)
+	payload, _ := proto.Marshal(request(1, startRequest("proxies: []", nil)))
+	go func() { first <- d.Handle(context.Background(), peer.Identity{}, payload) }()
+	<-blocked.entered
+	d.Close()
+	waited := make(chan struct{})
+	go func() {
+		d.Wait()
+		close(waited)
+	}()
+	select {
+	case <-waited:
+		t.Fatal("Wait returned while the Start was in the core")
+	case <-time.After(100 * time.Millisecond):
+	}
+	close(blocked.release)
+	select {
+	case <-waited:
+	case <-time.After(time.Second):
+		t.Fatal("Wait did not return after the Start")
+	}
+	<-first
 }

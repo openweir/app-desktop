@@ -25,7 +25,7 @@ type requestIntent struct {
 func (d *Dispatcher) prepareStop(ctx context.Context, caller peer.Identity) (requestIntent, error) {
 	return operation.Run(d.intents, ctx, "record_stop", 5*time.Second, 0,
 		func(work context.Context) (requestIntent, error) {
-			if tooLate(work) {
+			if tooLate(work, minimumWork) {
 				return requestIntent{}, context.DeadlineExceeded
 			}
 			if d.host == nil {

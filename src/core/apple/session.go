@@ -85,7 +85,8 @@ func attach(fd int, home, resources string, includeAllNetworks bool) error {
 }
 
 func detach() {
-	defer operation.Guard("detach_tunnel", 20*time.Second, operation.Terminate)()
+	guard := operation.Guard("detach_tunnel", detachLimit, operation.Terminate)
+	defer func() { guard() }()
 	lifecycle.Lock()
 	defer lifecycle.Unlock()
 	mu.RLock()
@@ -100,9 +101,19 @@ func detach() {
 	current = nil
 	mu.Unlock()
 	detaching.dispatcher.Close()
+	// Work already in the core keeps the engine's lifecycle lock for as long as its deadline
+	// allows, 50 s for a Start: longer than detachLimit, which would replace the extension
+	// for waiting on it. That deadline and the dispatcher's watchdog bound the wait; the
+	// limit is for detaching itself.
+	guard()
+	detaching.dispatcher.Wait()
+	guard = operation.Guard("detach_tunnel", detachLimit, operation.Terminate)
 	// Close stops the core; mihomo closes the duplicate its TUN runs on.
 	_ = detaching.engine.Close()
 }
+
+// detachLimit bounds detaching the tunnel, apart from waiting for the work in flight.
+const detachLimit = 20 * time.Second
 
 // handle answers one Request with the attached tunnel's dispatcher. The system restricts
 // provider messages to this app, so there is no peer identity.

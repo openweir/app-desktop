@@ -180,10 +180,18 @@ func New(options Options) *Dispatcher {
 	return dispatcher
 }
 
-// Close ends every subscription. It does not stop the engine.
+// Close ends every subscription and withdraws the requests still waiting for their turn.
+// It does not stop the engine.
 func (d *Dispatcher) Close() {
 	d.closeLifetime()
 	d.subscriptions.close()
+}
+
+// Wait returns once the serialized work already in the core returned, after Close: a Start
+// holds the engine's lifecycle lock, which closing the engine needs, for as long as its
+// deadline allows. The watchdog bounds the wait, by replacing a host whose work hangs.
+func (d *Dispatcher) Wait() {
+	d.operations.Wait()
 }
 
 // Handle answers one encoded Request. Every failure, including an undecodable request,

@@ -179,3 +179,46 @@ func TestGateCancelledWaiterCannotAcquireLater(t *testing.T) {
 	}
 	gate.Unlock()
 }
+
+// Wait outlasts work whose caller gave up on it: the worker owns its slot until it returns.
+func TestWaitOutlastsAbandonedWork(t *testing.T) {
+	executor := New(2, nil)
+	entered, release := make(chan struct{}), make(chan struct{})
+	ctx, cancel := context.WithCancel(context.Background())
+	returned := make(chan error, 1)
+	go func() {
+		_, err := Run(executor, ctx, "parse", time.Minute, time.Minute, func(context.Context) (int, error) {
+			close(entered)
+			<-release
+			return 0, nil
+		})
+		returned <- err
+	}()
+	<-entered
+	cancel()
+	if err := <-returned; !errors.Is(err, context.Canceled) {
+		t.Fatalf("abandoned work returned %v", err)
+	}
+	waited := make(chan struct{})
+	go func() {
+		executor.Wait()
+		close(waited)
+	}()
+	select {
+	case <-waited:
+		t.Fatal("Wait returned while the work ran")
+	case <-time.After(50 * time.Millisecond):
+	}
+	close(release)
+	select {
+	case <-waited:
+	case <-time.After(time.Second):
+		t.Fatal("Wait did not return once the work did")
+	}
+	// The slots are free again.
+	if _, err := Run(executor, context.Background(), "next", time.Second, 0, func(context.Context) (int, error) {
+		return 1, nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
