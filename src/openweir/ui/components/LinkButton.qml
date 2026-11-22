@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Controls.Basic
 
-// A text link to another page, e.g. a section's "管理".
+// link: a text link to another page, e.g. a section's "管理", in body-sm.
 AbstractButton {
     id: control
 
@@ -11,7 +11,7 @@ AbstractButton {
 
     contentItem: UiText {
         text: control.text
-        role: Theme.type.caption
+        role: Theme.type.bodySm
         color: control.hovered ? Theme.linkHover : Theme.link
     }
 
