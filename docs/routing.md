@@ -417,7 +417,8 @@ D 编号也在那里。
   protobuf 里的分类字段，不解码域名和 IP 段；和实际匹配用的是同一份数据。
 - **随包资源**：`GeoSite.dat`、`GeoIP.dat`、`geoip.metadb`、`ASN.mmdb` 来自 MetaCubeX/meta-rules-dat；版本、
   大小和 SHA-256 由 [`scripts/fetch_geodata.py`](../scripts/fetch_geodata.py) 固定。MMDB 和 ASN 文件用于对应模式及规则。
-  宿主在打开 engine 前通过 `Seed` 原子补齐 home 中的缺失文件，保留已有数据；复制失败时不以网络下载兜底。
+  宿主在打开 engine 前通过 `Seed` 原子补齐 home 中的缺失文件（副本先落盘再改名，断电不会留下全零的文件），
+  保留已有数据；复制失败时不以网络下载兜底。
   macOS 在扩展 attach 时从 bundle 复制，Windows 从安装目录的 `geodata/` 复制，开发服务也会准备这些资源。
 - **分类兜底**：`src/openweir/host/geo_categories.py` 由 `fetch_geodata.py --categories` 生成，包含分类名和摘要。
   内核缺少分类数据或暂不可用时，界面使用该清单；CI 用 `--check` 检查它与随包数据一致。

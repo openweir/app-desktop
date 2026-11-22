@@ -1,9 +1,12 @@
 package geodata
 
 import (
+	"errors"
+	"io/fs"
 	"maps"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -100,5 +103,46 @@ func TestSeedLeavesNoPartialFile(t *testing.T) {
 	}
 	if got := readDir(t, home); len(got) != 1 || got["GeoSite.dat"] != "site" {
 		t.Fatalf("home = %v, want GeoSite.dat alone", got)
+	}
+}
+
+// Each copy reaches the disk before it takes the file's name: after a power loss that kept
+// the rename but not the data, Seed would take the file of zeros left behind for the data,
+// and never replace it.
+func TestSeedSyncsEachCopyBeforeItsRename(t *testing.T) {
+	bundled := t.TempDir()
+	files := writeBundledFiles(t, bundled)
+	home := t.TempDir()
+	synced := map[string]string{}
+	sync := syncFile
+	t.Cleanup(func() { syncFile = sync })
+	syncFile = func(file *os.File) error {
+		name := strings.TrimPrefix(filepath.Base(file.Name()), ".")
+		name = name[:strings.LastIndex(name, "-")]
+		if _, err := os.Stat(filepath.Join(home, name)); !errors.Is(err, fs.ErrNotExist) {
+			t.Errorf("%s took its name before its copy was synced (%v)", name, err)
+		}
+		content, err := os.ReadFile(file.Name())
+		if err != nil {
+			return err
+		}
+		synced[name] = string(content)
+		return sync(file)
+	}
+	if err := Seed(bundled, home); err != nil {
+		t.Fatal(err)
+	}
+	if !maps.Equal(synced, files) {
+		t.Fatalf("synced %v, want %v", synced, files)
+	}
+
+	// A copy that did not reach the disk does not take the name, nor stay behind.
+	home = t.TempDir()
+	syncFile = func(*os.File) error { return errors.New("the disk went away") }
+	if err := Seed(bundled, home); err == nil {
+		t.Fatal("seeded a copy that was not synced")
+	}
+	if got := readDir(t, home); len(got) != 0 {
+		t.Fatalf("home = %v", got)
 	}
 }

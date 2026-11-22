@@ -34,9 +34,14 @@ func Seed(dir, home string) error {
 	return nil
 }
 
+// syncFile flushes a copy to the disk; tests watch it.
+var syncFile = (*os.File).Sync
+
 // copyFile writes target through a temporary file beside it, so that an interrupted copy
-// never leaves a partial file that a later Seed would take for the data. Made in home, the
-// copy also takes the home's ACL on Windows, which a file moved in from elsewhere would not.
+// never leaves a partial file that a later Seed would take for the data. The copy reaches
+// the disk before the rename: otherwise a power loss could keep the rename but not the
+// data, leaving a file of zeros that Seed would never replace. Made in home, the copy also
+// takes the home's ACL on Windows, which a file moved in from elsewhere would not.
 func copyFile(source, target string) error {
 	in, err := os.Open(source)
 	if err != nil {
@@ -48,6 +53,9 @@ func copyFile(source, target string) error {
 		return err
 	}
 	_, err = io.Copy(out, in)
+	if err == nil {
+		err = syncFile(out)
+	}
 	if closeErr := out.Close(); err == nil {
 		err = closeErr
 	}
