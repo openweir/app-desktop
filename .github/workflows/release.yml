@@ -614,6 +614,14 @@ jobs:
             echo "::error::.github/release-notes.md has a placeholder other than {{version}}"
             exit 1
           fi
+          # Approval may come long after the run started. Draft only while this commit is still
+          # main's tip: a later push's own run drafts that one, and this one must not replace it.
+          main=$(gh api "repos/$GH_REPO/git/ref/heads/main" --jq .object.sha)
+          if [[ "$main" != "$GITHUB_SHA" ]]; then
+            echo "::warning::main has moved on to ${main:0:7}; its own run drafts the release, so ${GITHUB_SHA:0:7} gets no draft"
+            echo "main moved on to \`$main\` while this run waited; no draft." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
           # A draft of this version from an earlier main push is superseded by this one.
           if [[ "$(gh release view "v$VERSION" --json isDraft --jq .isDraft 2>/dev/null)" == true ]]; then
             gh release delete "v$VERSION" --yes

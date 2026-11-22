@@ -79,6 +79,23 @@ def test_the_release_job_builds_no_source_archive() -> None:
     assert used <= set(outputs("1.2.3"))
 
 
+def test_only_mains_tip_is_drafted() -> None:
+    # Approved late, an older run finds main moved on and leaves the newer run's draft alone.
+    run = step("Create the draft")["run"]
+    check = run.index('"$main" != "$GITHUB_SHA"')
+    assert run.index("git/ref/heads/main") < check < run.index("gh release delete")
+    assert check < run.index("gh release create")
+
+
+def test_a_release_awaiting_approval_holds_back_no_later_main_run() -> None:
+    ci = yaml.load((WORKFLOW.parent / "ci.yml").read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
+    group = ci["concurrency"]["group"]
+    # Each main run is a group of its own; other refs share one per ref.
+    assert "github.ref == 'refs/heads/main'" in group
+    assert "github.run_id" in group
+    assert ci["concurrency"]["cancel-in-progress"] == "${{ github.ref != 'refs/heads/main' }}"
+
+
 def test_the_notes_say_where_the_source_is() -> None:
     notes = NOTES.read_text(encoding="utf-8")
     assert set(re.findall(r"\{\{\w*\}\}", notes)) == {"{{version}}"}
