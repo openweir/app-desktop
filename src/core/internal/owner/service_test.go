@@ -97,6 +97,9 @@ type fakeCore struct {
 	resumed []*controlpb.StartRequest
 	stops   int // a take-over's stops
 	stopErr error
+	// resumeErr is what a resume fails with, as when the core cannot open its ports.
+	resumeErr     error
+	failedResumes int
 }
 
 func (c *fakeCore) Running() bool { return c.running }
@@ -125,6 +128,10 @@ func (c *fakeCore) Suspend() error {
 func (c *fakeCore) ResumeContext(ctx context.Context, start *controlpb.StartRequest) error {
 	if err := ctx.Err(); err != nil {
 		return err
+	}
+	if c.resumeErr != nil {
+		c.failedResumes++
+		return c.resumeErr
 	}
 	return c.Resume(start)
 }
@@ -633,6 +640,38 @@ func TestFormerOwnerGetsTheirProxyBack(t *testing.T) {
 		t.Fatalf("alice's proxy = %+v", m.proxies[alice])
 	}
 	if _, saved, _ := (kept{Home(root, alice)}).previousProxy(); saved {
+		t.Fatal("alice's settings are still kept")
+	}
+}
+
+// A tunnel that does not come back after a crash takes the system proxy the crashed process
+// left with it, which points at a port nothing listens on: the owner gets theirs back.
+func TestFailedResumeGivesTheProxyBack(t *testing.T) {
+	root, m := t.TempDir(), newMachine()
+	if err := SaveRecord(root, Record{SID: alice, Session: 1}); err != nil {
+		t.Fatal(err)
+	}
+	theirs := sysproxy.Settings{Flags: sysproxy.Direct}
+	m.sessions[1], m.proxies[alice] = alice, theirs
+	service, core, home := start(t, root, m)
+	core.running = true
+	if err := service.Applied(profile(true), current); err != nil {
+		t.Fatal(err)
+	}
+	// A crash: no Close. The next process's core cannot open the mixed port.
+	service, _, err := Open(context.Background(), root, bundled(t), m, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	core = &fakeCore{host: service, resumeErr: errors.New("apply_failed: listen tcp 127.0.0.1:7890: address already in use")}
+	service.Attach(core)
+	if core.failedResumes != 1 || core.running {
+		t.Fatalf("%d failed resumes, running %v", core.failedResumes, core.running)
+	}
+	if m.proxies[alice] != theirs || service.SystemProxyEnabled() {
+		t.Fatalf("alice's proxy = %+v", m.proxies[alice])
+	}
+	if _, saved, _ := (kept{home}).previousProxy(); saved {
 		t.Fatal("alice's settings are still kept")
 	}
 }

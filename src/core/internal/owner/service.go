@@ -505,18 +505,18 @@ func (s *Service) signedIn(ctx context.Context, session uint32, sequence uint64)
 			s.log.Warn("clear the previous login's connection intent", "error", err)
 		}
 	}
-	if !resume {
-		if err := s.restoreLeftProxy(); err != nil {
-			s.log.Warn("restore the owner's proxy settings", "error", err)
+	if resume {
+		if err := s.resume(ctx, profile); err != nil {
+			s.log.Error("bring the owner's tunnel back", "error", err)
+		} else if s.running() {
+			s.log.Info("brought the owner's tunnel back", "session", session)
+			return
 		}
-		return
 	}
-	if err := s.resume(ctx, profile); err != nil {
-		s.log.Error("bring the owner's tunnel back", "error", err)
-		return
-	}
-	if s.running() {
-		s.log.Info("brought the owner's tunnel back", "session", session)
+	// Settings a crashed process left in place point at a port nothing listens on unless the
+	// tunnel came back: give the owner theirs.
+	if err := s.restoreLeftProxy(); err != nil {
+		s.log.Warn("restore the owner's proxy settings", "error", err)
 	}
 }
 
