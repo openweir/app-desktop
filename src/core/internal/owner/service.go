@@ -78,10 +78,13 @@ type Service struct {
 	sessionSequence      uint64
 	ownerSessionSequence uint64
 	// owner is nil until the first claim. bound says this process opened the engine in the
-	// owner's home; a process started without an owner never does.
+	// owner's home; a process started without an owner never does. homeSID is whose home
+	// that is: a claim by someone else names the next process's owner, but this process
+	// keeps the former owner's home, and with it their proxy settings in proxy.json.
 	owner      *Record
 	bound      bool
 	home       kept
+	homeSID    string
 	restarting bool
 	// profile is the one the core runs, or ran last.
 	profile     *controlpb.StartRequest
@@ -131,7 +134,7 @@ func Open(ctx context.Context, root, geodataDir string, platform Platform, log *
 	if err := geodata.Seed(geodataDir, home); err != nil {
 		log.Warn("seed the GEO data", "error", err)
 	}
-	s.owner, s.bound, s.home = &record, true, kept{home}
+	s.owner, s.bound, s.home, s.homeSID = &record, true, kept{home}, record.SID
 	s.wantRunning = s.home.wasRunning()
 	s.resumeBlocked = s.home.resumeInterrupted()
 	if s.resumeBlocked && s.wantRunning {
@@ -433,8 +436,9 @@ func (s *Service) SystemProxyEnabled() bool {
 	return s.proxyPort != 0
 }
 
-// Close gives the owner their proxy settings back as the service stops, for a shutdown or an
-// upgrade. was_running stays for recovery within the same Windows logon session.
+// Close gives the owner their proxy settings back as the service stops, for a shutdown, an
+// upgrade or a new owner; for a new owner they go to the former one. was_running stays for
+// recovery within the same Windows logon session.
 func (s *Service) Close() {
 	s.cancel()
 	s.mu.Lock()
@@ -581,18 +585,26 @@ func (s *Service) saveRecordLocked() {
 	}
 }
 
-// sessionLocked is a session the owner is signed in to: the one they last used if they still
-// are, or else another.
+// sessionLocked is a session of the user whose home this process opened, the one whose
+// settings proxy.json keeps. While they own the service, it is the session they last used if
+// they still are signed in to it, or else another. After someone else claimed it, the record
+// names the claimant, yet the settings stay the former owner's: they go to the former owner's
+// session, never to the claimant's.
 func (s *Service) sessionLocked() (uint32, error) {
-	if user, err := s.platform.SessionUser(s.owner.Session); err == nil && user == s.owner.SID {
-		return s.owner.Session, nil
+	owns := s.owner != nil && s.owner.SID == s.homeSID
+	if owns {
+		if user, err := s.platform.SessionUser(s.owner.Session); err == nil && user == s.homeSID {
+			return s.owner.Session, nil
+		}
 	}
-	sessions := s.platform.SignedIn(s.owner.SID)
+	sessions := s.platform.SignedIn(s.homeSID)
 	if len(sessions) == 0 {
 		return 0, errors.New("the owner is not signed in")
 	}
-	s.owner.Session = sessions[0]
-	s.saveRecordLocked()
+	if owns {
+		s.owner.Session = sessions[0]
+		s.saveRecordLocked()
+	}
 	return sessions[0], nil
 }
 
@@ -639,8 +651,9 @@ func (s *Service) proxyOn(port uint16) error {
 	return nil
 }
 
-// proxyOff gives the owner their own settings back. When they are not signed in, the
-// settings wait in their home for the next sign-in.
+// proxyOff gives the owner their own settings back; as the process exits for a new owner,
+// that is still the former owner (see sessionLocked). When they are not signed in, the
+// settings wait in their home for their next sign-in.
 func (s *Service) proxyOff() error {
 	s.proxyMu.Lock()
 	defer s.proxyMu.Unlock()

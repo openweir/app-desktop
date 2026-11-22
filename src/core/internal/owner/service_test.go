@@ -637,6 +637,65 @@ func TestFormerOwnerGetsTheirProxyBack(t *testing.T) {
 	}
 }
 
+// A claim by someone else names them the owner before the process exits for them. As it
+// exits, the settings it kept in the former owner's home still go back to her, at once if she
+// is signed in, or else at her next sign-in; the claimant's own settings stay as they are.
+func TestClaimRestartGivesTheProxyToTheFormerOwner(t *testing.T) {
+	for _, signedIn := range []bool{false, true} {
+		t.Run(fmt.Sprintf("signed in %v", signedIn), func(t *testing.T) {
+			root, m := t.TempDir(), newMachine()
+			if err := SaveRecord(root, Record{SID: alice, Session: 1}); err != nil {
+				t.Fatal(err)
+			}
+			theirs := sysproxy.Settings{Flags: sysproxy.Direct | sysproxy.AutoProxyURL, AutoConfigURL: "http://corp/pac"}
+			bobs := sysproxy.Settings{Flags: sysproxy.Direct}
+			m.sessions[1], m.proxies[alice] = alice, theirs
+			service, core, home := start(t, root, m)
+			core.running = true
+			if err := service.Applied(profile(true), current); err != nil {
+				t.Fatal(err)
+			}
+			// Her sign-out stops the tunnel, but the service cannot write her settings then.
+			delete(m.sessions, 1)
+			service.SignedOut(1)
+			m.sessions[2], m.proxies[bob] = bob, bobs
+			if err := service.Claim(as(bob, 2)); !errors.Is(err, control.ErrRestarting) {
+				t.Fatalf("claim = %v", err)
+			}
+			if signedIn {
+				m.sessions[3] = alice // before the service heard of it
+			}
+			service.Close()
+			if m.proxies[bob] != bobs {
+				t.Fatalf("bob's proxy = %+v", m.proxies[bob])
+			}
+			if _, saved, _ := (kept{Home(root, bob)}).previousProxy(); saved {
+				t.Fatal("alice's settings were kept as bob's")
+			}
+			_, saved, _ := (kept{home}).previousProxy()
+			if signedIn && (saved || m.proxies[alice] != theirs) {
+				t.Fatalf("saved %v, alice's proxy %+v as the service stopped", saved, m.proxies[alice])
+			}
+			if !signedIn && (!saved || m.proxies[alice] != sysproxy.Core(7890)) {
+				t.Fatalf("saved %v, alice's proxy %+v while she is away", saved, m.proxies[alice])
+			}
+			if record, _, _ := LoadRecord(root); record != (Record{SID: bob, Session: 2}) {
+				t.Fatalf("record = %+v", record)
+			}
+
+			service, _, _ = start(t, root, m)
+			m.sessions[4] = alice
+			service.SignedIn(4)
+			if m.proxies[alice] != theirs || m.proxies[bob] != bobs {
+				t.Fatalf("alice's proxy %+v, bob's %+v", m.proxies[alice], m.proxies[bob])
+			}
+			if _, saved, _ := (kept{home}).previousProxy(); saved {
+				t.Fatal("alice's settings are still kept")
+			}
+		})
+	}
+}
+
 // An administrator takes over another user's running tunnel (decision D5b): it stops as
 // after Stop, its owner gets their proxy settings back, and the service restarts for the
 // administrator. Anyone else still waits.
