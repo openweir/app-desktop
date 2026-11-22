@@ -178,13 +178,14 @@ jobs:
           QT_QPA_PLATFORM: offscreen
         run: uv run pytest -q
       # The ARM64 build's Nuitka plugin against the function it replaces, under the build's
-      # Nuitka and its own copy of pefile, which it installs only on Windows.
+      # Nuitka (the locked build group) and its own copy of pefile, which it installs only on
+      # Windows.
       - name: Nuitka dependency plugin
         if: runner.os == 'Windows'
         env:
           QT_QPA_PLATFORM: offscreen
           OPENWEIR_NUITKA_TESTS: "1"
-        run: uv run --frozen --with nuitka==4.2.2 pytest -q tests/test_nuitka_pefile.py
+        run: uv run --frozen --group build pytest -q tests/test_nuitka_pefile.py
 
   # The UI against the real development service (docs/architecture.md §11): no TUN, only
   # loopback traffic to local servers through the mixed port.
@@ -312,10 +313,13 @@ jobs:
         with:
           go-version-file: src/core/go.mod
           cache-dependency-path: src/core/go.sum
+      # The one build tool not pinned: Homebrew installs only its current XcodeGen
+      # (docs/maintenance.md §5.4).
       - name: XcodeGen
         run: |
           xcodebuild -version
           brew install xcodegen
+          xcodegen --version
       # The GEO data the extension carries in its resources; the pin is in the script.
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
         with:
@@ -326,16 +330,17 @@ jobs:
           if ! arch -x86_64 /usr/bin/true; then
             sudo softwareupdate --install-rosetta --agree-to-license
           fi
+      # With the build tools (Nuitka, dmgbuild) from the lock's build group.
       - name: Install (locked)
-        run: uv sync --frozen
+        run: uv sync --frozen --group build
       # Compile and merge the real UI, Python/Qt libraries, manager and Go/Cronet extension.
       # The builder checks every Mach-O for both slices before ad hoc signing.
       - name: Build universal app (unsigned)
-        run: uv run --frozen --with nuitka==4.2.2 python scripts/build_app.py --unsigned
+        run: uv run --frozen --group build python scripts/build_app.py --unsigned
       # The release's actual universal app in a disk image.
       - name: Disk image
         run: |
-          uv run --no-project --with dmgbuild==1.6.7 python scripts/build_dmg.py \
+          uv run --frozen --group build python scripts/build_dmg.py \
             build/app/OpenWeir.app "$RUNNER_TEMP/OpenWeir-universal.dmg"
 
       - name: Retain universal disk image
@@ -522,8 +527,9 @@ jobs:
           cache-dependency-path: src/core/go.sum
       - name: NSIS
         run: ./package/windows/install-nsis.ps1
+      # With the build tools (Nuitka) from the lock's build group.
       - name: Install (locked)
-        run: uv sync --frozen
+        run: uv sync --frozen --group build
       - name: Installer cleanup regression
         run: uv run --frozen pytest -q tests/test_build_windows.py -k "removal_routine or readonly_owned_files or locked_old_extension"
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
@@ -536,7 +542,7 @@ jobs:
           path: build/nuitka-cache-${{ matrix.arch }}
           key: nuitka-windows-${{ matrix.arch }}-${{ hashFiles('uv.lock', 'scripts/build_windows.py', 'package/windows/nuitka_pefile.py') }}
       - name: Build (unsigned)
-        run: uv run --frozen --with nuitka==4.2.2 python scripts/build_windows.py --arch ${{ matrix.arch }}
+        run: uv run --frozen --group build python scripts/build_windows.py --arch ${{ matrix.arch }}
       - name: Install, upgrade and uninstall
         shell: powershell
         run: ./package/windows/smoke-test.ps1 -Installer (Get-Item ${{ matrix.build }}/OpenWeir-*-windows-${{ matrix.arch }}-setup.exe).FullName

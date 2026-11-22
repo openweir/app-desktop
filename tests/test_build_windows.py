@@ -12,11 +12,13 @@ import stat
 import struct
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 from typing import Any
 
 import pytest
 import yaml
+from packaging.requirements import Requirement
 
 from openweir.desktop.links import SCHEMES
 from scripts import build_installer_ui, build_windows
@@ -106,9 +108,35 @@ def test_the_dependency_plugin_is_written_for_the_builds_nuitka() -> None:
     source = build_windows.PEFILE_PLUGIN.read_text(encoding="utf-8")
     (version,) = re.findall(r'^NUITKA_VERSION = "([^"]+)"$', source, re.MULTILINE)
     assert version == build_windows.build_app.NUITKA_VERSION
+
+
+def test_the_build_tools_are_locked_at_the_versions_the_scripts_check() -> None:
+    root = build_windows.ROOT
+    group = tomllib.loads((root / "pyproject.toml").read_text("utf-8"))["dependency-groups"]
+    pins = {
+        requirement.name: str(requirement.specifier)
+        for requirement in map(Requirement, group["build"])
+    }
+    source = (root / "scripts" / "build_dmg.py").read_text("utf-8")
+    (dmgbuild,) = re.findall(r'^DMGBUILD_VERSION = "([^"]+)"', source, re.MULTILINE)
+    assert pins == {
+        "nuitka": f"=={build_windows.build_app.NUITKA_VERSION}",
+        "dmgbuild": f"=={dmgbuild}",
+    }
+    locked = {
+        package["name"]: package["version"]
+        for package in tomllib.loads((root / "uv.lock").read_text("utf-8"))["package"]
+    }
+    assert locked["nuitka"] == build_windows.build_app.NUITKA_VERSION
+    assert locked["dmgbuild"] == dmgbuild
+    # The workflows install them from the lock, never with uv run --with.
     for name in ("ci.yml", "release.yml"):
-        workflow = (build_windows.ROOT / ".github" / "workflows" / name).read_text("utf-8")
-        assert set(re.findall(r"--with nuitka==(\S+)", workflow)) == {version}
+        workflow = (root / ".github" / "workflows" / name).read_text("utf-8")
+        assert not re.findall(r"--with (?:nuitka|dmgbuild)", workflow)
+        builds = re.findall(r"uv run [^\n]*scripts/build_(?:app|dmg|windows)\.py[^\n]*", workflow)
+        assert builds
+        for command in builds:
+            assert "--group build" in command or "--installer-only" in command, command
 
 
 @pytest.mark.parametrize("arch", ["x64", "arm64"])

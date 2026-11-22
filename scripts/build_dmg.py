@@ -1,6 +1,6 @@
 """Make the macOS disk image (docs/release.md §1, apple/README.md) from a built OpenWeir.app.
 
-    uv run --no-project --with dmgbuild==1.6.7 python scripts/build_dmg.py \\
+    uv run --group build python scripts/build_dmg.py \\
         build/app/OpenWeir.app build/release/OpenWeir-<version>-macos-universal.dmg
 
 The mounted volume opens as one fixed Finder window without toolbar or sidebar: OpenWeir.app on
@@ -32,7 +32,7 @@ sys.path.insert(0, str(ROOT))
 
 from scripts import macos  # noqa: E402
 
-DMGBUILD_VERSION = "1.6.7"
+DMGBUILD_VERSION = "1.6.7"  # pinned in pyproject.toml's build group and locked
 
 VOLUME_NAME = "OpenWeir"
 APP_NAME = "OpenWeir.app"
@@ -160,7 +160,7 @@ def main() -> None:
         installed = None
     if installed != DMGBUILD_VERSION:
         version = DMGBUILD_VERSION
-        sys.exit(f"build_dmg: run with uv run --with dmgbuild=={version} (found {installed})")
+        sys.exit(f"build_dmg: run with uv run --group build (dmgbuild {installed}, not {version})")
     app: Path = arguments.app
     image: Path = arguments.image
     if app.name != APP_NAME or not app.is_dir():

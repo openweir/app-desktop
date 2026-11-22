@@ -36,6 +36,13 @@ dev = [
     "pyyaml>=6.0.3",
     "ruff>=0.16.9",
 ]
+# The installer builds' tools, at the exact versions the build scripts check (NUITKA_VERSION in
+# scripts/build_app.py and package/windows/nuitka_pefile.py, DMGBUILD_VERSION in
+# scripts/build_dmg.py): uv run --group build python scripts/build_app.py, and so on.
+build = [
+    "nuitka==4.2.2",
+    "dmgbuild==1.6.7; sys_platform == 'darwin'",
+]
 
 [tool.ruff]
 extend-exclude = ["src/openweir/protocol/*_pb2.py", "src/openweir/protocol/*_pb2.pyi"]

@@ -2,8 +2,8 @@
 Contents/MacOS, OpenWeirManager.dylib in Contents/Frameworks and the system extension in
 Contents/Library/SystemExtensions, then sign it with the Developer ID identity and verify.
 
-    uv run --with nuitka==4.2.2 python scripts/build_app.py               # signed
-    uv run --with nuitka==4.2.2 python scripts/build_app.py --unsigned    # ad hoc
+    uv run --group build python scripts/build_app.py               # signed
+    uv run --group build python scripts/build_app.py --unsigned    # ad hoc
 
 The native parts come from scripts/build_apple.py's steps, built for the same version and build
 number; the app lands in build/app/OpenWeir.app. Signing follows build_apple.py: the identity is
@@ -61,7 +61,7 @@ EXECUTABLE = "OpenWeirUI"
 URL_SCHEMES = product.URL_SCHEMES  # one-click import (D6, D45): product.json
 CORE_VERSION_KEY = "OpenWeirCoreVersion"  # read by openweir.host.extension.bundled_host
 MIHOMO_MODULE = "github.com/metacubex/mihomo"
-NUITKA_VERSION = "4.2.2"
+NUITKA_VERSION = "4.2.2"  # pinned in pyproject.toml's build group and locked
 
 # Qt modules that --include-qt-plugins=qml brings and the UI never loads. Libraries are named
 # QtX in the bundle. Kept: QtDBus (QtGui links it), QtOpenGL (the QtQuick binding needs it),
@@ -294,8 +294,8 @@ def build_ui(version: str) -> Path:
                 "--frozen",
                 "--python",
                 f"cpython-{python_version}-macos-{arch}-none",
-                "--with",
-                f"nuitka=={NUITKA_VERSION}",
+                "--group",
+                "build",
                 "python",
                 ROOT / "scripts" / "build_app.py",
                 "--ui-arch",
@@ -514,7 +514,9 @@ def main() -> None:
     except importlib.metadata.PackageNotFoundError:
         installed = None
     if installed != NUITKA_VERSION:
-        sys.exit(f"build_app: run with uv run --with nuitka=={NUITKA_VERSION} (found {installed})")
+        sys.exit(
+            f"build_app: run with uv run --group build (Nuitka {installed}, not {NUITKA_VERSION})"
+        )
     if shutil.which("xcodegen") is None:
         sys.exit("build_app: XcodeGen is missing (brew install xcodegen)")
     version = build_apple._version()

@@ -106,12 +106,16 @@ jobs:
         with:
           go-version-file: src/core/go.mod
           cache-dependency-path: src/core/go.sum
+      # The one build tool not pinned: Homebrew installs only its current XcodeGen
+      # (docs/maintenance.md §5.4).
       - name: XcodeGen
         run: |
           xcodebuild -version
           brew install xcodegen
+          xcodegen --version
+      # With the build tools (Nuitka, and dmgbuild on macOS) from the lock's build group.
       - name: Install (locked)
-        run: uv sync --frozen
+        run: uv sync --frozen --group build
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
         with:
           path: build/geodata
@@ -203,7 +207,7 @@ jobs:
         env:
           OPENWEIR_GOOGLE_CLIENT_ID: ${{ secrets.OPENWEIR_GOOGLE_CLIENT_ID }}
           OPENWEIR_GOOGLE_CLIENT_SECRET: ${{ secrets.OPENWEIR_GOOGLE_CLIENT_SECRET }}
-        run: uv run --frozen --with nuitka==4.2.2 python scripts/build_app.py
+        run: uv run --frozen --group build python scripts/build_app.py
 
       # The app is notarized and stapled first, so that it opens offline once copied out of
       # the image; then the image itself. notarize.py tries submitting, waiting and stapling
@@ -234,7 +238,7 @@ jobs:
         env:
           DMG: ${{ steps.version.outputs.dmg }}
         run: |
-          uv run --no-project --with dmgbuild==1.6.7 python scripts/build_dmg.py \
+          uv run --frozen --group build python scripts/build_dmg.py \
             build/app/OpenWeir.app "build/release/$DMG"
           codesign --force --sign "$IDENTITY" --timestamp "build/release/$DMG"
           codesign --verify --strict "build/release/$DMG"
@@ -352,8 +356,9 @@ jobs:
           cache-dependency-path: src/core/go.sum
       - name: NSIS
         run: ./package/windows/install-nsis.ps1
+      # With the build tools (Nuitka, and dmgbuild on macOS) from the lock's build group.
       - name: Install (locked)
-        run: uv sync --frozen
+        run: uv sync --frozen --group build
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
         with:
           path: build/geodata
@@ -376,7 +381,7 @@ jobs:
         env:
           OPENWEIR_GOOGLE_CLIENT_ID: ${{ secrets.OPENWEIR_GOOGLE_CLIENT_ID }}
           OPENWEIR_GOOGLE_CLIENT_SECRET: ${{ secrets.OPENWEIR_GOOGLE_CLIENT_SECRET }}
-        run: uv run --frozen --with nuitka==4.2.2 python scripts/build_windows.py --arch ${{ matrix.arch }} --skip-installer --sign
+        run: uv run --frozen --group build python scripts/build_windows.py --arch ${{ matrix.arch }} --skip-installer --sign
 
       # Azure Artifact Signing (D42, docs/release.md §1): signtool with Artifact Signing's dlib,
       # both x64, at exact versions with their SHA-256. The dlib is built only for x86 and x64,

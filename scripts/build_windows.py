@@ -2,8 +2,8 @@
 standalone mode, the service by go build, the GEO data beside it, then the NSIS installer
 around the three.
 
-    uv run --with nuitka==4.2.2 python scripts/build_windows.py                    # all
-    uv run --with nuitka==4.2.2 python scripts/build_windows.py --skip-installer   # directory
+    uv run --group build python scripts/build_windows.py                    # all
+    uv run --group build python scripts/build_windows.py --skip-installer   # directory
     uv run python scripts/build_windows.py --installer-only                        # installer
     ... --sign                                                                     # a release
 
@@ -378,7 +378,9 @@ def _check_nuitka() -> None:
         installed = None
     if installed != build_app.NUITKA_VERSION:
         version = build_app.NUITKA_VERSION
-        sys.exit(f"build_windows: run with uv run --with nuitka=={version} (found {installed})")
+        sys.exit(
+            f"build_windows: run with uv run --group build (Nuitka {installed}, not {version})"
+        )
 
 
 def main() -> None:

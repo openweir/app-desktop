@@ -6,7 +6,7 @@ Needs Nuitka, which is not a project dependency, and pefile: Nuitka installs its
 Windows. Without them the tests are skipped, unless OPENWEIR_NUITKA_TESTS=1, as on CI's Windows
 runners, where the python job runs them. Elsewhere:
 
-    uv run --with nuitka==4.2.2 --with pefile==2024.8.26 pytest tests/test_nuitka_pefile.py
+    uv run --group build --with pefile==2024.8.26 pytest tests/test_nuitka_pefile.py
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ def _unavailable(reason: str) -> None:
 
 
 if importlib.util.find_spec("nuitka") is None:
-    _unavailable("needs Nuitka: uv run --with nuitka==4.2.2")
+    _unavailable("needs Nuitka: uv run --group build")
 SharedLibraries = importlib.import_module("nuitka.utils.SharedLibraries")
 scan = importlib.import_module("nuitka.freezer.DllDependenciesWin32PEFile")
 nuitka_version = importlib.import_module("nuitka.Version")

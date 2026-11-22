@@ -25,7 +25,7 @@ getPEFileUsedDllNames(), how detectDLLsWithPEFile() calls it, and Nuitka's copy 
 updating this file and its tests to match, then NUITKA_VERSION.
 """
 
-# Nuitka is not a project dependency: the build adds it with uv run --with nuitka==.
+# Nuitka is not a project dependency: the build runs with pyproject.toml's build group.
 # pyright: reportMissingImports=false
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ import os
 
 from nuitka.plugins.PluginBase import NuitkaPluginBase
 
-# scripts/build_app.py NUITKA_VERSION, and --with nuitka== in the workflows.
+# scripts/build_app.py NUITKA_VERSION, and the nuitka pin in pyproject.toml's build group.
 NUITKA_VERSION = "4.2.2"
 
 _IMPORT = "IMAGE_DIRECTORY_ENTRY_IMPORT"

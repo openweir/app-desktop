@@ -125,11 +125,11 @@ Developer ID 证书签名并校验。脚本依次：
 ## 组装 OpenWeir.app
 
 ```bash
-uv run --with nuitka==4.2.2 python scripts/build_app.py
+uv run --group build python scripts/build_app.py
 ```
 
 ```bash
-uv run --with nuitka==4.2.2 python scripts/build_app.py --unsigned
+uv run --group build python scripts/build_app.py --unsigned
 ```
 
 脚本先按 `build_apple.py` 的步骤构建原生部分（带签名，或 `--unsigned` 时不签名），再：
@@ -166,11 +166,11 @@ uv run --with nuitka==4.2.2 python scripts/build_app.py --unsigned
 ## 磁盘映像
 
 ```bash
-uv run --no-project --with dmgbuild==1.6.7 python scripts/build_dmg.py \
+uv run --group build python scripts/build_dmg.py \
   build/app/OpenWeir.app build/release/OpenWeir-<版本>-macos-universal.dmg
 ```
 
-`scripts/build_dmg.py` 用 dmgbuild 1.6.7 把构建好的 `OpenWeir.app`（签名的或 `--unsigned` 的都行）做成磁盘映像：
+`scripts/build_dmg.py` 用 dmgbuild 1.6.7（`pyproject.toml` 的 `build` 依赖组，只在 macOS 上装）把构建好的 `OpenWeir.app`（签名的或 `--unsigned` 的都行）做成磁盘映像：
 
 - 卷名 OpenWeir，卷图标是 `package/icons/openweir.icns`（`scripts/gen_icons.py`）；
 - 挂载后打开一个固定的 Finder 窗口，600 × 360 点，不显示工具栏、侧边栏和状态栏，128 点的大图标：左边 OpenWeir.app，

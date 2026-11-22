@@ -852,7 +852,7 @@ macOS 不监听任何 socket，控制消息全部走 Network Extension 自带的
     1603 一般失败、1633 不是 64 位的 Windows 10 及以上、1638 已装在别的目录。
   - 签名（D42，第 10 节）：发布构建的安装器和卸载器都由 Artifact Signing 签名，卸载器经 makensis 的 `!uninstfinalize`
     在放进安装器之前签名；安装目录里的程序在编译安装包之前签好。
-  - NSIS：工作流用 `package/windows/install-nsis.ps1` 从 Chocolatey 安装。社区源出错时 choco 什么都没装也返回成功，
+  - NSIS：工作流用 `package/windows/install-nsis.ps1` 从 Chocolatey 安装固定的版本（脚本的 `$Version`）。社区源出错时 choco 什么都没装也返回成功，
     所以脚本最多试四次，直到 `makensis` 存在并能运行，否则这一步就失败，不留到构建时才发现。
   - 验证：CI 的 `windows-installer` job 在 `windows-latest` 上构建不签名的安装包，由 `package/windows/smoke-test.ps1`
     首次安装通过 UI Automation 操作真实安装窗口，之后打开界面、静默升级、静默卸载（保留数据）、再安装、以 `/PURGE` 卸载，核对文件、服务的
@@ -892,7 +892,7 @@ Windows 安装器为两个 OpenWeir 可执行文件设置独立的 WER mini dump
 | macOS 包 | `scripts/build_app.py` 组装并签名 `OpenWeir.app`；发布工作流公证后做成 `.dmg` |
 | 崩溃符号 | Nuitka `--unstripped`；macOS dSYM 校验 UUID；Windows PDB 与精确 Go 服务二进制独立存档，发布 artifact 保留 90 天 |
 
-- **Windows 构建**（`scripts/build_windows.py`，在 Windows 上运行，`uv run --with nuitka==4.2.2`）：拉取 GEO 数据
+- **Windows 构建**（`scripts/build_windows.py`，在 Windows 上运行，`uv run --group build`，Nuitka 4.2.2 锁在 `uv.lock` 里）：拉取 GEO 数据
   （`scripts/fetch_geodata.py`）、构建服务、Nuitka 构建界面（不带界面用不到的 Qt 模块、QML 目录和图片格式插件，与
   macOS 相同；Qt 的 OpenSSL 后端也不带，TLS 用 Schannel，CPython 自带的 libssl 和 libcrypto 留着给 `ssl` 模块），
   ARM64 另给 Nuitka 加上依赖分析插件 `package/windows/nuitka_pefile.py`（原因见 [development.md](development.md)「从源码构建」），

@@ -421,14 +421,19 @@ exits.md 第 9 节的待实测项。
   subconv 自己的 `testdata/<格式>/input.*`，新版加了格式就照样补一份。subconv 改了警告代码或略去规则的写法时，同步
   `host/base.py` 的 `NODE_LEFT_OUT`、`RULE_LEFT_OUT` 和模拟宿主（`tests/support/simulated_core.py`）。路由模板的主机
   和清单格式归 subconv 的 `rules` 包，升级时读它的 docs/rules.md。
+- **构建工具**：Nuitka 和 dmgbuild 见上一条，锁在 `uv.lock`；CI 和发布的 Windows 构建用 Chocolatey 装固定版本的 NSIS
+  （`package/windows/install-nsis.ps1` 的 `$Version`，现为 3.13.0，`--allow-downgrade` 盖过 runner 镜像自带的版本），换版本
+  就改这里。XcodeGen 是唯一没有固定版本的：Homebrew 只装它当前的版本，CI 的日志里有 `xcodegen --version`；新版本生成的
+  工程有问题时 `apple` job 会失败，那时再考虑改为下载固定版本的 release 包并核对 SHA-256。
 - **GitHub Actions**：工作流里的每个 action 都固定到提交 SHA，后面的注释写它是哪个版本（`# vX.Y.Z`，
   `tests/test_workflows.py` 核对）。Dependabot（`.github/dependabot.yml`）每月向 `develop` 提一个合并了全部 action 更新的
   PR，提交前缀 `ci`。手动升级时用 `git ls-remote --tags https://github.com/<owner>/<action> 'refs/tags/vX*'` 查同一主版本
   最新的 `vX.Y.Z` 对应的提交（带注释的标签取 `^{}` 那一行），SHA 和注释一起改。
 - **GEO 数据**的版本和 SHA-256 钉在 `scripts/fetch_geodata.py` 里；改了之后用 `--categories` 重新生成附带的分类名
   清单（`src/openweir/host/geo_categories.py`），CI 用 `--check` 核对。
-- **macOS** 的产品最低版本固定为 26（D28）；构建器同时检查 PySide6 等依赖的实际 Mach-O 版本要求，只能提高该底线。**Nuitka** 的版本是 `scripts/build_app.py` 的 `NUITKA_VERSION`，CI 和
-  发布工作流里的 `--with nuitka==` 要一起改。4.3.4 构建的 Windows 界面在冒烟测试里启动即退出（退出码 3，即
+- **macOS** 的产品最低版本固定为 26（D28）；构建器同时检查 PySide6 等依赖的实际 Mach-O 版本要求，只能提高该底线。**Nuitka** 的版本是 `scripts/build_app.py` 的 `NUITKA_VERSION`，
+  `pyproject.toml` 的 `build` 依赖组里的 `nuitka==` 要一起改，再 `uv lock`（dmgbuild 同样：`scripts/build_dmg.py` 的
+  `DMGBUILD_VERSION` 和同一组里的 `dmgbuild==`；`tests/test_build_windows.py` 核对两者）。4.3.4 构建的 Windows 界面在冒烟测试里启动即退出（退出码 3，即
   `abort()`），原因未查明，所以仍用 4.2.2；再试新版本时，失败的 `windows-installer` 任务会上传界面的输出和崩溃目录
   （`windows-ui-<架构>-<提交>`），从那里看原因。ARM64 构建的 Nuitka 插件 `package/windows/nuitka_pefile.py` 换掉了
   Nuitka 内部的 `getPEFileUsedDllNames()`（为什么见 [development.md](development.md)「从源码构建」），只在它的
