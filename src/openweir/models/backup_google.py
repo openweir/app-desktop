@@ -45,7 +45,7 @@ from typing import Any
 from urllib.parse import parse_qs, quote, urlencode, urlsplit
 
 from openweir import __version__
-from openweir.host.extension import _blocking  # a request in flight must not hold up the exit
+from openweir.host.workers import run_blocking  # a request in flight must not hold up the exit
 from openweir.models.backup import MAX_SNAPSHOT_BYTES, BackupError, Counts, Snapshot, SnapshotInfo
 from openweir.models.backup_providers import BackupEntry
 from openweir.models.credentials import CredentialError, CredentialStore
@@ -522,7 +522,7 @@ class GoogleDriveProvider:
         request.add_header("User-Agent", USER_AGENT)
         for name, value in (headers or {}).items():
             request.add_header(name, value)
-        return await _blocking(partial(_send, request, limit))
+        return await run_blocking(partial(_send, request, limit))
 
     async def _form(self, url: str, fields: dict[str, str]) -> _Response:
         body = urlencode(fields).encode()

@@ -52,6 +52,7 @@ class DesktopViewModel(QObject):
     quitRequested = Signal()  # leave the event loop now
     quitChanged = Signal()
     quitFailed = Signal()  # the disconnect before quitting failed; ask what to do
+    windowShownChanged = Signal()
 
     def __init__(
         self,
@@ -78,6 +79,7 @@ class DesktopViewModel(QObject):
         settings.subscribe(self._settings_changed)
         self._tray = tray_available
         self._start_hidden = start_hidden and tray_available
+        self._window_shown = not self._start_hidden
         self._mac = platform == "darwin"
         self._windows = platform == "win32"
         if application is None and self._mac and QGuiApplication.platformName() == "cocoa":
@@ -169,6 +171,14 @@ class DesktopViewModel(QObject):
         """Main.qml: the window was shown or hidden, whichever way: the menu bar's 打开主窗口,
         a second launch, an install link, the dialogs that bring it back, or closing it."""
         self._dock(shown=shown)
+        if shown != self._window_shown:
+            self._window_shown = shown
+            self.windowShownChanged.emit()
+
+    @property
+    def window_shown(self) -> bool:
+        """Whether the window shows; while it hides, only the tray polls (composition.py)."""
+        return self._window_shown
 
     @Slot(QQuickWindow)
     def releaseWindow(self, window: QQuickWindow) -> None:

@@ -46,10 +46,21 @@ class TunnelSession:
         self._latest: TrafficSample | None = None
         self._rates = RateTracker(clock)
 
-    async def refresh(self, *, include_groups: bool = False) -> TunnelSnapshot:
+    async def refresh(
+        self, *, include_groups: bool = False, include_traffic: bool = True
+    ) -> TunnelSnapshot:
+        """Read the status, and while the tunnel runs its traffic and connections too, unless
+        ``include_traffic`` is False, as while the window hides. Then the history starts over;
+        once traffic is read again, the samples the subscription kept while it was not
+        fill in the last seconds."""
         status = await self._host.get_status()
         recent: tuple[ConnectionRate, ...] = ()
-        if status.state == "running":
+        if not include_traffic:
+            self._down.extend([0] * HISTORY_LENGTH)
+            self._up.extend([0] * HISTORY_LENGTH)
+            self._latest = None
+            self._rates.forget()
+        elif status.state == "running":
             for sample in await self._host.poll_traffic():
                 self._down.append(sample.down_bytes_per_second)
                 self._up.append(sample.up_bytes_per_second)

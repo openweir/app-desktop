@@ -14,6 +14,7 @@ from openweir.host.transport import Streams
 from openweir.models.profiles import ProfileError
 from openweir.models.store import ProfileStore
 from openweir.viewmodels.composition import ViewModels, compose
+from openweir.viewmodels.logs import HIDDEN_POLL_MS, POLL_MS
 from tests.support.simulated import SAMPLE_CONFIG, SimulatedFetcher, SimulatedHost, seed_profiles
 from tests.support.storage import has_config, has_override
 
@@ -48,6 +49,47 @@ def test_overview_shows_the_running_tunnel(qtbot: QtBot, view_models: ViewModels
     assert prop(overview, "statusTitle") == "已连接"
     assert prop(overview, "nodeDelay") == "68 ms"
     assert len(prop(overview, "downPoints")) == 40
+
+
+def test_while_the_window_hides_only_the_status_is_polled(
+    qtbot: QtBot, view_models: ViewModels, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The tray shows the status and controls the connection; the traffic, connections and
+    groups only the window shows. Logs keep arriving, slower."""
+    overview, host = view_models.overview, view_models.host
+    connections, logs = view_models.connections, view_models.logs
+    assert isinstance(host, SimulatedHost)
+    view_models.shell.setPage("connections")
+    qtbot.waitUntil(lambda: prop(overview, "nodeName") == "香港 01")
+    assert connections._timer.isActive()
+
+    view_models.desktop.setWindowShown(False)
+    assert not connections._timer.isActive()
+    assert logs._timer.interval() == HIDDEN_POLL_MS
+    qtbot.waitUntil(lambda: not overview._refreshing)  # one that started before
+    calls: list[str] = []
+
+    def counting(name: str) -> Any:
+        call = getattr(host, name)
+
+        def counted(*args: Any) -> Any:
+            calls.append(name)
+            return call(*args)
+
+        return counted
+
+    for name in ("get_status", "poll_traffic", "poll_connections", "list_groups"):
+        monkeypatch.setattr(host, name, counting(name))
+    overview.refreshGroups()
+    qtbot.waitUntil(lambda: calls.count("get_status") >= 2, timeout=5000)
+    qtbot.waitUntil(lambda: not overview._refreshing)
+    assert set(calls) == {"get_status"}
+    assert prop(overview, "connected")
+
+    view_models.desktop.setWindowShown(True)
+    qtbot.waitUntil(lambda: {"poll_traffic", "poll_connections", "list_groups"} <= set(calls))
+    assert connections._timer.isActive()
+    assert logs._timer.interval() == POLL_MS
 
 
 def test_overview_recovers_when_the_service_answers_again(

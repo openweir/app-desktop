@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 
 from openweir import __version__
-from openweir.host import extension
+from openweir.host import extension, workers
 from openweir.host.base import HostError, HostInfo, HostStatus, RunOptions, TunnelConfig
 from openweir.host.extension import (
     MacExtensionHost,
@@ -125,6 +125,23 @@ def test_provider_message_timeout_does_not_wait_for_a_stuck_native_call() -> Non
             await host.close()
 
     asyncio.run(scenario())
+
+
+def test_provider_messages_reuse_the_worker_threads() -> None:
+    """The overview reads the status every second: no thread is started for each read."""
+    manager = FakeManager(lambda _: running_status())
+    manager.tunnel = extension.TUNNEL_CONNECTED
+    host = MacExtensionHost(manager)
+    before = workers._WORKERS.threads
+
+    async def scenario() -> None:
+        for _ in range(20):
+            await host.get_status()
+
+    asyncio.run(scenario())
+    assert workers._WORKERS.threads <= max(before, 1)
+    assert all(thread.daemon for thread in manager.threads)
+    assert threading.main_thread() not in manager.threads
 
 
 def test_deactivation_forgets_the_old_tunnel_and_next_connect_activates_again() -> None:

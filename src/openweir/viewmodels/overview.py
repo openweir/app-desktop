@@ -91,6 +91,8 @@ class OverviewViewModel(QObject):
         self._acted = 0  # actions done so far, so a refresh knows which one it settles
         self._refresh_again = False  # a refresh was asked for while one was on its way
         self._ticks = 0
+        # While the window hides, a refresh reads only the status, which the tray shows.
+        self._window_shown = True
         self._pending = ""  # "start" or "stop" while the connection switch's action runs
         self._error = ""  # the last action's failure, until the next action
         self._connection_error = ""  # the last connect's or disconnect's failure
@@ -124,6 +126,20 @@ class OverviewViewModel(QObject):
     def stop(self) -> None:
         self._login_pending = False
         self._timer.stop()
+
+    def set_window_shown(self, shown: bool) -> None:
+        """While the window hides, refresh only the status, for the tray and the connection
+        it controls; traffic, connections and groups wait until the window shows again, and
+        then come at once."""
+        if shown == self._window_shown:
+            return
+        self._window_shown = shown
+        if shown and self._timer.isActive():
+            self._ticks = 0  # with the groups
+            if self._refreshing:
+                self._refresh_again = True  # once the status-only one is back
+            else:
+                self.refresh()
 
     def _login_status(self, status: LoginItemStatus) -> None:
         if not status.enabled or status.needs_approval:
@@ -176,11 +192,12 @@ class OverviewViewModel(QObject):
             return
         self._refreshing = True
         self._refresh_again = False
-        include_groups = self._ticks % GROUPS_EVERY_TICKS == 0
+        shown = self._window_shown
+        include_groups = shown and self._ticks % GROUPS_EVERY_TICKS == 0
         self._ticks += 1
         settles = self._acted if self._settling else 0
         self._runner.submit(
-            self._session.refresh(include_groups=include_groups),
+            self._session.refresh(include_groups=include_groups, include_traffic=shown),
             lambda snapshot: self._applied(snapshot, settles),
             lambda error: self._failed(error, settles),
         )

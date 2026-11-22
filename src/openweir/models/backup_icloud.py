@@ -32,8 +32,8 @@ from openweir.host.extension import (
     UNREACHABLE,
     ManagerError,
     ManagerLibrary,
-    _blocking,  # the same rule: a call in flight must not hold up the app's exit
 )
+from openweir.host.workers import run_blocking  # a call in flight must not hold up the exit
 from openweir.models.backup import BackupError, Counts, Snapshot, SnapshotInfo
 from openweir.models.backup_providers import BackupEntry
 
@@ -129,7 +129,7 @@ class ICloudProvider:
     async def status(self) -> int:
         """The system's account: a OpenWeirICloudStatus, COULD_NOT_DETERMINE when asking fails."""
         try:
-            return await _blocking(partial(self._library.icloud_status, STATUS_TIMEOUT_S))
+            return await run_blocking(partial(self._library.icloud_status, STATUS_TIMEOUT_S))
         except ManagerError:
             return COULD_NOT_DETERMINE
 
@@ -173,7 +173,7 @@ class ICloudProvider:
 
     async def _call[T](self, call: Callable[..., T], *arguments: Any) -> T:
         try:
-            return await _blocking(partial(call, *arguments))
+            return await run_blocking(partial(call, *arguments))
         except ManagerError as error:
             code = _CODES.get(error.result, "cloud_failed")
             raise BackupError(code, error.message) from error

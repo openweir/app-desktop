@@ -184,8 +184,8 @@ macOS 上可以和 iCloud 同时开启，各自上传、各自保留快照。实
   refresh token（`invalid_grant`：授权被撤销、令牌失效）时，本机删除它；目标保留，那一行写"需要重新登录"，自动备份
   等到重新登录，不会每小时失败一次。
 - **网络请求**：用标准库 `urllib` 调 token、revoke 端点和 Drive v3 的 files、about 接口，不引入 Google SDK。所有请求
-  都在界面进程里、以当前用户身份发出，跟随系统代理设置，和订阅下载一样。每个请求在自己的 daemon 线程上执行，超时
-  60 秒，进行中的请求不拖住退出。
+  都在界面进程里、以当前用户身份发出，跟随系统代理设置，和订阅下载一样。请求在常驻的 daemon 工作线程上执行
+  （`host/workers.py`），超时 60 秒，进行中的请求不拖住退出。
 - **快照**：每份快照是 appDataFolder 里的一个文件，名字与目录提供方相同（`openweir-backup-<UTC 时间>-<摘要前 12 位>.json`），
   以 multipart 上传。`SnapshotInfo`（时间、设备名、版本、配置和方案的份数）放在文件的 `appProperties` 里，列出时只取
   `id`、`name`、`size`、`appProperties`，不下载快照；Drive 每个属性的键和值合计最多 124 字节，设备名过长时按字符
@@ -232,8 +232,8 @@ macOS 上可以和 iCloud 同时开启，各自上传、各自保留快照。实
   不可用（`UNREACHABLE`），其余是 `FAILED` 加 CloudKit 的说明。没有 iCloud entitlement 的构建（不签名、ad hoc）里
   CloudKit 会抛出结束进程的 Objective-C 异常，所以管理库先读自己进程的 entitlement，没有这个 container 就不创建
   `CKContainer`：状态报 `UNSUPPORTED`，其余调用报 `FAILED`。
-- **Python**（`models/backup_icloud.py` 的 `ICloudProvider`）：经 `ManagerLibrary`（ctypes）调用，每次调用在一个
-  daemon 线程里执行，进行中的上传不拖住退出。记录名与目录提供方的文件名相同，只是没有 `.json`；`list()` 只认这样
+- **Python**（`models/backup_icloud.py` 的 `ICloudProvider`）：经 `ManagerLibrary`（ctypes）调用，调用在常驻的
+  daemon 工作线程上执行（`host/workers.py`），进行中的上传不拖住退出。记录名与目录提供方的文件名相同，只是没有 `.json`；`list()` 只认这样
   命名、`info` 读得出来的记录。错误变成 `BackupError`：`not_signed_in`、`backup_missing`、`cloud_full`、
   `cloud_unreachable`、`cloud_failed`。`sign_in()` 只检查系统账户可用，`sign_out()` 什么也不做。打包的 app 里
   （`Contents/Frameworks` 有管理库）才有这个提供方；从源码运行时没有，设置页写「仅签名的安装版可用」。

@@ -16,7 +16,7 @@ from openweir.models.logs import (
     subscription_level,
 )
 from openweir.viewmodels.common.async_runner import AsyncRunner
-from openweir.viewmodels.logs import LogListModel, LogsViewModel
+from openweir.viewmodels.logs import HIDDEN_POLL_MS, POLL_MS, LogListModel, LogsViewModel
 from tests.support.simulated import SimulatedHost
 
 NOW = datetime(2026, 10, 29, 12, 4, 1).timestamp()
@@ -172,6 +172,27 @@ def test_pause_holds_new_lines_until_resumed(
     logs.clear()
     assert prop(logs, "count") == 0
     assert prop(logs, "status") == "0 条"
+
+
+def test_logs_keep_arriving_slower_while_the_window_hides(
+    qtbot: QtBot, scripted: tuple[ScriptedHost, LogsViewModel]
+) -> None:
+    """Often enough that the core keeps the subscription (it drops one after 30 seconds
+    without a poll); the lines it kept come at once when the window shows again."""
+    host, logs = scripted
+    logs.start()
+    qtbot.waitUntil(lambda: len(host.levels) > 0)
+    logs.set_window_shown(False)
+    assert logs._timer.interval() == HIDDEN_POLL_MS < 30_000
+    assert logs._timer.isActive()
+    qtbot.waitUntil(lambda: not logs._polling)
+    polls = len(host.levels)
+    host.queued = [entry("info", "while hidden")]
+    qtbot.wait(700)
+    assert len(host.levels) == polls
+    logs.set_window_shown(True)
+    assert logs._timer.interval() == POLL_MS
+    qtbot.waitUntil(lambda: prop(logs, "count") == 1)
 
 
 def test_buffer_limit_drops_the_oldest_lines(

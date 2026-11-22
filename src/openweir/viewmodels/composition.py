@@ -230,7 +230,13 @@ def compose(
             settings_page.refreshInfo()
             settings_page.refreshLoginItem()
             backup.refreshCloud()
-        connections.setActive(shell.currentPage == "connections")
+        connections.setActive(desktop.window_shown and shell.currentPage == "connections")
+
+    def window_shown() -> None:
+        # While the window hides, only the tray's status is polled at full rate (ui.md §8).
+        overview.set_window_shown(desktop.window_shown)
+        logs.set_window_shown(desktop.window_shown)
+        connections.setActive(desktop.window_shown and shell.currentPage == "connections")
 
     def profiles_applied() -> None:
         # The routing page lists the rules the core runs; shown later, it reads them then.
@@ -238,6 +244,8 @@ def compose(
             routing.refresh()
 
     shell.currentPageChanged.connect(page_shown)
+    desktop.windowShownChanged.connect(window_shown)
+    window_shown()
     proxies.selectionApplied.connect(overview.refreshGroups)
     profiles.applied.connect(overview.refreshGroups)
     profiles.applied.connect(proxies.refresh)

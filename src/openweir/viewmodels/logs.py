@@ -44,6 +44,9 @@ QML_IMPORT_NAME = "OpenWeir"
 QML_IMPORT_MAJOR_VERSION = 1
 
 POLL_MS = 500
+# While the window hides: often enough that the subscription, which the core drops after
+# 30 seconds without a poll, keeps the lines in its buffer (docs/architecture.md §4.4).
+HIDDEN_POLL_MS = 10_000
 NOTICE_MS = 4000
 LEVEL_OPTIONS = {
     "debug": QT_TRANSLATE_NOOP("LogsViewModel", "调试"),
@@ -159,6 +162,16 @@ class LogsViewModel(QObject):
     def stop(self) -> None:
         self._timer.stop()
         self._notice_timer.stop()
+
+    def set_window_shown(self, shown: bool) -> None:
+        """Keep collecting while the window hides, at a slower pace; catch up at once when
+        it shows again."""
+        interval = POLL_MS if shown else HIDDEN_POLL_MS
+        if interval == self._timer.interval():
+            return
+        self._timer.setInterval(interval)
+        if shown and self._timer.isActive():
+            self.poll()
 
     @Slot()
     def poll(self) -> None:

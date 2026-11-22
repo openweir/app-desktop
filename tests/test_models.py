@@ -137,6 +137,48 @@ def test_session_tracks_history_and_connection_rates() -> None:
     asyncio.run(scenario())
 
 
+def test_session_reads_only_the_status_while_the_window_hides() -> None:
+    """The tray needs the status only. The traffic history starts over, so that the chart
+    does not show the seconds before the window hid as the latest."""
+    calls: list[str] = []
+    samples = [TrafficSample(1, 2, 3, 4)]
+
+    class Host:
+        async def get_status(self) -> HostStatus:
+            calls.append("get_status")
+            return HostStatus("running", "rule", 1, 0, 1, False, False)
+
+        async def poll_traffic(self) -> list[TrafficSample]:
+            calls.append("poll_traffic")
+            return samples
+
+        async def poll_connections(self) -> list[Connection]:
+            calls.append("poll_connections")
+            return []
+
+        async def list_groups(self) -> list[ProxyGroup]:
+            calls.append("list_groups")
+            return []
+
+    session = TunnelSession(Host())  # pyright: ignore[reportArgumentType]
+
+    async def scenario() -> None:
+        shown = await session.refresh()
+        assert shown.latest == samples[0]
+        assert shown.down_history[-1] == 2
+        calls.clear()
+        hidden = await session.refresh(include_traffic=False)
+        assert calls == ["get_status"]
+        assert hidden.status.state == "running"
+        assert hidden.latest is None
+        assert hidden.down_history == hidden.up_history == (0,) * HISTORY_LENGTH
+        assert hidden.recent == ()
+        again = await session.refresh()
+        assert again.down_history == (0,) * (HISTORY_LENGTH - 1) + (2,)
+
+    asyncio.run(scenario())
+
+
 def test_session_ranks_by_rates_over_several_polls() -> None:
     """The core takes a snapshot a second, as often as the overview polls, so a poll may find
     the last one again; the busiest connection keeps its rate meanwhile. A connection to an

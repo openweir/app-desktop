@@ -288,8 +288,10 @@ mihomo home 在扩展容器的 `Application Support/OpenWeir/core`，`startTunne
 
 `src/openweir/host/extension.py` 的 `MacExtensionHost` 是 macOS 正式版的宿主：`ManagerLibrary` 经 ctypes 绑定
 `OpenWeirManager.dylib`，每个 Request 用一次 `openweir_manager_send` 发给扩展，请求和响应的映射沿用
-`ServiceHost`。阻塞调用各在一个 daemon 线程里执行：NetworkExtension 在主队列上完成回调，app 退出时没人处理
-主队列，进行中的调用要等到超时，daemon 线程不会拖住退出。
+`ServiceHost`。阻塞调用在 `host/workers.py` 的 daemon 工作线程上执行：NetworkExtension 在主队列上完成回调，
+app 退出时没人处理主队列，进行中的调用要等到超时，daemon 线程不会拖住退出。线程启动后常驻、接着做下一个调用，
+不为每条 provider message 新开线程；最多 8 个同时执行，慢的调用（`Start`、测速）不挡住状态查询，再多的排队，
+排队期间调用者已放弃的不再执行。
 
 - **启动**：本次运行第一次连接时 `activate`（要用户批准时报 `extension_needs_approval`，需要重启时报
   `extension_needs_reboot`），再 `start`（`include_all_networks` 取自 `RunOptions.include_all_networks`，即设置页的

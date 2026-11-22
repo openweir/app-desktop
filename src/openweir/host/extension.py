@@ -16,7 +16,6 @@ import ctypes
 import itertools
 import plistlib
 import sys
-import threading
 from collections.abc import AsyncIterator, Callable
 from contextvars import ContextVar
 from functools import partial
@@ -45,6 +44,7 @@ from openweir.host.base import (
 from openweir.host.service import ServiceHost
 from openweir.host.timeouts import remaining_seconds, request_timeout, set_host_deadline
 from openweir.host.transport import Streams
+from openweir.host.workers import run_blocking
 from openweir.product import PROTOCOL_VERSION
 from openweir.protocol import control_pb2
 
@@ -306,31 +306,6 @@ def _bind(library: ctypes.CDLL, name: str, *argtypes: Any) -> Any:
     return function
 
 
-async def _blocking[T](call: Callable[[], T]) -> T:
-    """Run a blocking manager call on a thread of its own. NetworkExtension completes on the
-    main queue, which nothing serves once the app quits; a call in flight then returns only
-    at its timeout, so the thread is a daemon that does not hold the process up."""
-    loop = asyncio.get_running_loop()
-    future: asyncio.Future[T] = loop.create_future()
-
-    def settle(outcome: Callable[[], None]) -> None:
-        if not future.done():  # the caller may have given up
-            outcome()
-
-    def run() -> None:
-        try:
-            result = call()
-        except BaseException as error:  # handed to the caller
-            outcome = partial(future.set_exception, error)
-        else:
-            outcome = partial(future.set_result, result)
-        with contextlib.suppress(RuntimeError):  # the loop closed meanwhile
-            loop.call_soon_threadsafe(settle, outcome)
-
-    threading.Thread(target=run, name="openweir-manager", daemon=True).start()
-    return await future
-
-
 class TunnelDownError(HostError):
     """The tunnel is not connected, so no extension runs to answer."""
 
@@ -407,7 +382,7 @@ class MacExtensionHost(ServiceHost):
         send = partial(self._manager.send, request.SerializeToString(), timeout)
         try:
             async with asyncio.timeout_at(deadline):
-                payload = await _blocking(send)
+                payload = await run_blocking(send)
         except TimeoutError as error:
             raise HostError(
                 "timeout", "the extension request did not finish in time", retryable=True
@@ -447,7 +422,7 @@ class MacExtensionHost(ServiceHost):
     async def _manage(self, call: Callable[[], None], timeout: float) -> None:
         try:
             async with asyncio.timeout(timeout + 2):
-                await _blocking(call)
+                await run_blocking(call)
         except TimeoutError as error:
             raise HostError(
                 "timeout", "the native tunnel operation did not finish in time", retryable=True
@@ -459,7 +434,7 @@ class MacExtensionHost(ServiceHost):
         """The tunnel's TUNNEL_ status; TUNNEL_INVALID when the manager cannot tell."""
         try:
             async with asyncio.timeout(5):
-                return await _blocking(self._manager.status)
+                return await run_blocking(self._manager.status)
         except ManagerError, TimeoutError:
             return TUNNEL_INVALID
 
