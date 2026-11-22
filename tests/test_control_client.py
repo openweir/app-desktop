@@ -280,6 +280,30 @@ def test_dropped_connection_fails_pending_calls() -> None:
     assert asyncio.run(scenario())
 
 
+def test_a_connection_the_service_dropped_is_closed() -> None:
+    """The client lets the pipe go as soon as it sees the connection end; the host only
+    replaces it at its next request, which may never come."""
+    dropped = asyncio.Event()
+
+    async def answer(_: control_pb2.Request) -> None:
+        dropped.set()
+        return None
+
+    async def scenario() -> None:
+        server, opener = await serve(answer)
+        async with server:
+            client = await ControlClient.connect(opener)
+            with pytest.raises(HostError):
+                await client.call(control_pb2.Request(get_info=control_pb2.GetInfoRequest()))
+            assert dropped.is_set()
+            assert client.closed
+            assert client._reader_task.done()
+            assert client._writer.is_closing()
+            await client.close()
+
+    asyncio.run(scenario())
+
+
 def test_cancelling_a_sent_request_keeps_the_connection() -> None:
     pb = control_pb2
 

@@ -127,6 +127,9 @@ class ControlClient:
                     future.set_result(response)
         except (asyncio.IncompleteReadError, FrameError, DecodeError, OSError) as error:
             self._fail(HostError("connection_closed", str(error), retryable=True))
+            # Nothing more goes over it: let the pipe or socket go now, rather than when the
+            # host connects again (if ever) and drops this client unclosed.
+            self._writer.close()
         except asyncio.CancelledError:
             self._fail(HostError("connection_closed", "client closed", retryable=True))
             raise
