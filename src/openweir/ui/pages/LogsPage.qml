@@ -14,7 +14,7 @@ Item {
 
     // The search and the level filter share the header row while it has room for them
     // beside the title and status; otherwise they get a row of their own under it.
-    readonly property bool filtersInHeader: header.rowWidth >= filters.implicitWidth + actions.implicitWidth + 280
+    readonly property bool filtersInHeader: header.keepsTitleRoom(filters.implicitWidth + Theme.space2 + actions.implicitWidth)
     readonly property var levelColors: ({
             "debug": Theme.textMuted,
             "info": Theme.info,

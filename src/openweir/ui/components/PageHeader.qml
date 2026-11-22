@@ -19,6 +19,12 @@ Item {
     readonly property real rowWidth: column.width
     signal undoRequested
 
+    // Whether the title and the status keep their 280px beside actions this wide; a page
+    // moves its filters under the header rule when they would not (DESIGN.md "页面标题栏").
+    function keepsTitleRoom(actionsWidth: real): bool {
+        return rowWidth - Theme.space3 - actionsWidth >= 280
+    }
+
     implicitWidth: column.implicitWidth + column.anchors.rightMargin
     implicitHeight: column.implicitHeight
 

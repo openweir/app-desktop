@@ -16,6 +16,7 @@ Item {
     readonly property bool tabsToRows: Application.styleHints.tabFocusBehavior === Qt.TabFocusAllControls
     readonly property string currentGroup: proxies.currentGroup
     readonly property string sort: proxies.sort
+    readonly property bool sortInHeader: pageHeader.keepsTitleRoom(sortControl.implicitWidth + Theme.space2 + testButton.steadyWidth)
 
     // Another group's nodes, or the nodes in another order, show from the top.
     function showFirstNodes() {
@@ -100,18 +101,52 @@ Item {
             title: qsTr("代理")
             detail: page.proxies.summary
 
-            SegmentedControl {
-                options: page.proxies.sortOptions
-                current: page.proxies.sort
-                accessibleName: qsTr("节点排序")
-                onPicked: value => page.proxies.setSort(value)
+            Item {
+                id: headerSlot
+
+                visible: page.sortInHeader
+                implicitWidth: sortControl.implicitWidth
+                implicitHeight: sortControl.implicitHeight
             }
 
             AppButton {
+                id: testButton
+
+                // As wide as its longer label, so testing moves nothing in the header.
+                readonly property real steadyWidth: Math.max(implicitWidth, otherLabel.width + leftPadding + rightPadding)
+
+                Layout.preferredWidth: steadyWidth
                 text: page.proxies.testing ? qsTr("测速中…") : qsTr("测速")
                 enabled: !page.proxies.testing && page.proxies.currentGroup !== ""
                 onClicked: page.proxies.testCurrentGroup()
+
+                TextMetrics {
+                    id: otherLabel
+
+                    font: testButton.font
+                    text: page.proxies.testing ? qsTr("测速") : qsTr("测速中…")
+                }
             }
+        }
+
+        // The sort order under the header rule, where the header has no room for it beside
+        // 280px of title and status (DESIGN.md "页面标题栏").
+        Item {
+            id: rowSlot
+
+            Layout.fillWidth: true
+            visible: !page.sortInHeader
+            implicitHeight: sortControl.implicitHeight
+        }
+
+        SegmentedControl {
+            id: sortControl
+
+            parent: page.sortInHeader ? headerSlot : rowSlot
+            options: page.proxies.sortOptions
+            current: page.proxies.sort
+            accessibleName: qsTr("节点排序")
+            onPicked: value => page.proxies.setSort(value)
         }
 
         // Side by side, both boxes reach down to the page's bottom margin. Stacked in a narrow
@@ -123,7 +158,7 @@ Item {
             id: panes
 
             readonly property real availableWidth: page.width - 2 * Theme.pageX
-            readonly property real availableHeight: page.height - Theme.titlebarPageTop - Theme.pageBottom - pageHeader.implicitHeight - Theme.space5
+            readonly property real availableHeight: page.height - Theme.titlebarPageTop - Theme.pageBottom - pageHeader.implicitHeight - Theme.space5 - (page.sortInHeader ? 0 : rowSlot.implicitHeight + Theme.space5)
             readonly property bool twoPanes: availableWidth >= 260 + Theme.space6 + 420
             readonly property real stackedGroupsHeight: (availableHeight - rowSpacing - 2 * (groupsLabel.implicitHeight + Theme.space2)) * 2 / 5
             // Every row at its taller height: the one row that folds the regions is shorter.
