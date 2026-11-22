@@ -534,7 +534,8 @@ UI 必须使用 Nuitka standalone 模式。onefile 模式会解压到 `%TEMP%` �
 - **一个进程只服务一个属主**：启动时读 `owner.json`，在属主的 home 里打开 engine；没有属主时不打开 engine，只回答
   `GetInfo` 和 `Claim`。认领换了属主时（包括第一次认领），服务写好新的 `owner.json`，回复 `service_restarting`，
   启动一个 `openweir-service.exe -restart` 辅助进程，然后退出；辅助进程等服务停下后再启动它，新进程打开新属主的
-  home。界面重连后再次认领（5.4 节）。
+  home。辅助进程没能启动时，服务以错误退出，由 SCM 的故障恢复重启它：安装器打开了 `failureflag`，服务以错误
+  退出也算故障，正常退出则不算。界面重连后再次认领（5.4 节）。
 - **持久化**：`Start`、`Reload` 生效后写 `profile.json` 并置 `was_running`；`Stop` 清除 `was_running`；
   `SetSystemProxy` 改写 `profile.json` 里的系统代理开关。写入失败只记日志，已经生效的请求照常成功。节点选择由
   mihomo 的 `store-selected` 存在 home 的 `cache.db` 里（3.3 节第 5 条）。

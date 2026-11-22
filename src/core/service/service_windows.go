@@ -203,7 +203,17 @@ func serve(ctx context.Context, sessions <-chan sessionEvent, powerEvents *power
 	verify := peer.PipeClientVerifier(filepath.Join(filepath.Dir(executable), product.UIExecutable), executable, signer)
 	logger.Info("service started", "version", product.Version, "core", engine.Version(), "owned", home != "",
 		"signed", product.SignedRelease == "true")
-	return server.Serve(ctx, listener, verify, dispatcher, logger)
+	return ending(ctx, server.Serve(ctx, listener, verify, dispatcher, logger))
+}
+
+// ending is what serve returns once the control server returned err. The server returns nil
+// once ctx is done, as it is for a new owner too: when the restart helper did not start,
+// errRestartHelper takes its place, so that the SCM's recovery starts the service again.
+func ending(ctx context.Context, err error) error {
+	if cause := context.Cause(ctx); err == nil && errors.Is(cause, errRestartHelper) {
+		return cause
+	}
+	return err
 }
 
 // openLog appends to service.log, starting it over once it outgrew logLimit.
@@ -220,22 +230,44 @@ func openLog(path string) (*slog.Logger, func(), error) {
 	return logger, func() { file.Close() }, nil
 }
 
-// restartLater starts a helper that starts the service again once this process stopped,
-// then stops it.
-func restartLater(stop context.CancelFunc) {
-	executable, err := os.Executable()
-	if err == nil {
-		helper := exec.Command(executable, "-restart")
-		helper.SysProcAttr = &syscall.SysProcAttr{
-			HideWindow:    true,
-			CreationFlags: windows.CREATE_NEW_PROCESS_GROUP | windows.DETACHED_PROCESS,
-		}
-		err = helper.Start()
-	}
+// errRestartHelper stops a service whose restart helper did not start. The SCM's recovery
+// starts a service again when it exits with an error (package/windows/setup.ps1 sets its
+// failureflag), not when it exits cleanly.
+var errRestartHelper = errors.New("the restart helper did not start")
+
+// restartLater runs startHelper, which starts the service again once this process stopped,
+// then stops the process. Without the helper, it stops with errRestartHelper as the cause.
+func restartLater(stop context.CancelCauseFunc, startHelper func() error) {
+	err := startHelper()
 	if err != nil {
-		slog.Error("start the restart helper; the SCM's recovery restarts the service instead", "error", err)
+		err = fmt.Errorf("%w: %w", errRestartHelper, err)
+		slog.Error("start the restart helper; the service stops with an error for the SCM's recovery to start it again", "error", err)
 	}
-	time.AfterFunc(restartDelay, stop)
+	time.AfterFunc(restartDelay, func() { stop(err) })
+}
+
+// startRestartHelper runs this executable with -restart, apart from the service.
+func startRestartHelper() error {
+	executable, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	helper := exec.Command(executable, "-restart")
+	helper.SysProcAttr = &syscall.SysProcAttr{
+		HideWindow:    true,
+		CreationFlags: windows.CREATE_NEW_PROCESS_GROUP | windows.DETACHED_PROCESS,
+	}
+	return helper.Start()
+}
+
+// exitCode is the service's exit code for the error serve returned. Any error but nil makes
+// the SCM's recovery start the service again.
+func exitCode(err error) uint32 {
+	if err != nil {
+		slog.Error("the service stopped with an error", "error", err)
+		return 1
+	}
+	return 0
 }
 
 // restartService is the helper: it waits for the service to stop, then starts it.
@@ -282,24 +314,19 @@ type service struct{}
 
 func (service) Execute(_ []string, requests <-chan svc.ChangeRequest, status chan<- svc.Status) (bool, uint32) {
 	status <- svc.Status{State: svc.StartPending}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx, cancel := context.WithCancelCause(context.Background())
+	defer cancel(nil)
 	sessions := make(chan sessionEvent, 64)
 	powerEvents := power.NewQueue()
 	done := make(chan error, 1)
-	// A new owner restarts the service, and only an error exit makes the SCM's recovery
-	// restart it; the helper does it at once.
-	go func() { done <- serve(ctx, sessions, powerEvents, func() { restartLater(cancel) }) }()
+	// A new owner restarts the service: the helper starts it again at once. Only an error
+	// exit makes the SCM's recovery do it, so without the helper the service ends in one.
+	go func() {
+		done <- serve(ctx, sessions, powerEvents, func() { restartLater(cancel, startRestartHelper) })
+	}()
 	status <- svc.Status{
 		State:   svc.Running,
 		Accepts: svc.AcceptStop | svc.AcceptShutdown | svc.AcceptSessionChange | svc.AcceptPowerEvent,
-	}
-	exitCode := func(err error) uint32 {
-		if err != nil {
-			slog.Error("control server stopped", "error", err)
-			return 1
-		}
-		return 0
 	}
 	for {
 		select {
@@ -314,7 +341,7 @@ func (service) Execute(_ []string, requests <-chan svc.ChangeRequest, status cha
 				powerEvents.Publish(request.EventType)
 			case svc.Stop, svc.Shutdown:
 				status <- svc.Status{State: svc.StopPending}
-				cancel()
+				cancel(nil)
 				select {
 				case err := <-done:
 					return false, exitCode(err)
