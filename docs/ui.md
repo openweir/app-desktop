@@ -346,9 +346,13 @@ UI 只保存和传递覆写原文，解析与合并在内核里做；模拟宿�
 - **长名称**（DESIGN.md「长名称」）：`UiText` 被截断（`truncated`）时才用一个 `Loader` 建出悬停处理和
   `AppToolTip`，完整显示的文字不多建对象；所以名称只要设了 `elide` 和宽度约束，悬停提示随之而来。名称在
   按钮或行里时，按钮 `Layout.fillWidth` 加 `Layout.maximumWidth: implicitWidth`，同一行的标签用
-  `Layout.minimumWidth` 保住宽度；嵌在固定文字里的名称用 `Text.ElideMiddle`。`AppMenu` 的宽度以
-  `menu-max-width` 为上限。`scripts/preview.py --long-names` 用 `tests/support/simulated.py` 里的
-  `LONG_*` 样本（中文、英文、Emoji）给订阅、节点、策略组、方案、组网和连接起长名称。
+  `Layout.minimumWidth` 保住宽度；嵌在固定文字里的名称用 `Text.ElideMiddle`。Qt Quick Layouts 里
+  没有 `Layout.fillWidth` 的项保持首选宽度，只有填充的项会缩到各自的 `Layout.minimumWidth`（默认 0），
+  所以要保住宽度的只是填充的标签；固定的项加起来比行宽时，行不缩小它们，而是让它们超出行尾。
+  `AppMenu` 的宽度以 `menu-max-width` 为上限，高度最多 10 项。`scripts/preview.py --long-names` 用
+  `tests/support/simulated.py` 里的 `LONG_*` 样本（中文、英文、Emoji）给订阅、节点、策略组、方案、组网和
+  连接起长名称；测试模块把 `long_names` 夹具改为 `True` 就用同样的样本。`tests/test_layout.py` 用它在
+  960 × 640 的窗口和 Windows 的标题带下检查各页：只有名称让出宽度，表格列与表头对齐，没有内容超出所在的行。
 - **测试**：`tests/test_qml.py` 检查 Theme.qml 与 DESIGN.md 一致、两组颜色角色相同，并按 DESIGN.md 的用法
   核对两种外观的对比度；`tests/test_appearance.py` 用 `tests/support/appearance.py` 模拟系统切换外观；
   `tests/test_app.py` 在浅色和深色下加载界面，并检查系统切换后窗口立即重绘。

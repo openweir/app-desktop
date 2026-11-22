@@ -245,3 +245,30 @@ def test_another_order_shows_the_nodes_from_the_top(
     qtbot.wait(50)
     assert offset(nodes) == 2000
     assert loaded.warnings == []
+
+
+def test_the_current_group_and_node_carry_the_check(
+    qtbot: QtBot, loaded: Loaded, page: QQuickItem
+) -> None:
+    """Rows that pick something mark the current one with a primary check (DESIGN.md
+    "分组与行")."""
+
+    def checked(view: QQuickItem) -> list[str]:
+        return [
+            r.property("name")
+            for r in made(view)
+            if find(r, lambda i: kind(i) == "Icon" and i.property("name") == "check")
+        ]
+
+    groups, nodes = lists(page)
+    assert checked(groups) == [group_name(0)]
+    assert checked(nodes) == [node_name(0)]
+
+    group = row(groups, group_name(3))
+    assert group is not None
+    loaded.click(qtbot, group)
+    qtbot.waitUntil(lambda: loaded.view_models.proxies.property("currentGroup") == group_name(3))
+    qtbot.wait(100)
+    assert checked(groups) == [group_name(3)]
+    assert checked(nodes) == [node_name(3)]
+    assert loaded.warnings == []

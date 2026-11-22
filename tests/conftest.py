@@ -21,7 +21,12 @@ from tests.support.appearance import SystemColorScheme
 from tests.support.credentials import MemoryKeyring
 from tests.support.i18n import ui_language
 from tests.support.releases import offline_updater
-from tests.support.simulated import SimulatedFetcher, SimulatedHost, seed_profiles
+from tests.support.simulated import (
+    SimulatedFetcher,
+    SimulatedHost,
+    seed_long_plan,
+    seed_profiles,
+)
 from tests.support.window import Loaded
 
 # The end-to-end tests talk to the development service over a Unix socket.
@@ -66,19 +71,29 @@ def takeover(request: pytest.FixtureRequest) -> str:
 
 
 @pytest.fixture
+def long_names() -> bool:
+    """Whether the window names everything at length (scripts/preview.py --long-names); a
+    module overrides this fixture to say so."""
+    return False
+
+
+@pytest.fixture
 def loaded(
     request: pytest.FixtureRequest,
     qtbot: QtBot,
     tmp_path: Path,
     appearance: Appearance,
     takeover: str,
+    long_names: bool,
 ) -> Iterator[Loaded]:
     """The main window in Chinese, or in the language given by indirect parametrization."""
     store = ProfileStore(tmp_path)
-    seed_profiles(store, time.time())
+    seed_profiles(store, time.time(), long_names=long_names)
+    if long_names:
+        seed_long_plan(store)
     with ui_language(getattr(request, "param", "zh")):
         view_models = compose(
-            SimulatedHost(takeover=takeover),
+            SimulatedHost(takeover=takeover, long_names=long_names),
             store,
             SimulatedFetcher(),
             appearance=appearance,
