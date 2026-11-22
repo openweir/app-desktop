@@ -276,8 +276,23 @@ func TestSecurity6MeshOutboundsOnlyGoOut(t *testing.T) {
 		"{name: et, type: easytier, network-name: n, network-secret: s, peers: ['tcp://198.51.100.1:11010'], state-dir: '%s'}",
 	} {
 		for _, path := range escapes {
+			// A profile's own outbound goes through subconv (D54), which drops the state
+			// directory of Tailscale and ZeroTier as the client's setting: whatever it keeps,
+			// nothing outside the home gets through.
 			source := "mixed-port: 7890\nproxies:\n  - " + fmt.Sprintf(outbound, path) + "\nrules: ['MATCH,DIRECT']\n"
-			_, err := admit(profileOf(source), admission.TunNone)
+			if admitted, err := admitProfile(profileOf(source), noTUN); err == nil {
+				for _, raw := range admitted.doc["proxies"].([]any) {
+					if dir, ok := raw.(map[string]any)["state-dir"]; ok {
+						t.Errorf("%s: state-dir %v admitted", fmt.Sprintf(outbound, path), dir)
+					}
+				}
+			} else if !errors.Is(err, ErrInvalidConfig) {
+				t.Errorf("%s: admit = %v", fmt.Sprintf(outbound, path), err)
+			}
+			// An override's, which subconv does not read, meets mihomo's own path check.
+			profile := profileOf(minimal)
+			profile.Overrides = [][]byte{[]byte("prepend-proxies:\n  - " + fmt.Sprintf(outbound, path) + "\n")}
+			_, err := admit(profile, admission.TunNone)
 			if !errors.Is(err, ErrInvalidConfig) {
 				t.Errorf("%s: admit = %v, want ErrInvalidConfig", fmt.Sprintf(outbound, path), err)
 				continue

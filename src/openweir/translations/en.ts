@@ -2871,6 +2871,24 @@ prepend-rules:
         </translation>
     </message>
     <message>
+        <source>路由模板使用中</source>
+        <translation>Routing template in use</translation>
+    </message>
+    <message numerus="yes">
+        <source>略去 %n 个节点</source>
+        <translation>
+            <numerusform>%n node left out</numerusform>
+            <numerusform>%n nodes left out</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>略去 %n 条规则</source>
+        <translation>
+            <numerusform>%n rule left out</numerusform>
+            <numerusform>%n rules left out</numerusform>
+        </translation>
+    </message>
+    <message>
         <source>更新</source>
         <translation>Update</translation>
     </message>

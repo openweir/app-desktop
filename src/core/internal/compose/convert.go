@@ -12,6 +12,7 @@ import (
 
 	"github.com/dlclark/regexp2"
 	RC "github.com/metacubex/mihomo/rules/common"
+	"github.com/openweir/subconv/rules"
 
 	"github.com/openweir/app-desktop/src/core/internal/controlpb"
 )
@@ -46,6 +47,9 @@ type Conversion struct {
 	// Categories leave out GEOSITE and GEOIP rules whose category the data does not have,
 	// which mihomo would refuse.
 	Categories Categories
+	// Template reads the routing template that a subscription without usable rules of its
+	// own routes by (Normalize); nil converts the subscription's own.
+	Template *rules.Client
 }
 
 // The UI's rule entry kinds (docs/routing.md §8.5): the core only reads the items, but the
@@ -99,7 +103,7 @@ func Convert(data []byte, options Conversion) (*controlpb.ConvertToPlanResponse,
 	if err != nil {
 		return nil, err
 	}
-	parsed, err := parseSubscription(data)
+	parsed, err := parseWithTemplate(data, options.Template)
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +111,13 @@ func Convert(data []byte, options Conversion) (*controlpb.ConvertToPlanResponse,
 	if err != nil {
 		return nil, err
 	}
-	rules, err := ruleLines(parsed.profile["rules"])
+	// A mihomo profile's rules as written: the converter says why it leaves each one out,
+	// where the conversion would only drop it (Normalized.Rules).
+	written := parsed.profile["rules"]
+	if parsed.read.Rules != nil {
+		written = parsed.read.Rules
+	}
+	rules, err := ruleLines(written)
 	if err != nil {
 		return nil, err
 	}

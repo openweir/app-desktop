@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/openweir/subconv/rules"
+
 	"github.com/openweir/app-desktop/src/core/internal/admission"
 	"github.com/openweir/app-desktop/src/core/internal/control"
 	"github.com/openweir/app-desktop/src/core/internal/controlpb"
@@ -61,6 +63,7 @@ func attach(fd int, home, resources string, includeAllNetworks bool) error {
 		Tun:                admission.TunFD,
 		TunFD:              fd,
 		IncludeAllNetworks: includeAllNetworks,
+		TemplateHosts:      rules.DefaultHosts(),
 	})
 	if err != nil {
 		return err

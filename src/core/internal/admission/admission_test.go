@@ -22,7 +22,7 @@ func TestOverridesExtendLists(t *testing.T) {
 	doc, err := decodeDocument([]byte(`proxies: [{name: a, type: direct}]
 proxy-groups: [{name: G, type: select, proxies: [a]}]
 rules: ['DOMAIN,a.example,G', 'MATCH,G']
-`))
+`), nil)
 	if err != nil {
 		t.Fatal(err)
 	}

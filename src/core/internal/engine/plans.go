@@ -17,9 +17,12 @@ import (
 	"github.com/openweir/app-desktop/src/core/internal/controlpb"
 )
 
-// InspectSource describes a subscription for the UI; it needs no running core.
+// InspectSource describes a subscription for the UI; it needs no running core. It is where
+// the routing template is refreshed, at most every few hours (routingtemplate.Refresh): as
+// a subscription is imported or updated, ahead of the Validate, Start or Reload that run it.
 func (e *Engine) InspectSource(source []byte, infoFilter string) (*controlpb.InspectSourceResponse, error) {
-	inspection, err := compose.Inspect(source, infoFilter)
+	e.template.Refresh()
+	inspection, err := compose.Inspect(source, infoFilter, e.template.Client())
 	if err != nil {
 		return nil, invalidConfig(err)
 	}
@@ -43,6 +46,7 @@ func (e *Engine) PreviewGroup(composition compose.Composition, groupID string) (
 // GEOSITE and GEOIP rules with a category the core's GEO data lacks are left out.
 func (e *Engine) ConvertToPlan(source []byte, options compose.Conversion) (*controlpb.ConvertToPlanResponse, error) {
 	options.Categories = e.categories()
+	options.Template = e.template.Client()
 	converted, err := compose.Convert(source, options)
 	if err != nil {
 		return nil, invalidConfig(err)

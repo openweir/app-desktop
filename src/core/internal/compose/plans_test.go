@@ -31,7 +31,7 @@ func TestPreviewIsTheComposedGroup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := nodeNames(preview.GetNodes()), []string{"香港 01", "US-LA 0.1x", "香港 01 · 机场 B"}; !slices.Equal(got, want) {
+	if got, want := nodeNames(preview.GetNodes()), []string{"香港 01", "US-LA 0.1x", "香港 01 2", "香港 01 · 机场 B"}; !slices.Equal(got, want) {
 		t.Errorf("nodes = %v, want %v", got, want)
 	}
 	// KR has no nodes, so no group.
@@ -161,6 +161,8 @@ func TestMarshalOrdered(t *testing.T) {
 }
 
 const convertible = `
+proxy-providers:
+  provider-a: {type: http, url: "https://example.com/provider-a.yaml", interval: 3600}
 proxies:
   - {name: 香港 01, type: ss, server: a.example, port: 1, cipher: aes-128-gcm, password: x}
   - {name: 香港 02, type: ss, server: a.example, port: 2, cipher: aes-128-gcm, password: x}

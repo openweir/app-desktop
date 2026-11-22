@@ -294,7 +294,7 @@ func TestMeshTargetsAreNotMembers(t *testing.T) {
 }
 
 func TestInspectMarksMeshOutbounds(t *testing.T) {
-	inspected, err := Inspect([]byte(meshSource), testInfoFilter)
+	inspected, err := Inspect([]byte(meshSource), testInfoFilter, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

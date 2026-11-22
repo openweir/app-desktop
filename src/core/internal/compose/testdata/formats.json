@@ -1,0 +1,940 @@
+{
+  "clash.yaml": {
+    "nodes": [
+      {
+        "name": "HK 01",
+        "type": "Shadowsocks",
+        "region": "HK"
+      },
+      {
+        "name": "HK 01 2",
+        "type": "Shadowsocks",
+        "region": "HK"
+      },
+      {
+        "name": "VMess legacy",
+        "type": "Vmess",
+        "region": "ZZ"
+      },
+      {
+        "name": "VLESS REALITY",
+        "type": "Vless",
+        "region": "ZZ"
+      },
+      {
+        "name": "Trojan",
+        "type": "Trojan",
+        "region": "ZZ"
+      },
+      {
+        "name": "Hy2 hop",
+        "type": "Hysteria2",
+        "region": "ZZ"
+      },
+      {
+        "name": "SS none",
+        "type": "Shadowsocks",
+        "region": "ZZ"
+      },
+      {
+        "name": "DIRECT 2",
+        "type": "Socks5",
+        "region": "ZZ"
+      },
+      {
+        "name": "http p.example.com",
+        "type": "Http",
+        "region": "ZZ"
+      },
+      {
+        "name": "WG",
+        "type": "WireGuard",
+        "region": "ZZ"
+      },
+      {
+        "name": "Naive",
+        "type": "Naive",
+        "region": "ZZ"
+      },
+      {
+        "name": "Exit",
+        "type": "Shadowsocks",
+        "region": "ZZ"
+      },
+      {
+        "name": "Client cert",
+        "type": "Trojan",
+        "region": "ZZ"
+      },
+      {
+        "name": "Chain / VLESS REALITY",
+        "type": "Vless",
+        "region": "ZZ"
+      },
+      {
+        "name": "Chain",
+        "type": "Trojan",
+        "region": "ZZ"
+      }
+    ],
+    "has_rules": true,
+    "group_count": 5,
+    "rule_count": 12,
+    "warnings": [
+      {
+        "code": "invalid_proxy",
+        "detail": "proxy 17: not a mapping"
+      },
+      {
+        "code": "renamed",
+        "detail": "HK 01: renamed HK 01 2"
+      },
+      {
+        "code": "ignored_option",
+        "detail": "Trojan: interface-name is the client's setting"
+      },
+      {
+        "code": "ignored_option",
+        "detail": "Trojan: routing-mark is the client's setting"
+      },
+      {
+        "code": "invalid_proxy",
+        "detail": "Broken port: port 70000"
+      },
+      {
+        "code": "invalid_proxy",
+        "detail": "No server: no server"
+      },
+      {
+        "code": "unsupported_proxy",
+        "detail": "Juicity: type juicity"
+      },
+      {
+        "code": "renamed",
+        "detail": "DIRECT: renamed DIRECT 2"
+      },
+      {
+        "code": "ignored_option",
+        "detail": "Naive: alpn is Cronet's own"
+      },
+      {
+        "code": "ignored_option",
+        "detail": "Client cert: certificate is a local file"
+      },
+      {
+        "code": "ignored_option",
+        "detail": "Client cert: private-key is a local file"
+      },
+      {
+        "code": "local_provider",
+        "detail": "local: ./local.yaml"
+      },
+      {
+        "code": "unsupported_provider",
+        "detail": "broken: no web URL"
+      },
+      {
+        "code": "ignored_option",
+        "detail": "Balance: dialer-proxy belongs on proxies, not groups"
+      },
+      {
+        "code": "unsupported_group",
+        "detail": "Home: type ssid"
+      },
+      {
+        "code": "unknown_reference",
+        "detail": "Proxy: member Gone"
+      },
+      {
+        "code": "unknown_reference",
+        "detail": "Proxy: provider nowhere"
+      },
+      {
+        "code": "empty_group",
+        "detail": "Empty: no members left"
+      },
+      {
+        "code": "cyclic_reference",
+        "detail": "Loop: member Auto leads back to it"
+      },
+      {
+        "code": "unknown_reference",
+        "detail": "Exit: dialer-proxy Missing"
+      },
+      {
+        "code": "unsupported_rule_set",
+        "detail": "custom: a sing-box rule set mihomo cannot read"
+      },
+      {
+        "code": "local_provider",
+        "detail": "local: ./local.yaml"
+      },
+      {
+        "code": "unsupported_rule",
+        "detail": "RULE-SET,custom,Proxy: rule set custom was left out"
+      },
+      {
+        "code": "unsupported_rule",
+        "detail": "IP-CIDR,not-an-ip,Proxy: IP range not-an-ip"
+      },
+      {
+        "code": "unsupported_rule",
+        "detail": "USER-AGENT,Telegram*,Proxy: rule type USER-AGENT"
+      },
+      {
+        "code": "unsupported_rule",
+        "detail": "DOMAIN,b.com,Empty: policy Empty was left out"
+      },
+      {
+        "code": "unsupported_rule",
+        "detail": "DOMAIN,c.com,Nobody: policy Nobody does not exist"
+      },
+      {
+        "code": "unsupported_rule",
+        "detail": "SUB-RULE,(NETWORK,tcp),sub: sub-rules are not carried over"
+      }
+    ]
+  },
+  "links-base64.txt": {
+    "nodes": [
+      {
+        "name": "香港 01",
+        "type": "Vless",
+        "region": "HK"
+      },
+      {
+        "name": "VLESS XHTTP",
+        "type": "Vless",
+        "region": "ZZ"
+      },
+      {
+        "name": "Trojan WS",
+        "type": "Trojan",
+        "region": "ZZ"
+      },
+      {
+        "name": "VMess WS",
+        "type": "Vmess",
+        "region": "ZZ"
+      },
+      {
+        "name": "SS obfs",
+        "type": "Shadowsocks",
+        "region": "ZZ"
+      },
+      {
+        "name": "SS 2022",
+        "type": "Shadowsocks",
+        "region": "ZZ"
+      }
+    ]
+  },
+  "links-messy.txt": {
+    "nodes": [
+      {
+        "name": "🇭🇰 HK 01",
+        "type": "Vless",
+        "region": "HK"
+      },
+      {
+        "name": "🇯🇵 JP 01",
+        "type": "Trojan",
+        "region": "JP"
+      },
+      {
+        "name": "🇭🇰 HK 01 2",
+        "type": "Shadowsocks",
+        "region": "HK"
+      },
+      {
+        "name": "Hy2",
+        "type": "Hysteria2",
+        "region": "ZZ"
+      }
+    ],
+    "warnings": [
+      {
+        "code": "invalid_proxy",
+        "detail": "vmess link: not v2rayN's Base64 JSON"
+      },
+      {
+        "code": "unsupported_option",
+        "detail": "tg link: a Telegram proxy, which only Telegram uses"
+      },
+      {
+        "code": "renamed",
+        "detail": "🇭🇰 HK 01: renamed 🇭🇰 HK 01 2"
+      }
+    ]
+  },
+  "links.txt": {
+    "nodes": [
+      {
+        "name": "香港 01",
+        "type": "Vless",
+        "region": "HK"
+      },
+      {
+        "name": "VLESS XHTTP",
+        "type": "Vless",
+        "region": "ZZ"
+      },
+      {
+        "name": "Trojan WS",
+        "type": "Trojan",
+        "region": "ZZ"
+      },
+      {
+        "name": "VMess WS",
+        "type": "Vmess",
+        "region": "ZZ"
+      },
+      {
+        "name": "SS obfs",
+        "type": "Shadowsocks",
+        "region": "ZZ"
+      },
+      {
+        "name": "SS semicolons",
+        "type": "Shadowsocks",
+        "region": "ZZ"
+      },
+      {
+        "name": "SS 2022",
+        "type": "Shadowsocks",
+        "region": "ZZ"
+      },
+      {
+        "name": "Legacy SS",
+        "type": "Shadowsocks",
+        "region": "ZZ"
+      },
+      {
+        "name": "SSR 节点",
+        "type": "ShadowsocksR",
+        "region": "ZZ"
+      },
+      {
+        "name": "Hy2",
+        "type": "Hysteria2",
+        "region": "ZZ"
+      },
+      {
+        "name": "TUIC",
+        "type": "Tuic",
+        "region": "ZZ"
+      },
+      {
+        "name": "AnyTLS REALITY",
+        "type": "AnyTLS",
+        "region": "ZZ"
+      },
+      {
+        "name": "Naive QUIC",
+        "type": "Naive",
+        "region": "ZZ"
+      },
+      {
+        "name": "SOCKS",
+        "type": "Socks5",
+        "region": "ZZ"
+      },
+      {
+        "name": "HTTPS",
+        "type": "Http",
+        "region": "ZZ"
+      },
+      {
+        "name": "Mieru",
+        "type": "Mieru",
+        "region": "ZZ"
+      },
+      {
+        "name": "Nowhere",
+        "type": "Nowhere",
+        "region": "ZZ"
+      },
+      {
+        "name": "Snell v5",
+        "type": "Snell",
+        "region": "ZZ"
+      },
+      {
+        "name": "WG",
+        "type": "WireGuard",
+        "region": "ZZ"
+      },
+      {
+        "name": "Trojan WS 2",
+        "type": "Trojan",
+        "region": "ZZ"
+      }
+    ],
+    "warnings": [
+      {
+        "code": "unsupported_option",
+        "detail": "Telegram: a Telegram proxy, which only Telegram uses"
+      },
+      {
+        "code": "unsupported_option",
+        "detail": "QUIC VLESS: transport quic"
+      },
+      {
+        "code": "renamed",
+        "detail": "Trojan WS: renamed Trojan WS 2"
+      }
+    ]
+  },
+  "loon.conf": {
+    "nodes": [
+      {
+        "name": "HK SS",
+        "type": "Shadowsocks",
+        "region": "HK"
+      },
+      {
+        "name": "HK SS2022",
+        "type": "Shadowsocks",
+        "region": "HK"
+      },
+      {
+        "name": "JP SSR",
+        "type": "ShadowsocksR",
+        "region": "JP"
+      },
+      {
+        "name": "US VMess",
+        "type": "Vmess",
+        "region": "US"
+      },
+      {
+        "name": "US VLESS",
+        "type": "Vless",
+        "region": "US"
+      },
+      {
+        "name": "SG Trojan",
+        "type": "Trojan",
+        "region": "SG"
+      },
+      {
+        "name": "TW Hy2",
+        "type": "Hysteria2",
+        "region": "TW"
+      },
+      {
+        "name": "WG",
+        "type": "WireGuard",
+        "region": "ZZ"
+      },
+      {
+        "name": "Chain",
+        "type": "Vmess",
+        "region": "ZZ"
+      }
+    ],
+    "has_rules": true,
+    "group_count": 3,
+    "rule_count": 5,
+    "warnings": [
+      {
+        "code": "unsupported_provider",
+        "detail": "Airport: a remote server list in the client's own format"
+      },
+      {
+        "code": "unsupported_rule",
+        "detail": "section [plugin]: 1 lines"
+      },
+      {
+        "code": "unsupported_rule_set",
+        "detail": "Mixed: a list that names a policy per rule"
+      }
+    ]
+  },
+  "quantumultx.conf": {
+    "nodes": [
+      {
+        "name": "HK SS",
+        "type": "Shadowsocks",
+        "region": "HK"
+      },
+      {
+        "name": "HK SS WS",
+        "type": "Shadowsocks",
+        "region": "HK"
+      },
+      {
+        "name": "SSR",
+        "type": "ShadowsocksR",
+        "region": "ZZ"
+      },
+      {
+        "name": "JP VMess",
+        "type": "Vmess",
+        "region": "JP"
+      },
+      {
+        "name": "JP VMess TLS",
+        "type": "Vmess",
+        "region": "JP"
+      },
+      {
+        "name": "US VLESS",
+        "type": "Vless",
+        "region": "US"
+      },
+      {
+        "name": "US Trojan",
+        "type": "Trojan",
+        "region": "US"
+      },
+      {
+        "name": "HTTPS",
+        "type": "Http",
+        "region": "ZZ"
+      },
+      {
+        "name": "SOCKS",
+        "type": "Socks5",
+        "region": "ZZ"
+      }
+    ],
+    "has_rules": true,
+    "group_count": 5,
+    "rule_count": 7,
+    "warnings": [
+      {
+        "code": "unsupported_provider",
+        "detail": "example.com/qx.list: a remote server list in the client's own format"
+      },
+      {
+        "code": "unsupported_rule",
+        "detail": "section [rewrite_local]: 1 lines"
+      },
+      {
+        "code": "unsupported_group",
+        "detail": "Home: type ssid"
+      },
+      {
+        "code": "unsupported_rule_set",
+        "detail": "Ads: a Quantumult X list, which mihomo cannot read"
+      },
+      {
+        "code": "unsupported_rule_set",
+        "detail": "Mixed: a list that names a policy per rule"
+      },
+      {
+        "code": "unsupported_rule",
+        "detail": "USER-AGENT,Instagram*,proxy: rule type USER-AGENT"
+      }
+    ]
+  },
+  "shadowrocket.conf": {
+    "nodes": [
+      {
+        "name": "HK",
+        "type": "Trojan",
+        "region": "HK"
+      },
+      {
+        "name": "JP",
+        "type": "Vmess",
+        "region": "JP"
+      }
+    ],
+    "has_rules": true,
+    "group_count": 2,
+    "rule_count": 3
+  },
+  "sing-box-routing.json": {
+    "nodes": [
+      {
+        "name": "Node",
+        "type": "Vmess",
+        "region": "ZZ"
+      }
+    ],
+    "has_rules": true,
+    "group_count": 2,
+    "rule_count": 14,
+    "warnings": [
+      {
+        "code": "unsupported_rule_set",
+        "detail": "ads: a remote sing-box rule set that is not a well-known geosite or geoip set"
+      },
+      {
+        "code": "unsupported_rule",
+        "detail": "rule 8 to REJECT-DROP: rule set ads was left out"
+      },
+      {
+        "code": "unsupported_rule",
+        "detail": "rule 14 to DIRECT: a rule with wifi_ssid"
+      }
+    ]
+  },
+  "sing-box.json": {
+    "nodes": [
+      {
+        "name": "香港 01",
+        "type": "Shadowsocks",
+        "region": "HK"
+      },
+      {
+        "name": "SS obfs",
+        "type": "Shadowsocks",
+        "region": "ZZ"
+      },
+      {
+        "name": "VMess gRPC",
+        "type": "Vmess",
+        "region": "ZZ"
+      },
+      {
+        "name": "VLESS REALITY",
+        "type": "Vless",
+        "region": "ZZ"
+      },
+      {
+        "name": "VLESS XHTTP",
+        "type": "Vless",
+        "region": "ZZ"
+      },
+      {
+        "name": "Trojan WS",
+        "type": "Trojan",
+        "region": "ZZ"
+      },
+      {
+        "name": "Trojan upgrade",
+        "type": "Trojan",
+        "region": "ZZ"
+      },
+      {
+        "name": "Hy2",
+        "type": "Hysteria2",
+        "region": "ZZ"
+      },
+      {
+        "name": "TUIC",
+        "type": "Tuic",
+        "region": "ZZ"
+      },
+      {
+        "name": "AnyTLS REALITY",
+        "type": "AnyTLS",
+        "region": "ZZ"
+      },
+      {
+        "name": "Naive QUIC",
+        "type": "Naive",
+        "region": "ZZ"
+      },
+      {
+        "name": "HTTPS",
+        "type": "Http",
+        "region": "ZZ"
+      },
+      {
+        "name": "SOCKS",
+        "type": "Socks5",
+        "region": "ZZ"
+      },
+      {
+        "name": "SSR",
+        "type": "ShadowsocksR",
+        "region": "ZZ"
+      },
+      {
+        "name": "SSR auth",
+        "type": "ShadowsocksR",
+        "region": "ZZ"
+      },
+      {
+        "name": "VMess ECH",
+        "type": "Vmess",
+        "region": "ZZ"
+      },
+      {
+        "name": "WG",
+        "type": "WireGuard",
+        "region": "ZZ"
+      }
+    ],
+    "has_rules": true,
+    "group_count": 3,
+    "rule_count": 1,
+    "warnings": [
+      {
+        "code": "unsupported_option",
+        "detail": "SOCKS4: SOCKS4 (mihomo speaks SOCKS5)"
+      },
+      {
+        "code": "unsupported_proxy",
+        "detail": "ShadowTLS: ShadowTLS on its own; mihomo adds it to the proxy that dials through it"
+      },
+      {
+        "code": "invalid_proxy",
+        "detail": "SSR AEAD: cipher aes-128-gcm, not a stream cipher"
+      },
+      {
+        "code": "unknown_reference",
+        "detail": "Proxy: member Unknown"
+      },
+      {
+        "code": "empty_group",
+        "detail": "Empty: no members left"
+      }
+    ]
+  },
+  "sip008.json": {
+    "nodes": [
+      {
+        "name": "Server 1",
+        "type": "Shadowsocks",
+        "region": "ZZ"
+      },
+      {
+        "name": "Server 2 obfs",
+        "type": "Shadowsocks",
+        "region": "ZZ"
+      }
+    ],
+    "warnings": [
+      {
+        "code": "unsupported_option",
+        "detail": "Kcptun: plugin kcptun"
+      },
+      {
+        "code": "invalid_proxy",
+        "detail": "No port: no port"
+      }
+    ]
+  },
+  "ssd.txt": {
+    "nodes": [
+      {
+        "name": "HK 01",
+        "type": "Shadowsocks",
+        "region": "HK"
+      },
+      {
+        "name": "JP 02",
+        "type": "Shadowsocks",
+        "region": "JP"
+      }
+    ],
+    "warnings": [
+      {
+        "code": "invalid_proxy",
+        "detail": "Empty: no server"
+      }
+    ]
+  },
+  "stash.yaml": {
+    "nodes": [
+      {
+        "name": "HK",
+        "type": "Shadowsocks",
+        "region": "HK"
+      },
+      {
+        "name": "Hy1",
+        "type": "Hysteria",
+        "region": "ZZ"
+      }
+    ],
+    "has_rules": true,
+    "group_count": 1,
+    "rule_count": 2,
+    "warnings": [
+      {
+        "code": "unsupported_rule",
+        "detail": "http rewrite: 1 rules"
+      },
+      {
+        "code": "unsupported_rule",
+        "detail": "SCRIPT,quic,REJECT: rule type SCRIPT"
+      }
+    ]
+  },
+  "surge.conf": {
+    "nodes": [
+      {
+        "name": "🇭🇰 HK 01",
+        "type": "Shadowsocks",
+        "region": "HK"
+      },
+      {
+        "name": "🇯🇵 JP VMess",
+        "type": "Vmess",
+        "region": "JP"
+      },
+      {
+        "name": "🇺🇸 US Trojan",
+        "type": "Trojan",
+        "region": "US"
+      },
+      {
+        "name": "SG Snell",
+        "type": "Snell",
+        "region": "SG"
+      },
+      {
+        "name": "SG Snell ShadowTLS",
+        "type": "Snell",
+        "region": "SG"
+      },
+      {
+        "name": "HK SS ShadowTLS",
+        "type": "Shadowsocks",
+        "region": "HK"
+      },
+      {
+        "name": "NL VMess ShadowTLS",
+        "type": "Vmess",
+        "region": "NL"
+      },
+      {
+        "name": "SG Snell v6",
+        "type": "Snell",
+        "region": "SG"
+      },
+      {
+        "name": "TW Hy2",
+        "type": "Hysteria2",
+        "region": "TW"
+      },
+      {
+        "name": "KR TUIC",
+        "type": "Tuic",
+        "region": "KR"
+      },
+      {
+        "name": "HTTPS Proxy",
+        "type": "Http",
+        "region": "ZZ"
+      },
+      {
+        "name": "SOCKS",
+        "type": "Socks5",
+        "region": "ZZ"
+      },
+      {
+        "name": "Chain",
+        "type": "Trojan",
+        "region": "ZZ"
+      },
+      {
+        "name": "WARP",
+        "type": "WireGuard",
+        "region": "ZZ"
+      }
+    ],
+    "has_rules": true,
+    "group_count": 5,
+    "rule_count": 14,
+    "warnings": [
+      {
+        "code": "unsupported_rule",
+        "detail": "section [url rewrite]: 1 lines"
+      },
+      {
+        "code": "unsupported_proxy",
+        "detail": "External: type external"
+      },
+      {
+        "code": "ignored_option",
+        "detail": "Remote: policy-path (a list in the client's own format)"
+      },
+      {
+        "code": "unsupported_group",
+        "detail": "Home: type subnet"
+      },
+      {
+        "code": "unsupported_rule",
+        "detail": "RULE-SET,SYSTEM,DIRECT: Apple's system rule set"
+      },
+      {
+        "code": "invalid_credential",
+        "detail": "SG Snell password: a password but no psk"
+      },
+      {
+        "code": "invalid_proxy",
+        "detail": "Broken: no server"
+      },
+      {
+        "code": "empty_group",
+        "detail": "Remote: no members left"
+      },
+      {
+        "code": "unsupported_rule",
+        "detail": "USER-AGENT,Telegram*,Proxy: rule type USER-AGENT"
+      }
+    ]
+  },
+  "xray.json": {
+    "nodes": [
+      {
+        "name": "proxy",
+        "type": "Vless",
+        "region": "ZZ"
+      },
+      {
+        "name": "vmess-ws",
+        "type": "Vmess",
+        "region": "ZZ"
+      },
+      {
+        "name": "trojan-grpc 1",
+        "type": "Trojan",
+        "region": "ZZ"
+      },
+      {
+        "name": "trojan-grpc 2",
+        "type": "Trojan",
+        "region": "ZZ"
+      },
+      {
+        "name": "ss",
+        "type": "Shadowsocks",
+        "region": "ZZ"
+      },
+      {
+        "name": "wg",
+        "type": "WireGuard",
+        "region": "ZZ"
+      },
+      {
+        "name": "chained",
+        "type": "Socks5",
+        "region": "ZZ"
+      },
+      {
+        "name": "dialer",
+        "type": "Trojan",
+        "region": "ZZ"
+      }
+    ],
+    "has_rules": true,
+    "group_count": 2,
+    "rule_count": 15,
+    "warnings": [
+      {
+        "code": "ignored_option",
+        "detail": "vmess-ws: mux (Xray's own multiplexing)"
+      },
+      {
+        "code": "unsupported_option",
+        "detail": "kcp: transport kcp"
+      },
+      {
+        "code": "unsupported_rule",
+        "detail": "rule 9 to proxy: domain ext:custom.dat:tag"
+      },
+      {
+        "code": "unsupported_rule",
+        "detail": "rule 10 to DIRECT: a rule with protocol"
+      }
+    ]
+  }
+}

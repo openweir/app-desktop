@@ -40,6 +40,7 @@ from openweir.host.base import (
     SkippedRule,
     SourceInspection,
     SourceNode,
+    SourceWarning,
     TailscaleSettings,
     TunnelConfig,
     ZeroTierSettings,
@@ -205,33 +206,61 @@ def region_of(name: str) -> str:
     return OTHER_REGION
 
 
-def _share_links(text: str) -> list[dict[str, Any]]:
+# What subconv says of a share link it leaves out (the core's compose.Normalize, D54).
+TELEGRAM_LINK = SourceWarning(
+    "unsupported_option", "tg link: a Telegram proxy, which only Telegram uses"
+)
+
+
+def _share_links(text: str) -> tuple[list[dict[str, Any]], list[SourceWarning]]:
     with contextlib.suppress(binascii.Error, UnicodeDecodeError):
         text = base64.b64decode(text.strip() + "=" * (-len(text.strip()) % 4)).decode()
-    proxies = []
+    proxies, warnings = [], []
     for line in text.splitlines():
         link = urlsplit(line.strip())
         if link.scheme in LINK_SCHEMES and link.fragment:
             proxies.append({"name": unquote(link.fragment), "type": LINK_SCHEMES[link.scheme]})
-    return proxies
+        elif link.scheme == "tg":
+            warnings.append(TELEGRAM_LINK)
+        elif link.scheme and "://" in line:
+            detail = f"{link.scheme} link: scheme {link.scheme}"
+            warnings.append(SourceWarning("unsupported_proxy", detail))
+    return proxies, warnings
 
 
-def _subscription(text: str, label: str) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    """The named proxies of a subscription, each name once, and the profile itself."""
+def _subscription(
+    text: str, label: str
+) -> tuple[list[dict[str, Any]], dict[str, Any], list[SourceWarning]]:
+    """The named proxies of a subscription, a later one of a taken name numbered as subconv
+    numbers it, the profile itself and what reading it left out or changed."""
     document = _load(text, label)
+    warnings: list[SourceWarning] = []
     if isinstance(document, dict):
         proxies = document.get("proxies") or []
         if not isinstance(proxies, list):
             raise HostError("invalid_config", label + "proxies must be a list")
     else:
-        document, proxies = {}, _share_links(text)
+        document = {}
+        proxies, warnings = _share_links(text)
         if not proxies:
-            raise HostError("invalid_config", label + "neither a mihomo profile nor share links")
+            raise HostError("invalid_config", label + UNREADABLE)
     named: dict[str, dict[str, Any]] = {}
     for proxy in proxies:
         if isinstance(proxy, dict) and isinstance(proxy.get("name"), str) and proxy["name"]:
-            named.setdefault(proxy["name"], proxy)
-    return list(named.values()), document
+            name, number = proxy["name"], 2
+            while name in named:
+                name, number = f"{proxy['name']} {number}", number + 1
+            if name != proxy["name"]:
+                warnings.append(SourceWarning("renamed", f"{proxy['name']}: renamed {name}"))
+                proxy = {**proxy, "name": name}
+            named[name] = proxy
+    return list(named.values()), document, warnings
+
+
+# The core's answer for a body that is no subscription (compose.readError).
+UNREADABLE = (
+    "neither a mihomo profile nor share links, nor another subscription format the core reads"
+)
 
 
 def info_filter_of(pattern: str) -> re.Pattern[str] | None:
@@ -244,7 +273,7 @@ def info_filter_of(pattern: str) -> re.Pattern[str] | None:
 
 def inspect(text: str, info_filter: str = "") -> SourceInspection:
     info = info_filter_of(info_filter)
-    proxies, document = _subscription(text, "")
+    proxies, document, warnings = _subscription(text, "")
     rules = document.get("rules") or []
     return SourceInspection(
         nodes=tuple(
@@ -260,6 +289,7 @@ def inspect(text: str, info_filter: str = "") -> SourceInspection:
         has_rules=bool(rules),
         group_count=len(document.get("proxy-groups") or []),
         rule_count=len(rules),
+        warnings=tuple(warnings),
     )
 
 
@@ -599,7 +629,7 @@ def convert(text: str, source_id: str = "", locale: str = "zh") -> PlanConversio
     """A stand-in for the core's conversion (routing.md §4.7): groups by name, rules by
     kind with neighbouring domains and ranges of one target together, RULE-SET and SUB-RULE
     skipped."""
-    proxies, document = _subscription(text, "")
+    proxies, document, _ = _subscription(text, "")
     groups = [
         g for g in document.get("proxy-groups") or [] if isinstance(g, dict) and g.get("name")
     ]

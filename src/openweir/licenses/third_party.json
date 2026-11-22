@@ -1198,6 +1198,16 @@
       ]
     },
     {
+      "name": "github.com/openweir/subconv",
+      "version": "v0.5.0",
+      "license": "GPL-3.0-only",
+      "kind": "go",
+      "url": "https://github.com/openweir/subconv",
+      "notices": [
+        34
+      ]
+    },
+    {
       "name": "github.com/oschwald/maxminddb-golang",
       "version": "v1.12.0",
       "license": "ISC",

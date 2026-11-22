@@ -39,6 +39,7 @@ from openweir.host.base import (
     SkippedRule,
     SourceInspection,
     SourceNode,
+    SourceWarning,
     TailscaleSettings,
     TrafficSample,
     TunnelConfig,
@@ -515,6 +516,7 @@ class ServiceHost:
             has_rules=inspected.has_rules,
             group_count=inspected.group_count,
             rule_count=inspected.rule_count,
+            warnings=tuple(SourceWarning(w.code, w.detail) for w in inspected.warnings),
         )
 
     async def list_geo_categories(self) -> GeoCategories:

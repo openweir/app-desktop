@@ -28,7 +28,9 @@ type admittedConfig struct {
 // admit runs a profile through the admission pipeline on this engine's host.
 func (e *Engine) admit(profile admission.Profile) (*admittedConfig, error) {
 	homeInUse = e.home
-	return admitProfile(profile, admission.Host{Tun: e.tunMode, IncludeAllNetworks: e.includeAllNetworks})
+	return admitProfile(profile, admission.Host{
+		Tun: e.tunMode, IncludeAllNetworks: e.includeAllNetworks, Template: e.template.Client(),
+	})
 }
 
 // admitProfile runs the configuration admission pipeline (docs/architecture.md §3.2):

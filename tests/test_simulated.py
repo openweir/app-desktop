@@ -25,6 +25,7 @@ from openweir.host.base import (
     SkippedRule,
     SourceInspection,
     SourceNode,
+    SourceWarning,
     TailscaleSettings,
     TunnelConfig,
     ZeroTierSettings,
@@ -109,6 +110,7 @@ def test_inspection(name: str) -> None:
         answer.has_rules,
         answer.group_count,
         answer.rule_count,
+        tuple(SourceWarning(w.code, w.detail) for w in answer.warnings),
     )
     host = SimulatedHost()
     assert asyncio.run(host.inspect_source(case["yaml"], case["info_filter"])) == expected

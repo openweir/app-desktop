@@ -5842,11 +5842,14 @@ func (x *InspectSourceRequest) GetInfoFilter() string {
 }
 
 type InspectSourceResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Nodes         []*SourceNode          `protobuf:"bytes,1,rep,name=nodes,proto3" json:"nodes,omitempty"`
-	HasRules      bool                   `protobuf:"varint,2,opt,name=has_rules,json=hasRules,proto3" json:"has_rules,omitempty"`
-	GroupCount    uint32                 `protobuf:"varint,3,opt,name=group_count,json=groupCount,proto3" json:"group_count,omitempty"`
-	RuleCount     uint32                 `protobuf:"varint,4,opt,name=rule_count,json=ruleCount,proto3" json:"rule_count,omitempty"`
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	Nodes      []*SourceNode          `protobuf:"bytes,1,rep,name=nodes,proto3" json:"nodes,omitempty"`
+	HasRules   bool                   `protobuf:"varint,2,opt,name=has_rules,json=hasRules,proto3" json:"has_rules,omitempty"` // rules of its own, not only the MATCH a profile of groups gets
+	GroupCount uint32                 `protobuf:"varint,3,opt,name=group_count,json=groupCount,proto3" json:"group_count,omitempty"`
+	RuleCount  uint32                 `protobuf:"varint,4,opt,name=rule_count,json=ruleCount,proto3" json:"rule_count,omitempty"`
+	// What reading the subscription left out or changed, in the order met (docs/routing.md
+	// §8.1): a node, group, rule or provider mihomo would refuse, a renamed duplicate.
+	Warnings      []*SourceWarning `protobuf:"bytes,5,rep,name=warnings,proto3" json:"warnings,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -5907,6 +5910,13 @@ func (x *InspectSourceResponse) GetRuleCount() uint32 {
 		return x.RuleCount
 	}
 	return 0
+}
+
+func (x *InspectSourceResponse) GetWarnings() []*SourceWarning {
+	if x != nil {
+		return x.Warnings
+	}
+	return nil
 }
 
 type SourceNode struct {
@@ -5985,6 +5995,60 @@ func (x *SourceNode) GetMesh() bool {
 	return false
 }
 
+// One of github.com/openweir/subconv's warnings: a stable code (unsupported_proxy,
+// invalid_proxy, unsupported_rule, renamed...) and the item it is about.
+type SourceWarning struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Code          string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
+	Detail        string                 `protobuf:"bytes,2,opt,name=detail,proto3" json:"detail,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SourceWarning) Reset() {
+	*x = SourceWarning{}
+	mi := &file_openweir_protocol_control_proto_msgTypes[69]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SourceWarning) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SourceWarning) ProtoMessage() {}
+
+func (x *SourceWarning) ProtoReflect() protoreflect.Message {
+	mi := &file_openweir_protocol_control_proto_msgTypes[69]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SourceWarning.ProtoReflect.Descriptor instead.
+func (*SourceWarning) Descriptor() ([]byte, []int) {
+	return file_openweir_protocol_control_proto_rawDescGZIP(), []int{69}
+}
+
+func (x *SourceWarning) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+func (x *SourceWarning) GetDetail() string {
+	if x != nil {
+		return x.Detail
+	}
+	return ""
+}
+
 // Registers a WARP device through a group of the running configuration, or gives an
 // existing one a key for another protocol (docs/exits.md §3.2). Failures are
 // operation_failed with Cloudflare's text; not_running while the core is stopped.
@@ -6001,7 +6065,7 @@ type RegisterWarpRequest struct {
 
 func (x *RegisterWarpRequest) Reset() {
 	*x = RegisterWarpRequest{}
-	mi := &file_openweir_protocol_control_proto_msgTypes[69]
+	mi := &file_openweir_protocol_control_proto_msgTypes[70]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6013,7 +6077,7 @@ func (x *RegisterWarpRequest) String() string {
 func (*RegisterWarpRequest) ProtoMessage() {}
 
 func (x *RegisterWarpRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_openweir_protocol_control_proto_msgTypes[69]
+	mi := &file_openweir_protocol_control_proto_msgTypes[70]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6026,7 +6090,7 @@ func (x *RegisterWarpRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterWarpRequest.ProtoReflect.Descriptor instead.
 func (*RegisterWarpRequest) Descriptor() ([]byte, []int) {
-	return file_openweir_protocol_control_proto_rawDescGZIP(), []int{69}
+	return file_openweir_protocol_control_proto_rawDescGZIP(), []int{70}
 }
 
 func (x *RegisterWarpRequest) GetVia() string {
@@ -6066,7 +6130,7 @@ type RegisterWarpResponse struct {
 
 func (x *RegisterWarpResponse) Reset() {
 	*x = RegisterWarpResponse{}
-	mi := &file_openweir_protocol_control_proto_msgTypes[70]
+	mi := &file_openweir_protocol_control_proto_msgTypes[71]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6078,7 +6142,7 @@ func (x *RegisterWarpResponse) String() string {
 func (*RegisterWarpResponse) ProtoMessage() {}
 
 func (x *RegisterWarpResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_openweir_protocol_control_proto_msgTypes[70]
+	mi := &file_openweir_protocol_control_proto_msgTypes[71]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6091,7 +6155,7 @@ func (x *RegisterWarpResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterWarpResponse.ProtoReflect.Descriptor instead.
 func (*RegisterWarpResponse) Descriptor() ([]byte, []int) {
-	return file_openweir_protocol_control_proto_rawDescGZIP(), []int{70}
+	return file_openweir_protocol_control_proto_rawDescGZIP(), []int{71}
 }
 
 func (x *RegisterWarpResponse) GetAccount() *WarpAccount {
@@ -6113,7 +6177,7 @@ type ListVpnGateRequest struct {
 
 func (x *ListVpnGateRequest) Reset() {
 	*x = ListVpnGateRequest{}
-	mi := &file_openweir_protocol_control_proto_msgTypes[71]
+	mi := &file_openweir_protocol_control_proto_msgTypes[72]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6125,7 +6189,7 @@ func (x *ListVpnGateRequest) String() string {
 func (*ListVpnGateRequest) ProtoMessage() {}
 
 func (x *ListVpnGateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_openweir_protocol_control_proto_msgTypes[71]
+	mi := &file_openweir_protocol_control_proto_msgTypes[72]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6138,7 +6202,7 @@ func (x *ListVpnGateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListVpnGateRequest.ProtoReflect.Descriptor instead.
 func (*ListVpnGateRequest) Descriptor() ([]byte, []int) {
-	return file_openweir_protocol_control_proto_rawDescGZIP(), []int{71}
+	return file_openweir_protocol_control_proto_rawDescGZIP(), []int{72}
 }
 
 func (x *ListVpnGateRequest) GetVia() string {
@@ -6157,7 +6221,7 @@ type ListVpnGateResponse struct {
 
 func (x *ListVpnGateResponse) Reset() {
 	*x = ListVpnGateResponse{}
-	mi := &file_openweir_protocol_control_proto_msgTypes[72]
+	mi := &file_openweir_protocol_control_proto_msgTypes[73]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6169,7 +6233,7 @@ func (x *ListVpnGateResponse) String() string {
 func (*ListVpnGateResponse) ProtoMessage() {}
 
 func (x *ListVpnGateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_openweir_protocol_control_proto_msgTypes[72]
+	mi := &file_openweir_protocol_control_proto_msgTypes[73]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6182,7 +6246,7 @@ func (x *ListVpnGateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListVpnGateResponse.ProtoReflect.Descriptor instead.
 func (*ListVpnGateResponse) Descriptor() ([]byte, []int) {
-	return file_openweir_protocol_control_proto_rawDescGZIP(), []int{72}
+	return file_openweir_protocol_control_proto_rawDescGZIP(), []int{73}
 }
 
 func (x *ListVpnGateResponse) GetServers() []*VpnGateServer {
@@ -6212,7 +6276,7 @@ type VpnGateServer struct {
 
 func (x *VpnGateServer) Reset() {
 	*x = VpnGateServer{}
-	mi := &file_openweir_protocol_control_proto_msgTypes[73]
+	mi := &file_openweir_protocol_control_proto_msgTypes[74]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6224,7 +6288,7 @@ func (x *VpnGateServer) String() string {
 func (*VpnGateServer) ProtoMessage() {}
 
 func (x *VpnGateServer) ProtoReflect() protoreflect.Message {
-	mi := &file_openweir_protocol_control_proto_msgTypes[73]
+	mi := &file_openweir_protocol_control_proto_msgTypes[74]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6237,7 +6301,7 @@ func (x *VpnGateServer) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VpnGateServer.ProtoReflect.Descriptor instead.
 func (*VpnGateServer) Descriptor() ([]byte, []int) {
-	return file_openweir_protocol_control_proto_rawDescGZIP(), []int{73}
+	return file_openweir_protocol_control_proto_rawDescGZIP(), []int{74}
 }
 
 func (x *VpnGateServer) GetHostName() string {
@@ -6331,7 +6395,7 @@ type OpenVpnOptions struct {
 
 func (x *OpenVpnOptions) Reset() {
 	*x = OpenVpnOptions{}
-	mi := &file_openweir_protocol_control_proto_msgTypes[74]
+	mi := &file_openweir_protocol_control_proto_msgTypes[75]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6343,7 +6407,7 @@ func (x *OpenVpnOptions) String() string {
 func (*OpenVpnOptions) ProtoMessage() {}
 
 func (x *OpenVpnOptions) ProtoReflect() protoreflect.Message {
-	mi := &file_openweir_protocol_control_proto_msgTypes[74]
+	mi := &file_openweir_protocol_control_proto_msgTypes[75]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6356,7 +6420,7 @@ func (x *OpenVpnOptions) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OpenVpnOptions.ProtoReflect.Descriptor instead.
 func (*OpenVpnOptions) Descriptor() ([]byte, []int) {
-	return file_openweir_protocol_control_proto_rawDescGZIP(), []int{74}
+	return file_openweir_protocol_control_proto_rawDescGZIP(), []int{75}
 }
 
 func (x *OpenVpnOptions) GetServer() string {
@@ -6453,7 +6517,7 @@ type GetMeshStatusRequest struct {
 
 func (x *GetMeshStatusRequest) Reset() {
 	*x = GetMeshStatusRequest{}
-	mi := &file_openweir_protocol_control_proto_msgTypes[75]
+	mi := &file_openweir_protocol_control_proto_msgTypes[76]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6465,7 +6529,7 @@ func (x *GetMeshStatusRequest) String() string {
 func (*GetMeshStatusRequest) ProtoMessage() {}
 
 func (x *GetMeshStatusRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_openweir_protocol_control_proto_msgTypes[75]
+	mi := &file_openweir_protocol_control_proto_msgTypes[76]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6478,7 +6542,7 @@ func (x *GetMeshStatusRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetMeshStatusRequest.ProtoReflect.Descriptor instead.
 func (*GetMeshStatusRequest) Descriptor() ([]byte, []int) {
-	return file_openweir_protocol_control_proto_rawDescGZIP(), []int{75}
+	return file_openweir_protocol_control_proto_rawDescGZIP(), []int{76}
 }
 
 type GetMeshStatusResponse struct {
@@ -6490,7 +6554,7 @@ type GetMeshStatusResponse struct {
 
 func (x *GetMeshStatusResponse) Reset() {
 	*x = GetMeshStatusResponse{}
-	mi := &file_openweir_protocol_control_proto_msgTypes[76]
+	mi := &file_openweir_protocol_control_proto_msgTypes[77]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6502,7 +6566,7 @@ func (x *GetMeshStatusResponse) String() string {
 func (*GetMeshStatusResponse) ProtoMessage() {}
 
 func (x *GetMeshStatusResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_openweir_protocol_control_proto_msgTypes[76]
+	mi := &file_openweir_protocol_control_proto_msgTypes[77]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6515,7 +6579,7 @@ func (x *GetMeshStatusResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetMeshStatusResponse.ProtoReflect.Descriptor instead.
 func (*GetMeshStatusResponse) Descriptor() ([]byte, []int) {
-	return file_openweir_protocol_control_proto_rawDescGZIP(), []int{76}
+	return file_openweir_protocol_control_proto_rawDescGZIP(), []int{77}
 }
 
 func (x *GetMeshStatusResponse) GetNetworks() []*MeshStatus {
@@ -6543,7 +6607,7 @@ type MeshStatus struct {
 
 func (x *MeshStatus) Reset() {
 	*x = MeshStatus{}
-	mi := &file_openweir_protocol_control_proto_msgTypes[77]
+	mi := &file_openweir_protocol_control_proto_msgTypes[78]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6555,7 +6619,7 @@ func (x *MeshStatus) String() string {
 func (*MeshStatus) ProtoMessage() {}
 
 func (x *MeshStatus) ProtoReflect() protoreflect.Message {
-	mi := &file_openweir_protocol_control_proto_msgTypes[77]
+	mi := &file_openweir_protocol_control_proto_msgTypes[78]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6568,7 +6632,7 @@ func (x *MeshStatus) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MeshStatus.ProtoReflect.Descriptor instead.
 func (*MeshStatus) Descriptor() ([]byte, []int) {
-	return file_openweir_protocol_control_proto_rawDescGZIP(), []int{77}
+	return file_openweir_protocol_control_proto_rawDescGZIP(), []int{78}
 }
 
 func (x *MeshStatus) GetName() string {
@@ -6653,7 +6717,7 @@ type LoginMeshRequest struct {
 
 func (x *LoginMeshRequest) Reset() {
 	*x = LoginMeshRequest{}
-	mi := &file_openweir_protocol_control_proto_msgTypes[78]
+	mi := &file_openweir_protocol_control_proto_msgTypes[79]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6665,7 +6729,7 @@ func (x *LoginMeshRequest) String() string {
 func (*LoginMeshRequest) ProtoMessage() {}
 
 func (x *LoginMeshRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_openweir_protocol_control_proto_msgTypes[78]
+	mi := &file_openweir_protocol_control_proto_msgTypes[79]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6678,7 +6742,7 @@ func (x *LoginMeshRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LoginMeshRequest.ProtoReflect.Descriptor instead.
 func (*LoginMeshRequest) Descriptor() ([]byte, []int) {
-	return file_openweir_protocol_control_proto_rawDescGZIP(), []int{78}
+	return file_openweir_protocol_control_proto_rawDescGZIP(), []int{79}
 }
 
 func (x *LoginMeshRequest) GetName() string {
@@ -6697,7 +6761,7 @@ type LoginMeshResponse struct {
 
 func (x *LoginMeshResponse) Reset() {
 	*x = LoginMeshResponse{}
-	mi := &file_openweir_protocol_control_proto_msgTypes[79]
+	mi := &file_openweir_protocol_control_proto_msgTypes[80]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6709,7 +6773,7 @@ func (x *LoginMeshResponse) String() string {
 func (*LoginMeshResponse) ProtoMessage() {}
 
 func (x *LoginMeshResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_openweir_protocol_control_proto_msgTypes[79]
+	mi := &file_openweir_protocol_control_proto_msgTypes[80]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6722,7 +6786,7 @@ func (x *LoginMeshResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LoginMeshResponse.ProtoReflect.Descriptor instead.
 func (*LoginMeshResponse) Descriptor() ([]byte, []int) {
-	return file_openweir_protocol_control_proto_rawDescGZIP(), []int{79}
+	return file_openweir_protocol_control_proto_rawDescGZIP(), []int{80}
 }
 
 func (x *LoginMeshResponse) GetLoginUrl() string {
@@ -6740,7 +6804,7 @@ type ListGeoCategoriesRequest struct {
 
 func (x *ListGeoCategoriesRequest) Reset() {
 	*x = ListGeoCategoriesRequest{}
-	mi := &file_openweir_protocol_control_proto_msgTypes[80]
+	mi := &file_openweir_protocol_control_proto_msgTypes[81]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6752,7 +6816,7 @@ func (x *ListGeoCategoriesRequest) String() string {
 func (*ListGeoCategoriesRequest) ProtoMessage() {}
 
 func (x *ListGeoCategoriesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_openweir_protocol_control_proto_msgTypes[80]
+	mi := &file_openweir_protocol_control_proto_msgTypes[81]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6765,7 +6829,7 @@ func (x *ListGeoCategoriesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListGeoCategoriesRequest.ProtoReflect.Descriptor instead.
 func (*ListGeoCategoriesRequest) Descriptor() ([]byte, []int) {
-	return file_openweir_protocol_control_proto_rawDescGZIP(), []int{80}
+	return file_openweir_protocol_control_proto_rawDescGZIP(), []int{81}
 }
 
 type ListGeoCategoriesResponse struct {
@@ -6778,7 +6842,7 @@ type ListGeoCategoriesResponse struct {
 
 func (x *ListGeoCategoriesResponse) Reset() {
 	*x = ListGeoCategoriesResponse{}
-	mi := &file_openweir_protocol_control_proto_msgTypes[81]
+	mi := &file_openweir_protocol_control_proto_msgTypes[82]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6790,7 +6854,7 @@ func (x *ListGeoCategoriesResponse) String() string {
 func (*ListGeoCategoriesResponse) ProtoMessage() {}
 
 func (x *ListGeoCategoriesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_openweir_protocol_control_proto_msgTypes[81]
+	mi := &file_openweir_protocol_control_proto_msgTypes[82]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6803,7 +6867,7 @@ func (x *ListGeoCategoriesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListGeoCategoriesResponse.ProtoReflect.Descriptor instead.
 func (*ListGeoCategoriesResponse) Descriptor() ([]byte, []int) {
-	return file_openweir_protocol_control_proto_rawDescGZIP(), []int{81}
+	return file_openweir_protocol_control_proto_rawDescGZIP(), []int{82}
 }
 
 func (x *ListGeoCategoriesResponse) GetGeosite() *GeoCategories {
@@ -6833,7 +6897,7 @@ type GeoCategories struct {
 
 func (x *GeoCategories) Reset() {
 	*x = GeoCategories{}
-	mi := &file_openweir_protocol_control_proto_msgTypes[82]
+	mi := &file_openweir_protocol_control_proto_msgTypes[83]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6845,7 +6909,7 @@ func (x *GeoCategories) String() string {
 func (*GeoCategories) ProtoMessage() {}
 
 func (x *GeoCategories) ProtoReflect() protoreflect.Message {
-	mi := &file_openweir_protocol_control_proto_msgTypes[82]
+	mi := &file_openweir_protocol_control_proto_msgTypes[83]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6858,7 +6922,7 @@ func (x *GeoCategories) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GeoCategories.ProtoReflect.Descriptor instead.
 func (*GeoCategories) Descriptor() ([]byte, []int) {
-	return file_openweir_protocol_control_proto_rawDescGZIP(), []int{82}
+	return file_openweir_protocol_control_proto_rawDescGZIP(), []int{83}
 }
 
 func (x *GeoCategories) GetNames() []string {
@@ -6894,7 +6958,7 @@ type PreviewGroupRequest struct {
 
 func (x *PreviewGroupRequest) Reset() {
 	*x = PreviewGroupRequest{}
-	mi := &file_openweir_protocol_control_proto_msgTypes[83]
+	mi := &file_openweir_protocol_control_proto_msgTypes[84]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6906,7 +6970,7 @@ func (x *PreviewGroupRequest) String() string {
 func (*PreviewGroupRequest) ProtoMessage() {}
 
 func (x *PreviewGroupRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_openweir_protocol_control_proto_msgTypes[83]
+	mi := &file_openweir_protocol_control_proto_msgTypes[84]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6919,7 +6983,7 @@ func (x *PreviewGroupRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PreviewGroupRequest.ProtoReflect.Descriptor instead.
 func (*PreviewGroupRequest) Descriptor() ([]byte, []int) {
-	return file_openweir_protocol_control_proto_rawDescGZIP(), []int{83}
+	return file_openweir_protocol_control_proto_rawDescGZIP(), []int{84}
 }
 
 func (x *PreviewGroupRequest) GetComposition() *Composition {
@@ -6948,7 +7012,7 @@ type PreviewGroupResponse struct {
 
 func (x *PreviewGroupResponse) Reset() {
 	*x = PreviewGroupResponse{}
-	mi := &file_openweir_protocol_control_proto_msgTypes[84]
+	mi := &file_openweir_protocol_control_proto_msgTypes[85]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6960,7 +7024,7 @@ func (x *PreviewGroupResponse) String() string {
 func (*PreviewGroupResponse) ProtoMessage() {}
 
 func (x *PreviewGroupResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_openweir_protocol_control_proto_msgTypes[84]
+	mi := &file_openweir_protocol_control_proto_msgTypes[85]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6973,7 +7037,7 @@ func (x *PreviewGroupResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PreviewGroupResponse.ProtoReflect.Descriptor instead.
 func (*PreviewGroupResponse) Descriptor() ([]byte, []int) {
-	return file_openweir_protocol_control_proto_rawDescGZIP(), []int{84}
+	return file_openweir_protocol_control_proto_rawDescGZIP(), []int{85}
 }
 
 func (x *PreviewGroupResponse) GetNodes() []*PoolNode {
@@ -7010,7 +7074,7 @@ type MatchRuleRequest struct {
 
 func (x *MatchRuleRequest) Reset() {
 	*x = MatchRuleRequest{}
-	mi := &file_openweir_protocol_control_proto_msgTypes[85]
+	mi := &file_openweir_protocol_control_proto_msgTypes[86]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7022,7 +7086,7 @@ func (x *MatchRuleRequest) String() string {
 func (*MatchRuleRequest) ProtoMessage() {}
 
 func (x *MatchRuleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_openweir_protocol_control_proto_msgTypes[85]
+	mi := &file_openweir_protocol_control_proto_msgTypes[86]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7035,7 +7099,7 @@ func (x *MatchRuleRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MatchRuleRequest.ProtoReflect.Descriptor instead.
 func (*MatchRuleRequest) Descriptor() ([]byte, []int) {
-	return file_openweir_protocol_control_proto_rawDescGZIP(), []int{85}
+	return file_openweir_protocol_control_proto_rawDescGZIP(), []int{86}
 }
 
 func (x *MatchRuleRequest) GetSource() isMatchRuleRequest_Source {
@@ -7125,7 +7189,7 @@ type MatchRuleResponse struct {
 
 func (x *MatchRuleResponse) Reset() {
 	*x = MatchRuleResponse{}
-	mi := &file_openweir_protocol_control_proto_msgTypes[86]
+	mi := &file_openweir_protocol_control_proto_msgTypes[87]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7137,7 +7201,7 @@ func (x *MatchRuleResponse) String() string {
 func (*MatchRuleResponse) ProtoMessage() {}
 
 func (x *MatchRuleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_openweir_protocol_control_proto_msgTypes[86]
+	mi := &file_openweir_protocol_control_proto_msgTypes[87]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7150,7 +7214,7 @@ func (x *MatchRuleResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MatchRuleResponse.ProtoReflect.Descriptor instead.
 func (*MatchRuleResponse) Descriptor() ([]byte, []int) {
-	return file_openweir_protocol_control_proto_rawDescGZIP(), []int{86}
+	return file_openweir_protocol_control_proto_rawDescGZIP(), []int{87}
 }
 
 func (x *MatchRuleResponse) GetMatched() bool {
@@ -7204,7 +7268,7 @@ type ConvertToPlanRequest struct {
 
 func (x *ConvertToPlanRequest) Reset() {
 	*x = ConvertToPlanRequest{}
-	mi := &file_openweir_protocol_control_proto_msgTypes[87]
+	mi := &file_openweir_protocol_control_proto_msgTypes[88]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7216,7 +7280,7 @@ func (x *ConvertToPlanRequest) String() string {
 func (*ConvertToPlanRequest) ProtoMessage() {}
 
 func (x *ConvertToPlanRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_openweir_protocol_control_proto_msgTypes[87]
+	mi := &file_openweir_protocol_control_proto_msgTypes[88]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7229,7 +7293,7 @@ func (x *ConvertToPlanRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConvertToPlanRequest.ProtoReflect.Descriptor instead.
 func (*ConvertToPlanRequest) Descriptor() ([]byte, []int) {
-	return file_openweir_protocol_control_proto_rawDescGZIP(), []int{87}
+	return file_openweir_protocol_control_proto_rawDescGZIP(), []int{88}
 }
 
 func (x *ConvertToPlanRequest) GetYaml() string {
@@ -7275,7 +7339,7 @@ type ConvertToPlanResponse struct {
 
 func (x *ConvertToPlanResponse) Reset() {
 	*x = ConvertToPlanResponse{}
-	mi := &file_openweir_protocol_control_proto_msgTypes[88]
+	mi := &file_openweir_protocol_control_proto_msgTypes[89]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7287,7 +7351,7 @@ func (x *ConvertToPlanResponse) String() string {
 func (*ConvertToPlanResponse) ProtoMessage() {}
 
 func (x *ConvertToPlanResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_openweir_protocol_control_proto_msgTypes[88]
+	mi := &file_openweir_protocol_control_proto_msgTypes[89]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7300,7 +7364,7 @@ func (x *ConvertToPlanResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConvertToPlanResponse.ProtoReflect.Descriptor instead.
 func (*ConvertToPlanResponse) Descriptor() ([]byte, []int) {
-	return file_openweir_protocol_control_proto_rawDescGZIP(), []int{88}
+	return file_openweir_protocol_control_proto_rawDescGZIP(), []int{89}
 }
 
 func (x *ConvertToPlanResponse) GetPlanJson() string {
@@ -7365,7 +7429,7 @@ type SkippedRule struct {
 
 func (x *SkippedRule) Reset() {
 	*x = SkippedRule{}
-	mi := &file_openweir_protocol_control_proto_msgTypes[89]
+	mi := &file_openweir_protocol_control_proto_msgTypes[90]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7377,7 +7441,7 @@ func (x *SkippedRule) String() string {
 func (*SkippedRule) ProtoMessage() {}
 
 func (x *SkippedRule) ProtoReflect() protoreflect.Message {
-	mi := &file_openweir_protocol_control_proto_msgTypes[89]
+	mi := &file_openweir_protocol_control_proto_msgTypes[90]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7390,7 +7454,7 @@ func (x *SkippedRule) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SkippedRule.ProtoReflect.Descriptor instead.
 func (*SkippedRule) Descriptor() ([]byte, []int) {
-	return file_openweir_protocol_control_proto_rawDescGZIP(), []int{89}
+	return file_openweir_protocol_control_proto_rawDescGZIP(), []int{90}
 }
 
 func (x *SkippedRule) GetRule() string {
@@ -7419,7 +7483,7 @@ type ExportPlanRequest struct {
 
 func (x *ExportPlanRequest) Reset() {
 	*x = ExportPlanRequest{}
-	mi := &file_openweir_protocol_control_proto_msgTypes[90]
+	mi := &file_openweir_protocol_control_proto_msgTypes[91]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7431,7 +7495,7 @@ func (x *ExportPlanRequest) String() string {
 func (*ExportPlanRequest) ProtoMessage() {}
 
 func (x *ExportPlanRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_openweir_protocol_control_proto_msgTypes[90]
+	mi := &file_openweir_protocol_control_proto_msgTypes[91]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7444,7 +7508,7 @@ func (x *ExportPlanRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExportPlanRequest.ProtoReflect.Descriptor instead.
 func (*ExportPlanRequest) Descriptor() ([]byte, []int) {
-	return file_openweir_protocol_control_proto_rawDescGZIP(), []int{90}
+	return file_openweir_protocol_control_proto_rawDescGZIP(), []int{91}
 }
 
 func (x *ExportPlanRequest) GetComposition() *Composition {
@@ -7484,7 +7548,7 @@ type ExportPlanResponse struct {
 
 func (x *ExportPlanResponse) Reset() {
 	*x = ExportPlanResponse{}
-	mi := &file_openweir_protocol_control_proto_msgTypes[91]
+	mi := &file_openweir_protocol_control_proto_msgTypes[92]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7496,7 +7560,7 @@ func (x *ExportPlanResponse) String() string {
 func (*ExportPlanResponse) ProtoMessage() {}
 
 func (x *ExportPlanResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_openweir_protocol_control_proto_msgTypes[91]
+	mi := &file_openweir_protocol_control_proto_msgTypes[92]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7509,7 +7573,7 @@ func (x *ExportPlanResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExportPlanResponse.ProtoReflect.Descriptor instead.
 func (*ExportPlanResponse) Descriptor() ([]byte, []int) {
-	return file_openweir_protocol_control_proto_rawDescGZIP(), []int{91}
+	return file_openweir_protocol_control_proto_rawDescGZIP(), []int{92}
 }
 
 func (x *ExportPlanResponse) GetYaml() string {
@@ -7898,21 +7962,25 @@ const file_openweir_protocol_control_proto_rawDesc = "" +
 	"\x14InspectSourceRequest\x12\x12\n" +
 	"\x04yaml\x18\x01 \x01(\tR\x04yaml\x12\x1f\n" +
 	"\vinfo_filter\x18\x02 \x01(\tR\n" +
-	"infoFilter\"\xab\x01\n" +
+	"infoFilter\"\xeb\x01\n" +
 	"\x15InspectSourceResponse\x125\n" +
 	"\x05nodes\x18\x01 \x03(\v2\x1f.openweir.control.v1.SourceNodeR\x05nodes\x12\x1b\n" +
 	"\thas_rules\x18\x02 \x01(\bR\bhasRules\x12\x1f\n" +
 	"\vgroup_count\x18\x03 \x01(\rR\n" +
 	"groupCount\x12\x1d\n" +
 	"\n" +
-	"rule_count\x18\x04 \x01(\rR\truleCount\"t\n" +
+	"rule_count\x18\x04 \x01(\rR\truleCount\x12>\n" +
+	"\bwarnings\x18\x05 \x03(\v2\".openweir.control.v1.SourceWarningR\bwarnings\"t\n" +
 	"\n" +
 	"SourceNode\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04type\x18\x02 \x01(\tR\x04type\x12\x16\n" +
 	"\x06region\x18\x03 \x01(\tR\x06region\x12\x12\n" +
 	"\x04info\x18\x04 \x01(\bR\x04info\x12\x12\n" +
-	"\x04mesh\x18\x05 \x01(\bR\x04mesh\"\x99\x01\n" +
+	"\x04mesh\x18\x05 \x01(\bR\x04mesh\";\n" +
+	"\rSourceWarning\x12\x12\n" +
+	"\x04code\x18\x01 \x01(\tR\x04code\x12\x16\n" +
+	"\x06detail\x18\x02 \x01(\tR\x06detail\"\x99\x01\n" +
 	"\x13RegisterWarpRequest\x12\x10\n" +
 	"\x03via\x18\x01 \x01(\tR\x03via\x12=\n" +
 	"\bprotocol\x18\x02 \x01(\x0e2!.openweir.control.v1.WarpProtocolR\bprotocol\x12\x1b\n" +
@@ -8109,7 +8177,7 @@ func file_openweir_protocol_control_proto_rawDescGZIP() []byte {
 }
 
 var file_openweir_protocol_control_proto_enumTypes = make([]protoimpl.EnumInfo, 13)
-var file_openweir_protocol_control_proto_msgTypes = make([]protoimpl.MessageInfo, 92)
+var file_openweir_protocol_control_proto_msgTypes = make([]protoimpl.MessageInfo, 93)
 var file_openweir_protocol_control_proto_goTypes = []any{
 	(RunState)(0),                       // 0: openweir.control.v1.RunState
 	(Ownership)(0),                      // 1: openweir.control.v1.Ownership
@@ -8193,29 +8261,30 @@ var file_openweir_protocol_control_proto_goTypes = []any{
 	(*InspectSourceRequest)(nil),        // 79: openweir.control.v1.InspectSourceRequest
 	(*InspectSourceResponse)(nil),       // 80: openweir.control.v1.InspectSourceResponse
 	(*SourceNode)(nil),                  // 81: openweir.control.v1.SourceNode
-	(*RegisterWarpRequest)(nil),         // 82: openweir.control.v1.RegisterWarpRequest
-	(*RegisterWarpResponse)(nil),        // 83: openweir.control.v1.RegisterWarpResponse
-	(*ListVpnGateRequest)(nil),          // 84: openweir.control.v1.ListVpnGateRequest
-	(*ListVpnGateResponse)(nil),         // 85: openweir.control.v1.ListVpnGateResponse
-	(*VpnGateServer)(nil),               // 86: openweir.control.v1.VpnGateServer
-	(*OpenVpnOptions)(nil),              // 87: openweir.control.v1.OpenVpnOptions
-	(*GetMeshStatusRequest)(nil),        // 88: openweir.control.v1.GetMeshStatusRequest
-	(*GetMeshStatusResponse)(nil),       // 89: openweir.control.v1.GetMeshStatusResponse
-	(*MeshStatus)(nil),                  // 90: openweir.control.v1.MeshStatus
-	(*LoginMeshRequest)(nil),            // 91: openweir.control.v1.LoginMeshRequest
-	(*LoginMeshResponse)(nil),           // 92: openweir.control.v1.LoginMeshResponse
-	(*ListGeoCategoriesRequest)(nil),    // 93: openweir.control.v1.ListGeoCategoriesRequest
-	(*ListGeoCategoriesResponse)(nil),   // 94: openweir.control.v1.ListGeoCategoriesResponse
-	(*GeoCategories)(nil),               // 95: openweir.control.v1.GeoCategories
-	(*PreviewGroupRequest)(nil),         // 96: openweir.control.v1.PreviewGroupRequest
-	(*PreviewGroupResponse)(nil),        // 97: openweir.control.v1.PreviewGroupResponse
-	(*MatchRuleRequest)(nil),            // 98: openweir.control.v1.MatchRuleRequest
-	(*MatchRuleResponse)(nil),           // 99: openweir.control.v1.MatchRuleResponse
-	(*ConvertToPlanRequest)(nil),        // 100: openweir.control.v1.ConvertToPlanRequest
-	(*ConvertToPlanResponse)(nil),       // 101: openweir.control.v1.ConvertToPlanResponse
-	(*SkippedRule)(nil),                 // 102: openweir.control.v1.SkippedRule
-	(*ExportPlanRequest)(nil),           // 103: openweir.control.v1.ExportPlanRequest
-	(*ExportPlanResponse)(nil),          // 104: openweir.control.v1.ExportPlanResponse
+	(*SourceWarning)(nil),               // 82: openweir.control.v1.SourceWarning
+	(*RegisterWarpRequest)(nil),         // 83: openweir.control.v1.RegisterWarpRequest
+	(*RegisterWarpResponse)(nil),        // 84: openweir.control.v1.RegisterWarpResponse
+	(*ListVpnGateRequest)(nil),          // 85: openweir.control.v1.ListVpnGateRequest
+	(*ListVpnGateResponse)(nil),         // 86: openweir.control.v1.ListVpnGateResponse
+	(*VpnGateServer)(nil),               // 87: openweir.control.v1.VpnGateServer
+	(*OpenVpnOptions)(nil),              // 88: openweir.control.v1.OpenVpnOptions
+	(*GetMeshStatusRequest)(nil),        // 89: openweir.control.v1.GetMeshStatusRequest
+	(*GetMeshStatusResponse)(nil),       // 90: openweir.control.v1.GetMeshStatusResponse
+	(*MeshStatus)(nil),                  // 91: openweir.control.v1.MeshStatus
+	(*LoginMeshRequest)(nil),            // 92: openweir.control.v1.LoginMeshRequest
+	(*LoginMeshResponse)(nil),           // 93: openweir.control.v1.LoginMeshResponse
+	(*ListGeoCategoriesRequest)(nil),    // 94: openweir.control.v1.ListGeoCategoriesRequest
+	(*ListGeoCategoriesResponse)(nil),   // 95: openweir.control.v1.ListGeoCategoriesResponse
+	(*GeoCategories)(nil),               // 96: openweir.control.v1.GeoCategories
+	(*PreviewGroupRequest)(nil),         // 97: openweir.control.v1.PreviewGroupRequest
+	(*PreviewGroupResponse)(nil),        // 98: openweir.control.v1.PreviewGroupResponse
+	(*MatchRuleRequest)(nil),            // 99: openweir.control.v1.MatchRuleRequest
+	(*MatchRuleResponse)(nil),           // 100: openweir.control.v1.MatchRuleResponse
+	(*ConvertToPlanRequest)(nil),        // 101: openweir.control.v1.ConvertToPlanRequest
+	(*ConvertToPlanResponse)(nil),       // 102: openweir.control.v1.ConvertToPlanResponse
+	(*SkippedRule)(nil),                 // 103: openweir.control.v1.SkippedRule
+	(*ExportPlanRequest)(nil),           // 104: openweir.control.v1.ExportPlanRequest
+	(*ExportPlanResponse)(nil),          // 105: openweir.control.v1.ExportPlanResponse
 }
 var file_openweir_protocol_control_proto_depIdxs = []int32{
 	21,  // 0: openweir.control.v1.Request.get_info:type_name -> openweir.control.v1.GetInfoRequest
@@ -8245,15 +8314,15 @@ var file_openweir_protocol_control_proto_depIdxs = []int32{
 	71,  // 24: openweir.control.v1.Request.poll_events:type_name -> openweir.control.v1.PollEventsRequest
 	73,  // 25: openweir.control.v1.Request.unsubscribe:type_name -> openweir.control.v1.UnsubscribeRequest
 	79,  // 26: openweir.control.v1.Request.inspect_source:type_name -> openweir.control.v1.InspectSourceRequest
-	93,  // 27: openweir.control.v1.Request.list_geo_categories:type_name -> openweir.control.v1.ListGeoCategoriesRequest
-	96,  // 28: openweir.control.v1.Request.preview_group:type_name -> openweir.control.v1.PreviewGroupRequest
-	98,  // 29: openweir.control.v1.Request.match_rule:type_name -> openweir.control.v1.MatchRuleRequest
-	100, // 30: openweir.control.v1.Request.convert_to_plan:type_name -> openweir.control.v1.ConvertToPlanRequest
-	103, // 31: openweir.control.v1.Request.export_plan:type_name -> openweir.control.v1.ExportPlanRequest
-	82,  // 32: openweir.control.v1.Request.register_warp:type_name -> openweir.control.v1.RegisterWarpRequest
-	84,  // 33: openweir.control.v1.Request.list_vpn_gate:type_name -> openweir.control.v1.ListVpnGateRequest
-	88,  // 34: openweir.control.v1.Request.get_mesh_status:type_name -> openweir.control.v1.GetMeshStatusRequest
-	91,  // 35: openweir.control.v1.Request.login_mesh:type_name -> openweir.control.v1.LoginMeshRequest
+	94,  // 27: openweir.control.v1.Request.list_geo_categories:type_name -> openweir.control.v1.ListGeoCategoriesRequest
+	97,  // 28: openweir.control.v1.Request.preview_group:type_name -> openweir.control.v1.PreviewGroupRequest
+	99,  // 29: openweir.control.v1.Request.match_rule:type_name -> openweir.control.v1.MatchRuleRequest
+	101, // 30: openweir.control.v1.Request.convert_to_plan:type_name -> openweir.control.v1.ConvertToPlanRequest
+	104, // 31: openweir.control.v1.Request.export_plan:type_name -> openweir.control.v1.ExportPlanRequest
+	83,  // 32: openweir.control.v1.Request.register_warp:type_name -> openweir.control.v1.RegisterWarpRequest
+	85,  // 33: openweir.control.v1.Request.list_vpn_gate:type_name -> openweir.control.v1.ListVpnGateRequest
+	89,  // 34: openweir.control.v1.Request.get_mesh_status:type_name -> openweir.control.v1.GetMeshStatusRequest
+	92,  // 35: openweir.control.v1.Request.login_mesh:type_name -> openweir.control.v1.LoginMeshRequest
 	16,  // 36: openweir.control.v1.Request.get_geo_update:type_name -> openweir.control.v1.GetGeoUpdateRequest
 	19,  // 37: openweir.control.v1.Request.upload_geo:type_name -> openweir.control.v1.UploadGeoRequest
 	20,  // 38: openweir.control.v1.Response.error:type_name -> openweir.control.v1.Error
@@ -8269,15 +8338,15 @@ var file_openweir_protocol_control_proto_depIdxs = []int32{
 	70,  // 48: openweir.control.v1.Response.subscribe:type_name -> openweir.control.v1.SubscribeResponse
 	72,  // 49: openweir.control.v1.Response.poll_events:type_name -> openweir.control.v1.PollEventsResponse
 	80,  // 50: openweir.control.v1.Response.inspect_source:type_name -> openweir.control.v1.InspectSourceResponse
-	94,  // 51: openweir.control.v1.Response.list_geo_categories:type_name -> openweir.control.v1.ListGeoCategoriesResponse
-	97,  // 52: openweir.control.v1.Response.preview_group:type_name -> openweir.control.v1.PreviewGroupResponse
-	99,  // 53: openweir.control.v1.Response.match_rule:type_name -> openweir.control.v1.MatchRuleResponse
-	101, // 54: openweir.control.v1.Response.convert_to_plan:type_name -> openweir.control.v1.ConvertToPlanResponse
-	104, // 55: openweir.control.v1.Response.export_plan:type_name -> openweir.control.v1.ExportPlanResponse
-	83,  // 56: openweir.control.v1.Response.register_warp:type_name -> openweir.control.v1.RegisterWarpResponse
-	85,  // 57: openweir.control.v1.Response.list_vpn_gate:type_name -> openweir.control.v1.ListVpnGateResponse
-	89,  // 58: openweir.control.v1.Response.get_mesh_status:type_name -> openweir.control.v1.GetMeshStatusResponse
-	92,  // 59: openweir.control.v1.Response.login_mesh:type_name -> openweir.control.v1.LoginMeshResponse
+	95,  // 51: openweir.control.v1.Response.list_geo_categories:type_name -> openweir.control.v1.ListGeoCategoriesResponse
+	98,  // 52: openweir.control.v1.Response.preview_group:type_name -> openweir.control.v1.PreviewGroupResponse
+	100, // 53: openweir.control.v1.Response.match_rule:type_name -> openweir.control.v1.MatchRuleResponse
+	102, // 54: openweir.control.v1.Response.convert_to_plan:type_name -> openweir.control.v1.ConvertToPlanResponse
+	105, // 55: openweir.control.v1.Response.export_plan:type_name -> openweir.control.v1.ExportPlanResponse
+	84,  // 56: openweir.control.v1.Response.register_warp:type_name -> openweir.control.v1.RegisterWarpResponse
+	86,  // 57: openweir.control.v1.Response.list_vpn_gate:type_name -> openweir.control.v1.ListVpnGateResponse
+	90,  // 58: openweir.control.v1.Response.get_mesh_status:type_name -> openweir.control.v1.GetMeshStatusResponse
+	93,  // 59: openweir.control.v1.Response.login_mesh:type_name -> openweir.control.v1.LoginMeshResponse
 	18,  // 60: openweir.control.v1.Response.get_geo_update:type_name -> openweir.control.v1.GetGeoUpdateResponse
 	17,  // 61: openweir.control.v1.GetGeoUpdateResponse.files:type_name -> openweir.control.v1.GeoUpdateFile
 	0,   // 62: openweir.control.v1.GetInfoResponse.state:type_name -> openweir.control.v1.RunState
@@ -8295,7 +8364,7 @@ var file_openweir_protocol_control_proto_depIdxs = []int32{
 	31,  // 74: openweir.control.v1.MeshNetwork.zerotier:type_name -> openweir.control.v1.ZeroTierNetwork
 	32,  // 75: openweir.control.v1.MeshNetwork.easytier:type_name -> openweir.control.v1.EasyTierNetwork
 	34,  // 76: openweir.control.v1.Egress.warp:type_name -> openweir.control.v1.WarpAccount
-	86,  // 77: openweir.control.v1.Egress.vpn_gate:type_name -> openweir.control.v1.VpnGateServer
+	87,  // 77: openweir.control.v1.Egress.vpn_gate:type_name -> openweir.control.v1.VpnGateServer
 	3,   // 78: openweir.control.v1.WarpAccount.protocol:type_name -> openweir.control.v1.WarpProtocol
 	38,  // 79: openweir.control.v1.CompositionReport.warnings:type_name -> openweir.control.v1.CompositionWarning
 	39,  // 80: openweir.control.v1.CompositionReport.groups:type_name -> openweir.control.v1.ComposedGroup
@@ -8327,27 +8396,28 @@ var file_openweir_protocol_control_proto_depIdxs = []int32{
 	10,  // 106: openweir.control.v1.LogEntry.level:type_name -> openweir.control.v1.LogLevel
 	77,  // 107: openweir.control.v1.ConnectionSnapshot.connections:type_name -> openweir.control.v1.Connection
 	81,  // 108: openweir.control.v1.InspectSourceResponse.nodes:type_name -> openweir.control.v1.SourceNode
-	3,   // 109: openweir.control.v1.RegisterWarpRequest.protocol:type_name -> openweir.control.v1.WarpProtocol
-	34,  // 110: openweir.control.v1.RegisterWarpResponse.account:type_name -> openweir.control.v1.WarpAccount
-	86,  // 111: openweir.control.v1.ListVpnGateResponse.servers:type_name -> openweir.control.v1.VpnGateServer
-	87,  // 112: openweir.control.v1.VpnGateServer.openvpn:type_name -> openweir.control.v1.OpenVpnOptions
-	90,  // 113: openweir.control.v1.GetMeshStatusResponse.networks:type_name -> openweir.control.v1.MeshStatus
-	11,  // 114: openweir.control.v1.MeshStatus.state:type_name -> openweir.control.v1.MeshState
-	95,  // 115: openweir.control.v1.ListGeoCategoriesResponse.geosite:type_name -> openweir.control.v1.GeoCategories
-	95,  // 116: openweir.control.v1.ListGeoCategoriesResponse.geoip:type_name -> openweir.control.v1.GeoCategories
-	28,  // 117: openweir.control.v1.PreviewGroupRequest.composition:type_name -> openweir.control.v1.Composition
-	40,  // 118: openweir.control.v1.PreviewGroupResponse.nodes:type_name -> openweir.control.v1.PoolNode
-	28,  // 119: openweir.control.v1.MatchRuleRequest.composition:type_name -> openweir.control.v1.Composition
-	60,  // 120: openweir.control.v1.MatchRuleResponse.rule:type_name -> openweir.control.v1.Rule
-	102, // 121: openweir.control.v1.ConvertToPlanResponse.skipped:type_name -> openweir.control.v1.SkippedRule
-	28,  // 122: openweir.control.v1.ExportPlanRequest.composition:type_name -> openweir.control.v1.Composition
-	12,  // 123: openweir.control.v1.ExportPlanRequest.format:type_name -> openweir.control.v1.ExportFormat
-	24,  // 124: openweir.control.v1.ExportPlanRequest.options:type_name -> openweir.control.v1.RunOptions
-	125, // [125:125] is the sub-list for method output_type
-	125, // [125:125] is the sub-list for method input_type
-	125, // [125:125] is the sub-list for extension type_name
-	125, // [125:125] is the sub-list for extension extendee
-	0,   // [0:125] is the sub-list for field type_name
+	82,  // 109: openweir.control.v1.InspectSourceResponse.warnings:type_name -> openweir.control.v1.SourceWarning
+	3,   // 110: openweir.control.v1.RegisterWarpRequest.protocol:type_name -> openweir.control.v1.WarpProtocol
+	34,  // 111: openweir.control.v1.RegisterWarpResponse.account:type_name -> openweir.control.v1.WarpAccount
+	87,  // 112: openweir.control.v1.ListVpnGateResponse.servers:type_name -> openweir.control.v1.VpnGateServer
+	88,  // 113: openweir.control.v1.VpnGateServer.openvpn:type_name -> openweir.control.v1.OpenVpnOptions
+	91,  // 114: openweir.control.v1.GetMeshStatusResponse.networks:type_name -> openweir.control.v1.MeshStatus
+	11,  // 115: openweir.control.v1.MeshStatus.state:type_name -> openweir.control.v1.MeshState
+	96,  // 116: openweir.control.v1.ListGeoCategoriesResponse.geosite:type_name -> openweir.control.v1.GeoCategories
+	96,  // 117: openweir.control.v1.ListGeoCategoriesResponse.geoip:type_name -> openweir.control.v1.GeoCategories
+	28,  // 118: openweir.control.v1.PreviewGroupRequest.composition:type_name -> openweir.control.v1.Composition
+	40,  // 119: openweir.control.v1.PreviewGroupResponse.nodes:type_name -> openweir.control.v1.PoolNode
+	28,  // 120: openweir.control.v1.MatchRuleRequest.composition:type_name -> openweir.control.v1.Composition
+	60,  // 121: openweir.control.v1.MatchRuleResponse.rule:type_name -> openweir.control.v1.Rule
+	103, // 122: openweir.control.v1.ConvertToPlanResponse.skipped:type_name -> openweir.control.v1.SkippedRule
+	28,  // 123: openweir.control.v1.ExportPlanRequest.composition:type_name -> openweir.control.v1.Composition
+	12,  // 124: openweir.control.v1.ExportPlanRequest.format:type_name -> openweir.control.v1.ExportFormat
+	24,  // 125: openweir.control.v1.ExportPlanRequest.options:type_name -> openweir.control.v1.RunOptions
+	126, // [126:126] is the sub-list for method output_type
+	126, // [126:126] is the sub-list for method input_type
+	126, // [126:126] is the sub-list for extension type_name
+	126, // [126:126] is the sub-list for extension extendee
+	0,   // [0:126] is the sub-list for field type_name
 }
 
 func init() { file_openweir_protocol_control_proto_init() }
@@ -8444,7 +8514,7 @@ func file_openweir_protocol_control_proto_init() {
 		(*Event_Traffic)(nil),
 		(*Event_Connections)(nil),
 	}
-	file_openweir_protocol_control_proto_msgTypes[85].OneofWrappers = []any{
+	file_openweir_protocol_control_proto_msgTypes[86].OneofWrappers = []any{
 		(*MatchRuleRequest_ConfigYaml)(nil),
 		(*MatchRuleRequest_Composition)(nil),
 	}
@@ -8454,7 +8524,7 @@ func file_openweir_protocol_control_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_openweir_protocol_control_proto_rawDesc), len(file_openweir_protocol_control_proto_rawDesc)),
 			NumEnums:      13,
-			NumMessages:   92,
+			NumMessages:   93,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

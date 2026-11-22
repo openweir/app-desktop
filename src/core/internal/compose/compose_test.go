@@ -119,7 +119,8 @@ func TestPoolDropsInfoNodesAndRenamesClashes(t *testing.T) {
 		"a/香港 01 → 香港 01 HK Shadowsocks",
 		"a/🇯🇵 东京 02 → 🇯🇵 东京 02 JP Trojan",
 		"a/US-LA 0.1x → US-LA 0.1x US Vmess",
-		// The second 香港 01 of source a goes, as mihomo's provider drops it.
+		// subconv numbers the second 香港 01 of source a, so that both are nodes (D54).
+		"a/香港 01 2 → 香港 01 2 HK Shadowsocks",
 		"b/香港 01 → 香港 01 · 机场 B HK Http",
 		"b/Mars 1 → Mars 1 ZZ Http",
 	}
@@ -155,11 +156,11 @@ func TestDefaultGroups(t *testing.T) {
 		t.Fatalf("自动选择 = %v", auto)
 	}
 	hk := groupConfig(t, result, "🇭🇰 香港")
-	if hk["type"] != "url-test" || hk["filter"] != `^(?:香港\ 01|香港\ 01\ ·\ 机场\ B)$` ||
+	if hk["type"] != "url-test" || hk["filter"] != `^(?:香港\ 01|香港\ 01\ 2|香港\ 01\ ·\ 机场\ B)$` ||
 		!slices.Equal(hk["use"].([]any), []any{"pool:a", "pool:b"}) {
 		t.Fatalf("🇭🇰 香港 = %v", hk)
 	}
-	if got := reportGroup(result, "region:HK"); got.Kind != controlpb.GroupKind_GROUP_KIND_REGION || got.Region != "HK" || got.NodeCount != 2 {
+	if got := reportGroup(result, "region:HK"); got.Kind != controlpb.GroupKind_GROUP_KIND_REGION || got.Region != "HK" || got.NodeCount != 3 {
 		t.Fatalf("report of region:HK = %v", got)
 	}
 }
@@ -372,7 +373,7 @@ func TestSourceErrors(t *testing.T) {
 	plan := []byte(`{"version": 1}`)
 	for name, composition := range map[string]Composition{
 		"bad YAML":    {Sources: []Source{{ID: "a", Name: "A", YAML: []byte("proxies: [\n")}}, Plan: plan},
-		"proxies":     {Sources: []Source{{ID: "a", Name: "A", YAML: []byte("proxies: 3\n")}}, Plan: plan},
+		"no nodes":    {Sources: []Source{{ID: "a", Name: "A", YAML: []byte("token expired\n")}}, Plan: plan},
 		"no id":       {Sources: []Source{{Name: "A", YAML: []byte(subscriptionB)}}, Plan: plan},
 		"same id":     {Sources: []Source{{ID: "a", Name: "A"}, {ID: "a", Name: "B"}}, Plan: plan},
 		"info filter": {InfoFilter: "(", Plan: plan},
@@ -384,11 +385,12 @@ func TestSourceErrors(t *testing.T) {
 }
 
 func TestInspect(t *testing.T) {
-	inspection, err := Inspect([]byte(subscriptionA), testInfoFilter)
+	inspection, err := Inspect([]byte(subscriptionA), testInfoFilter, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !inspection.HasRules || inspection.GroupCount != 1 || inspection.RuleCount != 1 || len(inspection.Nodes) != 4 {
+	if !inspection.HasRules || inspection.GroupCount != 1 || inspection.RuleCount != 1 || len(inspection.Nodes) != 5 ||
+		len(inspection.Warnings) != 1 || inspection.Warnings[0].Code != "renamed" {
 		t.Fatalf("inspection = %v", inspection)
 	}
 	if node := inspection.Nodes[2]; node.Name != "剩余流量：10 GB" || !node.Info || node.Type != "Shadowsocks" {
@@ -397,7 +399,7 @@ func TestInspect(t *testing.T) {
 	// Share links, base64-encoded as subscriptions serve them.
 	links := "trojan://secret@t.example:443#%F0%9F%87%B8%F0%9F%87%AC%20SG%2001\n" +
 		"ss://YWVzLTEyOC1nY206eA@s.example:8388#Tokyo\n"
-	inspection, err = Inspect([]byte(base64.StdEncoding.EncodeToString([]byte(links))), "")
+	inspection, err = Inspect([]byte(base64.StdEncoding.EncodeToString([]byte(links))), "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -408,7 +410,7 @@ func TestInspect(t *testing.T) {
 	if inspection.HasRules || !slices.Equal(got, []string{"🇸🇬 SG 01 Trojan SG", "Tokyo Shadowsocks JP"}) {
 		t.Fatalf("share links = %v (%v)", got, inspection)
 	}
-	if _, err := Inspect([]byte("   "), ""); err == nil {
+	if _, err := Inspect([]byte("   "), "", nil); err == nil {
 		t.Fatal("an empty subscription inspected fine")
 	}
 }
@@ -431,7 +433,7 @@ func TestPastedVLESSLinksKeepCredentialsAndTransport(t *testing.T) {
 	if !ok || options["path"] != "/proxy" {
 		t.Fatalf("websocket options = %v", node["ws-opts"])
 	}
-	inspection, err := Inspect([]byte(link+"\ntrojan://secret@other.example:443#Singapore\n"), "")
+	inspection, err := Inspect([]byte(link+"\ntrojan://secret@other.example:443#Singapore\n"), "", nil)
 	if err != nil || len(inspection.GetNodes()) != 2 || inspection.GetHasRules() {
 		t.Fatalf("node import = %v, %v", inspection, err)
 	}

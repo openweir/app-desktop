@@ -9,6 +9,7 @@ OpenWeir 是网络代理客户端。它没有账户，不收集使用数据，�
 | --- | --- | --- |
 | 下载和更新订阅 | 订阅链接所在的服务器 | 一次普通的 HTTP 请求：订阅链接（常含令牌）、你的 IP、User-Agent `OpenWeir/<版本> (Windows 或 macOS) clash.meta`。由界面以当前用户身份发出，跟随系统代理设置；订阅默认每 12 小时自动更新一次，可以按订阅关闭 |
 | 连接代理 | 配置里的节点和服务器 | 内核按配置连接节点；配置里的 proxy provider 和规则集由内核按配置下载；策略组的延迟测试访问配置里的测速地址 |
+| 路由模板 | subconv 的 CDN 主机（`cdn.jsdmirror.com`、`fastly.jsdelivr.net`、`testingcf.jsdelivr.net`、`gcore.jsdelivr.net`、`cdn.jsdelivr.net`）和 GitHub（`raw.githubusercontent.com`） | 导入或更新订阅时，内核最多每 6 小时下载一次公开的路由模板和它的清单：你的 IP、Go 默认的 User-Agent，不带订阅内容。订阅没有可用的规则、按模板分流时，模板里的规则集由内核按配置从同一主机下载 |
 | GEO 数据更新 | 配置指定的下载站点，默认是 GitHub（MetaCubeX/meta-rules-dat） | 启用自动更新时，按配置周期更新正在使用的数据库，默认周期为 24 小时。请求从界面进程发出，遵循系统代理设置；完全退出界面后暂停，下次打开补查 |
 | 检查更新 | GitHub（`api.github.com`） | 一次不带认证的请求：你的 IP、User-Agent `openweir/<版本>`。自动检查默认开启，可以在设置页"关于"里关闭；下载安装包和 `SHA256SUMS` 也来自 GitHub |
 | 注册 WARP 出口 | Cloudflare（`api.cloudflareclient.com`） | 只在你注册时：内核新生成的公钥、随机的设备标识、时间、语言 `en-US`。请求经你选择的"经由"节点发出，Cloudflare 看到的是节点的 IP。之后经 WARP 出口的流量由 Cloudflare 转发，适用 Cloudflare 的隐私政策 |
@@ -17,7 +18,7 @@ OpenWeir 是网络代理客户端。它没有账户，不收集使用数据，�
 | iCloud 备份（仅 macOS） | Apple（CloudKit） | 只在你开启时：备份快照（见下面的"备份"）存进你自己 iCloud 账户的私有数据库 |
 | Google Drive 备份 | Google（`accounts.google.com`、`oauth2.googleapis.com`、`www.googleapis.com`） | 只在你登录后：登录时浏览器打开 Google 的授权页；之后界面以当前用户身份、跟随系统代理设置，换取访问令牌，读取账户的邮箱，把备份快照存进你自己 Google 云端硬盘里本应用专属的隐藏目录。退出登录时向 Google 撤销授权 |
 
-GitHub、Cloudflare、VPN Gate、组网服务、Apple 和 Google 收到数据后如何处理，适用它们各自的隐私政策。点击网页上的"一键导入"链接只会在 OpenWeir 里预填订阅
+GitHub、jsDelivr 与它的镜像、Cloudflare、VPN Gate、组网服务、Apple 和 Google 收到数据后如何处理，适用它们各自的隐私政策。点击网页上的"一键导入"链接只会在 OpenWeir 里预填订阅
 链接和名称，由你确认后才下载。
 
 ## 本机保存的数据

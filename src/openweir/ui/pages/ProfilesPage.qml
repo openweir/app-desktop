@@ -461,6 +461,7 @@ ScrollView {
         required property string name
         required property string source
         required property string note
+        required property string leftOut
         required property string usage
         required property bool hasQuota
         required property real usedFraction
@@ -539,6 +540,15 @@ ScrollView {
                         text: qsTr(" · %1").arg(profileRow.note)
                         role: Theme.type.caption
                         color: Theme.textSecondary
+                    }
+
+                    // What the core left out reading it (D54), as DESIGN.md "分组与行" colours
+                    // a warning.
+                    UiText {
+                        visible: profileRow.leftOut !== ""
+                        text: qsTr(" · %1").arg(profileRow.leftOut)
+                        role: Theme.type.caption
+                        color: Theme.warning
                     }
 
                     Item {

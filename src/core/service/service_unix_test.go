@@ -47,7 +47,7 @@ func TestDevelopmentServerRefusesRoot(t *testing.T) {
 
 func developmentServer(t *testing.T) (*engine.Engine, *control.Dispatcher) {
 	t.Helper()
-	core, err := newDevelopmentEngine(testHome)
+	core, err := newDevelopmentEngine(testHome, false)
 	if err != nil {
 		t.Fatal(err)
 	}

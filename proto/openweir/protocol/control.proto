@@ -527,9 +527,12 @@ message InspectSourceRequest {
 }
 message InspectSourceResponse {
   repeated SourceNode nodes = 1;
-  bool has_rules = 2;
+  bool has_rules = 2; // rules of its own, not only the MATCH a profile of groups gets
   uint32 group_count = 3;
   uint32 rule_count = 4;
+  // What reading the subscription left out or changed, in the order met (docs/routing.md
+  // §8.1): a node, group, rule or provider mihomo would refuse, a renamed duplicate.
+  repeated SourceWarning warnings = 5;
 }
 message SourceNode {
   string name = 1;
@@ -537,6 +540,12 @@ message SourceNode {
   string region = 3; // region code; "ZZ" when no region matched
   bool info = 4;     // the name matches info_filter, so the pool leaves the node out
   bool mesh = 5;     // a Tailscale, ZeroTier or EasyTier outbound, kept out of the pool
+}
+// One of github.com/openweir/subconv's warnings: a stable code (unsupported_proxy,
+// invalid_proxy, unsupported_rule, renamed...) and the item it is about.
+message SourceWarning {
+  string code = 1;
+  string detail = 2;
 }
 
 // Registers a WARP device through a group of the running configuration, or gives an

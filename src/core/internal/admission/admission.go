@@ -15,6 +15,7 @@ import (
 	"fmt"
 
 	"github.com/metacubex/mihomo/common/yaml"
+	"github.com/openweir/subconv/rules"
 
 	"github.com/openweir/app-desktop/src/core/internal/compose"
 )
@@ -63,6 +64,9 @@ type Host struct {
 	// Warn is told of a change the pipeline makes beyond what the profile asked, as it
 	// makes it, for the engine's log; nil drops them.
 	Warn func(message string)
+	// Template reads subconv's routing template for a profile of its own whose routing is
+	// missing or too lossy (compose.Normalize, D54); nil keeps every profile's own.
+	Template *rules.Client
 }
 
 // RunOptions are the host's settings that the pipeline lays over the user's profile.
@@ -112,7 +116,7 @@ func Prepare(profile Profile, host Host) (*Prepared, error) {
 	if profile.Options.TUN && host.Tun == TunNone {
 		return nil, fmt.Errorf("%w: this host never creates a TUN", ErrUnsupported)
 	}
-	doc, composed, err := document(profile)
+	doc, composed, err := document(profile, host)
 	if err != nil {
 		return nil, invalidConfig(err)
 	}
@@ -163,9 +167,9 @@ func invalidConfig(err error) error {
 }
 
 // document is where the pipeline starts: the profile's YAML, or the composed configuration.
-func document(profile Profile) (map[string]any, *compose.Result, error) {
+func document(profile Profile, host Host) (map[string]any, *compose.Result, error) {
 	if profile.Composition == nil {
-		doc, err := decodeDocument(profile.Config)
+		doc, err := decodeDocument(profile.Config, host.Template)
 		return doc, nil, err
 	}
 	composed, err := compose.Compose(*profile.Composition)
@@ -175,23 +179,17 @@ func document(profile Profile) (map[string]any, *compose.Result, error) {
 	return composed.Config, composed, nil
 }
 
-// decodeDocument reads the profile as a generic mapping. Decoding into a map resolves
-// anchors and merge keys, so a patch cannot be bypassed by an alias. A sing-box
-// subscription is converted into a mihomo profile first (compose.Normalize).
-func decodeDocument(source []byte) (map[string]any, error) {
+// decodeDocument reads the profile as a generic mapping, through subconv in whatever format
+// it came (compose.Normalize, D54): nodes, groups, rules and providers mihomo would refuse
+// are left out rather than failing the profile. Decoding into a map resolves anchors and
+// merge keys, so a patch cannot be bypassed by an alias.
+func decodeDocument(source []byte, template *rules.Client) (map[string]any, error) {
 	if len(bytes.TrimSpace(source)) == 0 {
 		return nil, errors.New("the configuration is empty")
 	}
-	source, err := compose.Normalize(source)
+	read, err := compose.Normalize(source, template)
 	if err != nil {
 		return nil, err
 	}
-	var doc map[string]any
-	if err := yaml.Unmarshal(source, &doc); err != nil {
-		return nil, err
-	}
-	if doc == nil {
-		return nil, errors.New("the configuration is not a YAML mapping")
-	}
-	return doc, nil
+	return read.Profile, nil
 }

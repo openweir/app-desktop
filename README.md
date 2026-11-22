@@ -43,7 +43,7 @@ The user guide, development and other documents under `docs/` are in Chinese.
 ## Connections and routing
 
 - **One switch to connect**: on Windows choose TUN, the system proxy or both; on macOS a Network Extension takes over traffic. The overview shows the connection state, current mode and live traffic.
-- **Subscriptions in one place**: import mihomo (Clash), sing-box or share-link subscriptions, or local configuration files, refresh them on a schedule, and import with one click from `openweir://`, `clash://`, `mihomo://` and `clashmeta://` links. Overrides apply to all subscriptions or to one.
+- **Subscriptions in one place**: import subscriptions in any common format (mihomo/Clash, sing-box, Xray, share links, Surge, Loon, Shadowrocket, Quantumult X, SIP008), or local configuration files, refresh them on a schedule, and import with one click from `openweir://`, `clash://`, `mihomo://` and `clashmeta://` links. Overrides apply to all subscriptions or to one.
 - **Use the subscription's rules, or build your own**: pool nodes from several subscriptions, group them by region, create policy groups, and route by service, domain and IP range. The rule tester previews which rule a site will take; routing setups can be imported and exported.
 - **Choose and troubleshoot nodes**: switch between rule, global and direct modes, pick policy groups and nodes, run HTTP or TCP handshake latency tests, and view the connection list and core logs.
 

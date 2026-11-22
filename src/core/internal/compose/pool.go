@@ -7,9 +7,8 @@ import (
 	"strconv"
 
 	"github.com/dlclark/regexp2"
-	"github.com/metacubex/mihomo/common/convert"
-	"github.com/metacubex/mihomo/common/yaml"
 	C "github.com/metacubex/mihomo/constant"
+	"github.com/openweir/subconv/rules"
 
 	"github.com/openweir/app-desktop/src/core/internal/controlpb"
 )
@@ -36,41 +35,35 @@ type node struct {
 	via string
 }
 
-// subscription is what a source holds: its proxies and, for a mihomo profile, the
-// profile itself. Share links have no profile.
+// subscription is what a source holds: its proxies and the profile they came in.
 type subscription struct {
 	proxies []map[string]any
 	profile map[string]any
+	read    *Normalized
 }
 
-// parseSubscription reads a subscription the way mihomo's proxy providers do: a YAML
-// mapping with proxies, or else share links, one per line or base64-encoded. A sing-box
-// config is converted first (Normalize).
+// parseSubscription reads a subscription of any format through subconv (Normalize): a
+// mihomo profile, share links one per line or base64-encoded, sing-box, Surge and the rest.
+// A node mihomo would refuse is left out with a warning rather than failing the source.
 func parseSubscription(data []byte) (*subscription, error) {
+	return parseWithTemplate(data, nil)
+}
+
+// parseWithTemplate is parseSubscription with subconv's routing template (Normalize) for a
+// subscription that routes on its own: in InspectSource and ConvertToPlan.
+func parseWithTemplate(data []byte, template *rules.Client) (*subscription, error) {
 	if len(bytes.TrimSpace(data)) == 0 {
 		return nil, errors.New("the subscription is empty")
 	}
-	data, err := Normalize(data)
+	read, err := Normalize(data, template)
 	if err != nil {
 		return nil, err
 	}
-	var profile map[string]any
-	yamlErr := yaml.Unmarshal(data, &profile)
-	if yamlErr == nil && profile != nil {
-		proxies, err := proxyMappings(profile["proxies"])
-		if err != nil {
-			return nil, err
-		}
-		return &subscription{proxies: proxies, profile: profile}, nil
-	}
-	proxies, err := convert.ConvertsV2Ray(data)
+	proxies, err := proxyMappings(read.Profile["proxies"])
 	if err != nil {
-		if yamlErr == nil {
-			yamlErr = errors.New("not a YAML mapping")
-		}
-		return nil, fmt.Errorf("neither a mihomo profile (%w) nor share links (%w)", yamlErr, err)
+		return nil, err
 	}
-	return &subscription{proxies: proxies}, nil
+	return &subscription{proxies: proxies, profile: read.Profile, read: read}, nil
 }
 
 func proxyMappings(raw any) ([]map[string]any, error) {
@@ -164,13 +157,14 @@ func (f infoFilter) matches(name string) bool {
 }
 
 // Inspect describes a subscription for the UI (InspectSource): its nodes with their
-// regions, and how many groups and rules it brings.
-func Inspect(data []byte, infoPattern string) (*controlpb.InspectSourceResponse, error) {
+// regions, how many groups and rules it routes by with its own rules or the routing template
+// (template, nil for none), and what reading it left out or changed.
+func Inspect(data []byte, infoPattern string, template *rules.Client) (*controlpb.InspectSourceResponse, error) {
 	filter, err := newInfoFilter(infoPattern)
 	if err != nil {
 		return nil, err
 	}
-	parsed, err := parseSubscription(data)
+	parsed, err := parseWithTemplate(data, template)
 	if err != nil {
 		return nil, err
 	}
@@ -178,7 +172,10 @@ func Inspect(data []byte, infoPattern string) (*controlpb.InspectSourceResponse,
 		GroupCount: uint32(parsed.count("proxy-groups")),
 		RuleCount:  uint32(parsed.count("rules")),
 	}
-	out.HasRules = out.RuleCount > 0
+	out.HasRules = parsed.read.HasRules()
+	for _, warning := range parsed.read.Warnings {
+		out.Warnings = append(out.Warnings, &controlpb.SourceWarning{Code: warning.Code, Detail: warning.Detail})
+	}
 	for name, mapping := range parsed.named {
 		mesh := isMesh(mapping)
 		out.Nodes = append(out.Nodes, &controlpb.SourceNode{

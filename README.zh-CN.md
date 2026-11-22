@@ -43,7 +43,7 @@ OpenWeir 用来管理你的代理订阅、节点和分流规则。无需注册 O
 
 - **一个开关连接**：Windows 可选择 TUN、系统代理或同时启用；macOS 通过 Network Extension 接管流量。
   在概览页查看连接状态、当前模式和实时流量。
-- **集中管理订阅**：导入 mihomo（Clash）、sing-box 或分享链接订阅，或本地配置文件，设置定时更新，通过 `openweir://`、`clash://`、
+- **集中管理订阅**：导入各种常见格式的订阅（mihomo/Clash、sing-box、Xray、分享链接、Surge、Loon、Shadowrocket、Quantumult X、SIP008），或本地配置文件，设置定时更新，通过 `openweir://`、`clash://`、
   `mihomo://`、`clashmeta://` 链接一键导入。支持全局覆写和单份订阅覆写。
 - **使用订阅规则，或建立自己的方案**：把多个订阅的节点合成节点池，按地区组织，自建策略组；按服务、域名和
   IP 段设置分流。规则测试可以预览目标网站会走哪条规则，方案支持导入与导出。

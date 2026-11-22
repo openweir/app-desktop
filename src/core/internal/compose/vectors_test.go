@@ -80,7 +80,7 @@ func TestVectors(t *testing.T) {
 	}
 	for i := range vectors.Inspect {
 		v := &vectors.Inspect[i]
-		inspection, err := Inspect([]byte(v.YAML), v.InfoFilter)
+		inspection, err := Inspect([]byte(v.YAML), v.InfoFilter, nil)
 		check(t, v.Name, inspection, err, &v.Inspection, &v.Error, &controlpb.InspectSourceResponse{})
 	}
 	for i := range vectors.Preview {

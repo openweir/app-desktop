@@ -1305,6 +1305,26 @@
           }
         ]
       }
+    },
+    {
+      "name": "share links, one of which only Telegram uses",
+      "yaml": "vless://7c8c8c0e-0000-4000-8000-000000000001@example.com:443?security=tls&sni=example.com#Tokyo%2001\ntg://proxy?server=203.0.113.1&port=443&secret=abc\n",
+      "info_filter": "",
+      "inspection": {
+        "nodes": [
+          {
+            "name": "Tokyo 01",
+            "type": "Vless",
+            "region": "JP"
+          }
+        ],
+        "warnings": [
+          {
+            "code": "unsupported_option",
+            "detail": "tg link: a Telegram proxy, which only Telegram uses"
+          }
+        ]
+      }
     }
   ],
   "preview": [

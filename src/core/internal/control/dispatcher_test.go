@@ -262,12 +262,15 @@ func TestLifecycleAndCoreMethods(t *testing.T) {
 	port := porttest.Free(t)
 	profile := profileYAML(port)
 
-	validate := func(yaml string) func(*controlpb.Request) {
+	validate := func(yaml string, overrides ...string) func(*controlpb.Request) {
 		return func(r *controlpb.Request) {
-			r.Method = &controlpb.Request_Validate{Validate: &controlpb.ValidateRequest{Source: &controlpb.ValidateRequest_ConfigYaml{ConfigYaml: yaml}}}
+			r.Method = &controlpb.Request_Validate{Validate: &controlpb.ValidateRequest{
+				Source: &controlpb.ValidateRequest_ConfigYaml{ConfigYaml: yaml}, Overrides: overrides,
+			}}
 		}
 	}
-	broken := call(t, dispatcher, request(1, validate("rules: ['MATCH,NOWHERE']\n")))
+	// subconv drops a rule mihomo would refuse from a profile (D54); an override's reaches it.
+	broken := call(t, dispatcher, request(1, validate(profile, "rules: ['MATCH,NOWHERE']\n")))
 	expectError(t, broken, 1, CodeInvalidConfig)
 	if message := broken.GetError().GetMessage(); strings.HasPrefix(message, "invalid configuration") || !strings.Contains(message, "NOWHERE") {
 		t.Errorf("invalid_config message = %q; the UI shows mihomo's text as it is", message)

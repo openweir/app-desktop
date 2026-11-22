@@ -16,6 +16,7 @@ package engine
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime/debug"
@@ -27,9 +28,11 @@ import (
 	C "github.com/metacubex/mihomo/constant"
 	"github.com/metacubex/mihomo/constant/features"
 	"github.com/metacubex/mihomo/hub/route"
+	"github.com/openweir/subconv/rules"
 
 	"github.com/openweir/app-desktop/src/core/internal/admission"
 	"github.com/openweir/app-desktop/src/core/internal/controlpb"
+	"github.com/openweir/app-desktop/src/core/internal/routingtemplate"
 )
 
 var (
@@ -57,6 +60,12 @@ type Options struct {
 	// macOS extension's includeAllNetworks (D19). mihomo's system and mixed stacks do not
 	// work there, so the pipeline replaces them with gVisor.
 	IncludeAllNetworks bool
+	// TemplateHosts serve subconv's routing template (D54), which a subscription without
+	// usable rules of its own routes by; the engine keeps it in the home's routing-template
+	// directory. None leaves every subscription its own routing. TemplateHTTP makes the
+	// requests; nil is a client of the engine's own.
+	TemplateHosts []rules.Host
+	TemplateHTTP  *http.Client
 }
 
 type Engine struct {
@@ -64,6 +73,8 @@ type Engine struct {
 	home    string
 	// includeAllNetworks is Options.IncludeAllNetworks in fd mode.
 	includeAllNetworks bool
+	// template keeps subconv's routing template; nil without Options.TemplateHosts.
+	template *routingtemplate.Source
 	// tun is the host's TUN in fd mode, nil otherwise; the lifecycle lock guards it.
 	tun *hostTUN
 
@@ -144,6 +155,7 @@ func newEngine(options Options) (*Engine, error) {
 		tunMode:            options.Tun,
 		home:               home,
 		includeAllNetworks: options.Tun == admission.TunFD && options.IncludeAllNetworks,
+		template:           newTemplate(home, options),
 		state:              controlpb.RunState_RUN_STATE_STOPPED,
 	}
 	if options.Tun == admission.TunFD {
@@ -226,6 +238,14 @@ func (e *Engine) Close() error {
 func (e *Engine) CoreVersion() string { return coreVerStr }
 
 func (e *Engine) TunMode() admission.TunMode { return e.tunMode }
+
+// newTemplate is the engine's routing template, or nil without hosts.
+func newTemplate(home string, options Options) *routingtemplate.Source {
+	if len(options.TemplateHosts) == 0 {
+		return nil
+	}
+	return routingtemplate.New(filepath.Join(home, routingtemplate.Dir), options.TemplateHosts, options.TemplateHTTP)
+}
 
 func (e *Engine) HomeDir() string { return e.home }
 

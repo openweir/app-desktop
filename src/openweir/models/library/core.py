@@ -31,6 +31,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
 
 from openweir.host.base import (
+    NODE_LEFT_OUT,
     Composition,
     CompositionReport,
     CompositionSource,
@@ -197,7 +198,9 @@ class LibraryCore:
             # must not silently lose part of what the user pasted.
             expected = len([line for line in text.splitlines() if line.strip()])
             if not expected or len(inspection.nodes) != expected:
-                raise ProfileError("invalid_node_links", "not every link produced a node")
+                left_out = [w.detail for w in inspection.warnings if w.code in NODE_LEFT_OUT]
+                detail = "; ".join(left_out) or "not every link produced a node"
+                raise ProfileError("invalid_node_links", detail)
         if inspection.has_rules:
             await self.host.validate(TunnelConfig(text, await self.overrides(profile_id)))
         return inspection

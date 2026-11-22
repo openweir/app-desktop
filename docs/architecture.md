@@ -135,8 +135,8 @@ secret 注入。而且接口面由 mihomo 决定：上游升级时新增的接�
   然后自检路径沙箱。开发服务的 home 默认在用户配置目录下的 `OpenWeir/dev-core`（`-home` 可改）；
   Windows 服务的 home 是属主的 `%ProgramData%\OpenWeir\users\<SID>`（5.1 节）。
   mihomo 在进程内只打开一次 `cache.db`，所以 home 在进程生命周期内不能更换，更换属主需要新的服务进程（5.4 节）。
-- **配置准入**：用户 YAML 解析为映射（锚点和合并键在这一步展开，补丁无法被别名绕过），或者由节点池和方案
-  拼装出映射 → 依次应用覆写 → 按 TUN 模式打补丁 → 最后一步强制安全项 → 重新编码后交给
+- **配置准入**：订阅原文经 subconv 读成映射（`compose.Normalize`，D54：任何格式都读，mihomo 会拒绝的节点、策略组、
+  规则逐项略去或修复，锚点和合并键在这一步展开，补丁无法被别名绕过），或者由节点池和方案拼装出映射 → 依次应用覆写 → 按 TUN 模式打补丁 → 最后一步强制安全项 → 重新编码后交给
   `executor.ParseWithBytes` → 校验解析结果，任一项不符就拒绝（fail closed）→ `hub.ApplyConfig`。`Validate`、
   `Start`、`Reload` 都走同一条流水线，`Validate` 走到校验为止。
   - 分工：解析之前的各步在 `internal/admission`（`admission.Prepare`，拼装调用 `internal/compose`），对解析结果的
@@ -149,6 +149,10 @@ secret 注入。而且接口面由 mihomo 决定：上游升级时新增的接�
   GEO 数据）。拼装只是流水线的起点：覆写、平台补丁和安全项照常在它之后，有测试守住这一顺序。`Validate`、
   `Start`、`Reload` 返回拼装报告（警告、生成的组和规则、节点池）；应用后 engine 保存"规则 → 规则条目"的对照表，
   `ListRules` 和连接快照用它带上条目 id，改用 YAML 时清空。
+- **路由模板**（D54，routing.md §8.9）：没有可用规则的订阅在"订阅自带"下按 subconv 的路由模板分流。engine 在
+  InspectSource 时最多每 6 小时从 subconv 的 CDN 主机取一次模板，存在 home 的 `routing-template/`（`internal/routingtemplate`）；
+  读订阅时只读这份缓存，准入不走网络。主机由宿主给出（`engine.Options.TemplateHosts`）：Windows 服务和 macOS 扩展总是
+  给，开发服务只在 `-routing-template` 时给。
 - **GEO 数据**（D17）：安装包附带四份数据，由宿主在打开 engine 前补齐。运行时下载、缓存、重试和调度归 Python
   `models/geodata.py`；GUI 完全退出后暂停，下次打开补查。Go 只提供已应用配置的更新计划、接收分块、校验与原子安装。
   MMDB/ASN 通过 fork 的不可变内存 reader 安全切换，旧查询保留自己的 reader；DAT 清除加载缓存后在下次应用配置时
@@ -373,7 +377,7 @@ Windows 上 UI 断线后按退避间隔重连，并重新建立订阅。
 | `SubscribeLogs` / `SubscribeTraffic` / `SubscribeConnections` | 开始订阅，返回 subscription_id |
 | `PollEvents` | 取走某个订阅自上次拉取以来缓存的事件 |
 | `Unsubscribe` | 结束订阅 |
-| `InspectSource` | 按拼装的方式读一份订阅：节点及其地区、有没有规则、策略组和规则的数量 |
+| `InspectSource` | 按拼装的方式读一份订阅：节点及其地区、有没有规则、策略组和规则的数量，读时略去或改动的内容（subconv 的警告）；顺带刷新路由模板 |
 | `ListGeoCategories` | home 里 GEO 数据的 GEOSITE / GEOIP 分类名，以及文件的 sha256 和修改时间 |
 | `GetGeoUpdate` | 已应用配置的更新代次、周期、实际使用的数据集及安装时间；停止或关闭自动更新时为空 |
 | `UploadGeo` | 按代次、文件名和偏移接收最多 48 KiB 的块；完整文件最多 256 MiB，校验 SHA-256 和格式后原子安装 |
@@ -506,6 +510,7 @@ C:\ProgramData\OpenWeir\              仅 SYSTEM 与 Administrators 可访问
     ├── proxy.json                     服务的系统代理生效期间，属主自己原来的代理设置（5.5 节）
     ├── GeoSite.dat、GeoIP.dat、geoip.metadb、ASN.mmdb  GEO 数据：打开 engine 前从 geodata\ 补齐，之后由 engine 更新
     ├── providers\ …                   provider 与规则集缓存
+    ├── routing-template\               subconv 的路由模板和它的清单（D54）
     └── cache.db                       mihomo profile 缓存，包括节点选择（store-selected）
 ```
 

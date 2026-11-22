@@ -231,9 +231,10 @@ func checkApplied(cfg *config.Config) error {
 }
 
 // idleConfig closes every inbound, the TUN and the DNS server and drops the proxies,
-// keeping the mode so a later Start resumes it.
+// keeping the mode so a later Start resumes it. Its one rule makes it a profile that routes,
+// which the admission pipeline reads like any other (compose.Normalize).
 func idleConfig() (*config.Config, error) {
-	source := fmt.Sprintf("mode: %s\nlog-level: %s\n", tunnel.Mode(), log.Level())
+	source := fmt.Sprintf("mode: %s\nlog-level: %s\nrules: [MATCH,DIRECT]\n", tunnel.Mode(), log.Level())
 	admitted, err := admitProfile(admission.Profile{Config: []byte(source)}, admission.Host{Tun: admission.TunNone})
 	if err != nil {
 		return nil, err

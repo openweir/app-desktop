@@ -415,6 +415,12 @@ exits.md 第 9 节的待实测项。
   包级状态）只在 engine 里用（`imports_test.go` 检查）；`admission`、`compose`、`vpngate` 用 mihomo 无状态的解析
   函数、类型和常量，升级时这几处也要核对。升级前跑完整测试，并按 [architecture.md](architecture.md) §3.3 逐条复核
   安全要求和 3.4 节的发布构建标签。
+- **subconv**（D54）：`src/core/go.mod` 的 `github.com/openweir/subconv`。升级后运行
+  `go -C src/core test ./internal/compose -run 'TestFormats|TestVectors' -args -update`，核对
+  `internal/compose/testdata/formats.json` 和 `testdata/core-vectors.json` 的变化；`testdata/formats/` 里的样本取自
+  subconv 自己的 `testdata/<格式>/input.*`，新版加了格式就照样补一份。subconv 改了警告代码或略去规则的写法时，同步
+  `host/base.py` 的 `NODE_LEFT_OUT`、`RULE_LEFT_OUT` 和模拟宿主（`tests/support/simulated_core.py`）。路由模板的主机
+  和清单格式归 subconv 的 `rules` 包，升级时读它的 docs/rules.md。
 - **GEO 数据**的版本和 SHA-256 钉在 `scripts/fetch_geodata.py` 里；改了之后用 `--categories` 重新生成附带的分类名
   清单（`src/openweir/host/geo_categories.py`），CI 用 `--check` 核对。
 - **macOS** 的产品最低版本固定为 26（D28）；构建器同时检查 PySide6 等依赖的实际 Mach-O 版本要求，只能提高该底线。**Nuitka** 的版本是 `scripts/build_app.py` 的 `NUITKA_VERSION`，CI 和

@@ -389,6 +389,24 @@ def test_importing_from_a_link(qtbot: QtBot, view_models: ViewModels) -> None:
     assert prop(profiles, "model").rows[-1].autoUpdateLabel == "每 12 小时自动更新"
 
 
+def test_a_subscription_imports_what_the_core_reads(qtbot: QtBot, view_models: ViewModels) -> None:
+    """What the core left out of a subscription (D54) shows on its row; the rest imports."""
+    profiles = view_models.profiles
+    fetcher = view_models.library.profiles._fetcher
+    assert isinstance(fetcher, SimulatedFetcher)
+    fetcher.body = (
+        b"vless://7c8c8c0e-0000-4000-8000-000000000001@a.example:443#Tokyo%2001\n"
+        b"tg://proxy?server=203.0.113.1&port=443&secret=abc\n"
+        b"trojan://secret@b.example:443#Singapore%2001\n"
+    )
+    with qtbot.waitSignal(profiles.imported):
+        profiles.importUrl("https://nodes.example.com/sub", "节点", True)
+    qtbot.waitUntil(lambda: rows(profiles)[-1].leftOut == "略去 1 个节点")
+    row = rows(profiles)[-1]
+    assert row.name == "节点"
+    assert view_models.library.snapshot().get(row.profileId).proxy_count == 2
+
+
 def test_import_failures(qtbot: QtBot, view_models: ViewModels, tmp_path: Path) -> None:
     profiles = view_models.profiles
     profiles.importUrl("not a link", "", True)

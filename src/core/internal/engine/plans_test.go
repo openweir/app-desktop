@@ -103,10 +103,17 @@ func TestMatchRuleOnADraft(t *testing.T) {
 			t.Errorf("host %q: %v", host, err)
 		}
 	}
-	nothing := &admission.Profile{Config: []byte("proxies: []\nrules: ['DOMAIN,only.example,DIRECT']\n")}
+	nothing := &admission.Profile{Config: []byte("proxies: []\nrules: ['DOMAIN,only.example,DIRECT']\n"),
+		Overrides: [][]byte{[]byte("rules: ['DOMAIN,only.example,DIRECT']\n")}}
 	if matched, err := engine.MatchRule(MatchRequest{Draft: nothing, Host: "else.example"}); err != nil ||
 		matched.GetMatched() || !slices.Equal(matched.GetChain(), []string{"DIRECT"}) {
 		t.Errorf("no rule matched: %v, %v", matched, err)
+	}
+	// A profile's rules end with a MATCH (subconv, D54), DIRECT when it has no groups.
+	nothing.Overrides = nil
+	if matched, err := engine.MatchRule(MatchRequest{Draft: nothing, Host: "else.example"}); err != nil ||
+		!matched.GetMatched() || matched.GetRule().GetType() != "MATCH" || !slices.Equal(matched.GetChain(), []string{"DIRECT"}) {
+		t.Errorf("the final MATCH: %v, %v", matched, err)
 	}
 }
 

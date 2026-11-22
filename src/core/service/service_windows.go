@@ -16,6 +16,7 @@ import (
 	"unsafe"
 
 	"github.com/Microsoft/go-winio"
+	"github.com/openweir/subconv/rules"
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/mgr"
@@ -144,7 +145,7 @@ func serve(ctx context.Context, sessions <-chan sessionEvent, powerEvents *power
 	}
 	var core control.Engine
 	if home != "" {
-		opened, err := engine.New(engine.Options{HomeDir: home, Tun: admission.TunOwned})
+		opened, err := engine.New(engine.Options{HomeDir: home, Tun: admission.TunOwned, TemplateHosts: rules.DefaultHosts()})
 		if err != nil {
 			logger.Error("open the engine", "home", home, "error", err)
 			return err

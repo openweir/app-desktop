@@ -15,6 +15,8 @@ import (
 	"path/filepath"
 	"syscall"
 
+	"github.com/openweir/subconv/rules"
+
 	"github.com/openweir/app-desktop/src/core/internal/admission"
 	"github.com/openweir/app-desktop/src/core/internal/control"
 	"github.com/openweir/app-desktop/src/core/internal/crashlog"
@@ -33,6 +35,7 @@ var errRoot = errors.New("the development server must not run as root: it never 
 func run() error {
 	socket := flag.String("socket", "", "development socket path (required)")
 	home := flag.String("home", "", "mihomo home directory (default: the user config directory)")
+	template := flag.Bool("routing-template", false, "fetch subconv's routing template for subscriptions without usable rules (D54); off, as the end-to-end tests expect")
 	flag.Parse()
 	if *socket == "" {
 		return errors.New("-socket is required: off Windows the service only runs as a development server")
@@ -51,7 +54,7 @@ func run() error {
 	} else {
 		defer closeCrashes()
 	}
-	core, err := newDevelopmentEngine(*home)
+	core, err := newDevelopmentEngine(*home, *template)
 	if err != nil {
 		return err
 	}
@@ -87,9 +90,14 @@ func developmentHome() (string, error) {
 }
 
 // newDevelopmentEngine runs mihomo without a TUN: whatever the profile says, nothing
-// takes over the machine's traffic and every inbound stays on 127.0.0.1.
-func newDevelopmentEngine(home string) (*engine.Engine, error) {
-	return engine.New(engine.Options{HomeDir: home, Tun: admission.TunNone})
+// takes over the machine's traffic and every inbound stays on 127.0.0.1. With template it
+// fetches the routing template as the released hosts do.
+func newDevelopmentEngine(home string, template bool) (*engine.Engine, error) {
+	options := engine.Options{HomeDir: home, Tun: admission.TunNone}
+	if template {
+		options.TemplateHosts = rules.DefaultHosts()
+	}
+	return engine.New(options)
 }
 
 // newDevelopmentDispatcher serves the host methods so ServiceHost works against it, and

@@ -330,18 +330,50 @@ class SourceNode:
     mesh: bool = False  # a Tailscale, ZeroTier or EasyTier outbound, kept out of the pool
 
 
+# subconv's warning codes (docs/routing.md §8.1): a node, and a rule, the core left out.
+NODE_LEFT_OUT = ("unsupported_proxy", "unsupported_option", "invalid_proxy", "invalid_credential")
+RULE_LEFT_OUT = "unsupported_rule"
+TEMPLATE_APPLIED = "template_applied"  # the routing template took the subscription's place
+
+
+@dataclass(frozen=True)
+class SourceWarning:
+    """What the core left out or changed reading a subscription: subconv's stable code and
+    the item it is about."""
+
+    code: str
+    detail: str
+
+
 @dataclass(frozen=True)
 class SourceInspection:
     nodes: tuple[SourceNode, ...]
-    has_rules: bool
+    has_rules: bool  # it routes by rules of its own or by the routing template (D54)
     group_count: int
     rule_count: int
+    warnings: tuple[SourceWarning, ...] = ()
 
     @property
     def node_count(self) -> int:
         """The nodes the source brings to the node pool: neither info nodes nor mesh
         outbounds (docs/mesh.md §3). The subscriptions page counts these everywhere."""
         return sum(not node.info and not node.mesh for node in self.nodes)
+
+    @property
+    def template(self) -> bool:
+        """It routes by the routing template, its own rules missing or too lossy (D54)."""
+        return any(w.code == TEMPLATE_APPLIED for w in self.warnings)
+
+    @property
+    def nodes_left_out(self) -> int:
+        return sum(w.code in NODE_LEFT_OUT for w in self.warnings)
+
+    @property
+    def rules_left_out(self) -> int:
+        """Its own rules the core could not run; none count once the template replaced them."""
+        if self.template:
+            return 0
+        return sum(w.code == RULE_LEFT_OUT for w in self.warnings)
 
 
 @dataclass(frozen=True)

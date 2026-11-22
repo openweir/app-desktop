@@ -161,7 +161,9 @@ func TestReloadMovesThePort(t *testing.T) {
 	if listening(first) || !listening(second) {
 		t.Fatalf("after Reload: old port open=%v, new port open=%v", listening(first), listening(second))
 	}
-	if _, err := engine.Reload(profileOf("rules: ['MATCH,NOWHERE']\n")); !errors.Is(err, ErrInvalidConfig) {
+	broken := profileOf(minimal)
+	broken.Overrides = [][]byte{[]byte("rules: ['MATCH,NOWHERE']\n")}
+	if _, err := engine.Reload(broken); !errors.Is(err, ErrInvalidConfig) {
 		t.Fatalf("Reload with a broken profile = %v", err)
 	}
 	if !listening(second) || engine.State() != controlpb.RunState_RUN_STATE_RUNNING {

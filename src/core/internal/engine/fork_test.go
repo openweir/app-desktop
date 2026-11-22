@@ -45,6 +45,21 @@ func forkProfile(t *testing.T, node map[string]any, composed bool) admission.Pro
 	}}
 }
 
+// forkRefuses reports whether the fork itself refuses node. A subscription's nodes reach it
+// through subconv (D54), which leaves out or repairs what mihomo would refuse, so the node
+// goes in an override, which subconv does not read, on top of a source of the same kind.
+func forkRefuses(t *testing.T, node map[string]any, composed bool) bool {
+	t.Helper()
+	override, err := yaml.Marshal(map[string]any{"prepend-proxies": []any{node}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	profile := forkProfile(t, map[string]any{"name": "other", "type": "direct"}, composed)
+	profile.Overrides = [][]byte{override}
+	_, err = admitProfile(profile, noTUN)
+	return err != nil
+}
+
 func TestForkAnyTLSRealitySurvivesAdmissionAndComposition(t *testing.T) {
 	for _, composed := range []bool{false, true} {
 		node := map[string]any{
@@ -73,7 +88,7 @@ func TestForkAnyTLSRealitySurvivesAdmissionAndComposition(t *testing.T) {
 		}
 		// The fork must reject an incompatible security configuration, not ignore it.
 		node["ech-opts"] = map[string]any{"enable": true}
-		if _, err := admitProfile(forkProfile(t, node, composed), noTUN); err == nil {
+		if !forkRefuses(t, node, composed) {
 			t.Fatal("accepted ECH together with REALITY")
 		}
 	}
@@ -144,7 +159,7 @@ func TestForkSnellSurvivesAdmissionAndComposition(t *testing.T) {
 				"psk": "test-snell-password", "version": sample.version,
 			}
 			node[sample.key] = sample.value
-			if _, err := admitProfile(forkProfile(t, node, composed), noTUN); err == nil {
+			if !forkRefuses(t, node, composed) {
 				t.Errorf("accepted incompatible Snell v%d %s (composed=%t)", sample.version, sample.key, composed)
 			}
 		}

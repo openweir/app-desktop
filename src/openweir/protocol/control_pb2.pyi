@@ -917,16 +917,18 @@ class InspectSourceRequest(_message.Message):
     def __init__(self, yaml: _Optional[str] = ..., info_filter: _Optional[str] = ...) -> None: ...
 
 class InspectSourceResponse(_message.Message):
-    __slots__ = ("nodes", "has_rules", "group_count", "rule_count")
+    __slots__ = ("nodes", "has_rules", "group_count", "rule_count", "warnings")
     NODES_FIELD_NUMBER: _ClassVar[int]
     HAS_RULES_FIELD_NUMBER: _ClassVar[int]
     GROUP_COUNT_FIELD_NUMBER: _ClassVar[int]
     RULE_COUNT_FIELD_NUMBER: _ClassVar[int]
+    WARNINGS_FIELD_NUMBER: _ClassVar[int]
     nodes: _containers.RepeatedCompositeFieldContainer[SourceNode]
     has_rules: bool
     group_count: int
     rule_count: int
-    def __init__(self, nodes: _Optional[_Iterable[_Union[SourceNode, _Mapping]]] = ..., has_rules: _Optional[bool] = ..., group_count: _Optional[int] = ..., rule_count: _Optional[int] = ...) -> None: ...
+    warnings: _containers.RepeatedCompositeFieldContainer[SourceWarning]
+    def __init__(self, nodes: _Optional[_Iterable[_Union[SourceNode, _Mapping]]] = ..., has_rules: _Optional[bool] = ..., group_count: _Optional[int] = ..., rule_count: _Optional[int] = ..., warnings: _Optional[_Iterable[_Union[SourceWarning, _Mapping]]] = ...) -> None: ...
 
 class SourceNode(_message.Message):
     __slots__ = ("name", "type", "region", "info", "mesh")
@@ -941,6 +943,14 @@ class SourceNode(_message.Message):
     info: bool
     mesh: bool
     def __init__(self, name: _Optional[str] = ..., type: _Optional[str] = ..., region: _Optional[str] = ..., info: _Optional[bool] = ..., mesh: _Optional[bool] = ...) -> None: ...
+
+class SourceWarning(_message.Message):
+    __slots__ = ("code", "detail")
+    CODE_FIELD_NUMBER: _ClassVar[int]
+    DETAIL_FIELD_NUMBER: _ClassVar[int]
+    code: str
+    detail: str
+    def __init__(self, code: _Optional[str] = ..., detail: _Optional[str] = ...) -> None: ...
 
 class RegisterWarpRequest(_message.Message):
     __slots__ = ("via", "protocol", "device_id", "token")

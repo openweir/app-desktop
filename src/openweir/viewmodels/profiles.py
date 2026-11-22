@@ -60,6 +60,8 @@ class ProfileRow:
     hasOverride: bool
     note: str  # 规则使用中 or 不加入节点池, after the source in the caption
     warning: str  # 更新失败, in the warning colour (DESIGN.md "分组与行"); empty otherwise
+    # What the core left out reading it (D54), after the note in the warning colour.
+    leftOut: str
     inPool: bool
     hasRules: bool  # it brings rules, or has not been read yet
 
@@ -352,6 +354,7 @@ class ProfilesViewModel(QObject):
             ),
             hasOverride=profile.has_override,
             note=self._note(profile),
+            leftOut=self._left_out(profile),
             warning=self.tr("更新失败")
             if profile.id in self._list.update_failed and not updating
             else "",
@@ -363,10 +366,28 @@ class ProfilesViewModel(QObject):
         if profile.unread:
             return self.tr("连接后读取")
         if self._routing.mode == MODE_PROFILE and profile.id == self._list.active:
+            inspection = self._routing.inspections.get(profile.id)
+            if inspection is not None and inspection.template:
+                # Its own rules are missing or too lossy: subconv's routing template routes.
+                return self.tr("路由模板使用中")
             return self.tr("规则使用中")
         if self._routing.mode == MODE_PLAN and not profile.in_pool:
             return self.tr("不加入节点池")
         return ""
+
+    def _left_out(self, profile: Profile) -> str:
+        """The nodes, and the rules of its own, that the core could not read (D54); its rules
+        only count while they route."""
+        inspection = self._routing.inspections.get(profile.id)
+        if inspection is None:
+            return ""
+        parts = []
+        if inspection.nodes_left_out:
+            parts.append(self.tr("略去 %n 个节点", "", inspection.nodes_left_out))
+        rules_in_use = self._routing.mode == MODE_PROFILE and profile.id == self._list.active
+        if rules_in_use and inspection.rules_left_out:
+            parts.append(self.tr("略去 %n 条规则", "", inspection.rules_left_out))
+        return " · ".join(parts)
 
     @Property(int, constant=True)
     def defaultAutoUpdateHours(self) -> int:

@@ -118,6 +118,9 @@ uv run python scripts/dev.py
 go -C src/core run ./service -socket /tmp/openweir-dev.sock
 ```
 
+开发服务默认不取 subconv 的路由模板（D54，[routing.md](routing.md) §8.9），只有节点的订阅因此和端到端测试里一样用
+"我的方案"；要像发布版一样取模板，加 `-routing-template`。
+
 ```bash
 OPENWEIR_DEV_SOCKET=/tmp/openweir-dev.sock uv run openweir
 ```

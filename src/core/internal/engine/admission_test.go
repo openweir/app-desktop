@@ -311,8 +311,10 @@ func TestAdmissionRejectsBrokenInput(t *testing.T) {
 		"empty":         profileOf("  \n"),
 		"not a mapping": profileOf("- a\n- b\n"),
 		"bad yaml":      profileOf("proxies: [\n"),
-		"unknown rule":  profileOf("rules: ['MATCH,NOWHERE']\n"),
 		"bad listeners": profileOf(minimal + "listeners: {a: b}\n"),
+		// subconv leaves such a rule out of a profile (D54); an override's reaches mihomo.
+		"unknown rule": {Config: []byte(minimal), Overrides: [][]byte{[]byte("rules: ['MATCH,NOWHERE']\n")}},
+		"nothing read": profileOf("proxies: 3\n"),
 	} {
 		if _, err := admit(profile, admission.TunNone); !errors.Is(err, ErrInvalidConfig) {
 			t.Errorf("%s: admit = %v, want ErrInvalidConfig", name, err)
