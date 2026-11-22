@@ -76,9 +76,11 @@ class ShellViewModel(QObject):
         self._sync_pages()
         self._info: HostInfo | None = None
         self._service_failed = False
+        self._refreshing = False
+        self._refresh_again = False  # asked for while a read was on its way
         self._timer = QTimer(self)
         self._timer.setInterval(SERVICE_POLL_MS)
-        self._timer.timeout.connect(self.refreshService)
+        self._timer.timeout.connect(self._poll)
 
     def start(self) -> None:
         self.refreshService()
@@ -159,16 +161,35 @@ class ShellViewModel(QObject):
             core=fmt.version_number(self._info.core_version), protocol=self._info.protocol_version
         )
 
+    def _poll(self) -> None:
+        # A service that answers slowly, up to the 15 s a read may take, is not asked again
+        # every poll meanwhile: the reads would pile up, and answer out of order.
+        if not self._refreshing:
+            self.refreshService()
+
     @Slot()
     def refreshService(self) -> None:
+        """Read the service's info. Asked while a read is on its way, which may have started
+        before what prompted this, read once more after it."""
+        if self._refreshing:
+            self._refresh_again = True
+            return
+        self._refreshing = True
+        self._refresh_again = False
         self._runner.submit(self._host.get_info(), self._apply_info, self._info_failed)
 
     def _apply_info(self, info: HostInfo) -> None:
         self._info = info
         self._service_failed = False
-        self.serviceChanged.emit()
+        self._refreshed()
 
     def _info_failed(self, error: BaseException) -> None:
         self._info = None
         self._service_failed = True
+        self._refreshed()
+
+    def _refreshed(self) -> None:
+        self._refreshing = False
         self.serviceChanged.emit()
+        if self._refresh_again:
+            self.refreshService()

@@ -1,4 +1,5 @@
 import asyncio
+import threading
 from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
@@ -8,13 +9,15 @@ import pytest
 from PySide6.QtCore import QObject
 from pytestqt.qtbot import QtBot
 
-from openweir.host.base import TAKEOVER_NONE, HostError, HostStatus, RunOptions
+from openweir.host.base import TAKEOVER_NONE, HostError, HostInfo, HostStatus, RunOptions
 from openweir.host.service import ServiceHost
 from openweir.host.transport import Streams
 from openweir.models.profiles import ProfileError
 from openweir.models.store import ProfileStore
+from openweir.viewmodels.common.async_runner import AsyncRunner
 from openweir.viewmodels.composition import ViewModels, compose
 from openweir.viewmodels.logs import HIDDEN_POLL_MS, POLL_MS
+from openweir.viewmodels.shell import ShellViewModel
 from tests.support.simulated import SAMPLE_CONFIG, SimulatedFetcher, SimulatedHost, seed_profiles
 from tests.support.storage import has_config, has_override
 
@@ -40,6 +43,45 @@ def view_models(qtbot: QtBot, tmp_path: Path) -> Iterator[ViewModels]:
     built.start()
     yield built
     built.shutdown()
+
+
+def test_service_reads_do_not_pile_up(qtbot: QtBot) -> None:
+    """A service that answers slowly is not asked again by each poll meanwhile; a read asked
+    for while one is on its way follows it, once."""
+
+    class SlowHost:
+        def __init__(self) -> None:
+            self.calls = 0
+            self.answer = threading.Event()
+
+        async def get_info(self) -> HostInfo:
+            self.calls += 1
+            while not self.answer.is_set():
+                await asyncio.sleep(0.01)
+            return HostInfo(1, "dev", "v1.19.33", "stopped", "available")
+
+    host = SlowHost()
+    runner = AsyncRunner()
+    runner.start()
+    shell = ShellViewModel(host, runner)  # pyright: ignore[reportArgumentType]
+    try:
+        shell.refreshService()
+        qtbot.waitUntil(lambda: host.calls == 1)
+        shell._poll()
+        shell._poll()
+        shell.refreshService()  # as when the system extension's maintenance finished
+        shell.refreshService()
+        qtbot.wait(100)
+        assert host.calls == 1
+        assert not prop(shell, "serviceAvailable")
+        host.answer.set()
+        qtbot.waitUntil(lambda: host.calls == 2)
+        qtbot.waitUntil(lambda: prop(shell, "serviceAvailable") and not shell._refreshing)
+        qtbot.wait(100)
+        assert host.calls == 2
+        assert prop(shell, "serviceText") == "服务运行中"
+    finally:
+        runner.shutdown()
 
 
 def test_overview_shows_the_running_tunnel(qtbot: QtBot, view_models: ViewModels) -> None:
