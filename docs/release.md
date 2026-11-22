@@ -59,6 +59,11 @@ Release 上有三个安装包和 SHA256SUMS，共四个文件（1.0.0 另有源�
    `ARTIFACT_SIGNING_ACCOUNT`、`ARTIFACT_SIGNING_PROFILE`；`AZURE_SUBSCRIPTION_ID` 不用。签名由 `package/windows/sign.ps1`
    调用 signtool 和 Artifact Signing 的 dlib 完成，时间戳来自 `http://timestamp.acs.microsoft.com`；签什么、怎么核对见
    architecture.md 第 10 节。签名失败、核对不过，job 就失败，不会产出未签名的安装包。
+
+   外部服务偶尔失败，所以这几步各试至多 3 次、间隔逐次加倍：macOS 的公证（`scripts/notarize.py`：没拿到结论时，有
+   提交 ID 就接着等这次提交，没有就重新提交；`Invalid`、`Rejected` 是结论，不再重试）和 staple；Windows 每批文件的
+   signtool 签名（连 Artifact Signing 和时间戳服务器，`package/windows/sign.ps1`）和两个 NuGet 包的下载（下载后仍核对
+   SHA-256）。macOS job 的超时因此是 240 分钟。
 2. **release** job（`contents: write`）：
    - 取 qualify 输出的版本，确认是三段数字（界面只认这种，第 2 节）；
    - 取回三个安装包 artifact，用构建 job 写的 `.sha256` 核对三个安装包；`.sha256` 文件不上传；

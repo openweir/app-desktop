@@ -54,6 +54,9 @@ $Programs = @('.exe', '.dll', '.pyd')  # scripts/build_windows.py's PE_SUFFIXES
 $OwnNames = @($Product.windows.uiExecutable, $Product.windows.serviceExecutable)
 # A command line holds 32767 characters; each signtool run gets a batch of files well under.
 $BatchLength = 16000
+# Signing tries per batch, and the wait after the first failed one, doubled after each.
+$SignAttempts = 3
+$SignRetrySeconds = 15
 
 # What keeps $File from being signed as a release signs it; nothing when it is.
 function Get-SignatureProblem([string] $File) {
@@ -111,14 +114,26 @@ function Get-CertificateProblem([Security.Cryptography.X509Certificates.X509Cert
     return $null
 }
 
-function Invoke-SignTool([string[]] $Arguments) {
-    & $env:SIGNTOOL @Arguments
-    if ($LASTEXITCODE -ne 0) {
-        throw "signtool $($Arguments[0]) failed with exit code $LASTEXITCODE"
+# Runs signtool with $Arguments, up to $Attempts times with a doubling wait in between.
+function Invoke-SignTool([string[]] $Arguments, [int] $Attempts = 1) {
+    for ($attempt = 1; ; $attempt++) {
+        & $env:SIGNTOOL @Arguments
+        $code = $LASTEXITCODE
+        if ($code -eq 0) {
+            return
+        }
+        if ($attempt -ge $Attempts) {
+            throw "signtool $($Arguments[0]) failed with exit code $code"
+        }
+        $wait = $SignRetrySeconds * [math]::Pow(2, $attempt - 1)
+        Write-Output "::warning::signtool $($Arguments[0]) failed with exit code $code (attempt $attempt of $Attempts); trying again in $wait s"
+        Start-Sleep -Seconds $wait
     }
 }
 
-# Signs $Files with a timestamp; signtool replaces a signature a file already has.
+# Signs $Files with a timestamp; signtool replaces a signature a file already has. Signing
+# reaches Artifact Signing and the timestamp server, which fail now and then, so each batch gets
+# $SignAttempts tries: a file a failed try signed is signed again.
 function Invoke-Signing([string[]] $Files) {
     foreach ($variable in 'SIGNTOOL', 'ARTIFACT_SIGNING_DLIB', 'ARTIFACT_SIGNING_METADATA') {
         $value = [Environment]::GetEnvironmentVariable($variable)
@@ -134,7 +149,7 @@ function Invoke-Signing([string[]] $Files) {
     $length = 0
     foreach ($file in $Files) {
         if ($batch.Count -gt 0 -and $length + $file.Length -gt $BatchLength) {
-            Invoke-SignTool ($options + $batch.ToArray())
+            Invoke-SignTool ($options + $batch.ToArray()) $SignAttempts
             $batch.Clear()
             $length = 0
         }
@@ -142,7 +157,7 @@ function Invoke-Signing([string[]] $Files) {
         $length += $file.Length + 3
     }
     if ($batch.Count -gt 0) {
-        Invoke-SignTool ($options + $batch.ToArray())
+        Invoke-SignTool ($options + $batch.ToArray()) $SignAttempts
     }
 }
 

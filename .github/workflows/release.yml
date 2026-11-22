@@ -85,7 +85,9 @@ jobs:
     env:
       # product.json leaves the signing identities empty; the release sets them (D47).
       OPENWEIR_APPLE_TEAM_ID: ${{ vars.OPENWEIR_APPLE_TEAM_ID }}
-    timeout-minutes: 120
+    # The build takes about an hour; notarizing the app and the image may take up to three
+    # attempts each (scripts/notarize.py).
+    timeout-minutes: 240
     steps:
       - uses: actions/checkout@v7
         with:
@@ -204,15 +206,16 @@ jobs:
         run: uv run --frozen --with nuitka==4.2.2 python scripts/build_app.py
 
       # The app is notarized and stapled first, so that it opens offline once copied out of
-      # the image; then the image itself.
+      # the image; then the image itself. notarize.py tries submitting, waiting and stapling
+      # again when Apple or the network fails.
       - name: Notarize the app
         env:
           APP_STORE_CONNECT_KEY_ID: ${{ vars.APP_STORE_CONNECT_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ vars.APP_STORE_CONNECT_ISSUER_ID }}
         run: |
           ditto -c -k --sequesterRsrc --keepParent build/app/OpenWeir.app "$RUNNER_TEMP/OpenWeir.zip"
-          uv run --no-project python scripts/notarize.py "$RUNNER_TEMP/OpenWeir.zip"
-          xcrun stapler staple build/app/OpenWeir.app
+          uv run --no-project python scripts/notarize.py "$RUNNER_TEMP/OpenWeir.zip" \
+            --staple build/app/OpenWeir.app
           xcrun stapler validate build/app/OpenWeir.app
           # Notarization accepted and the ticket stapled are the gate. Gatekeeper's own checks
           # only warn (docs/maintenance.md §3): on the runner syspolicy_check stops at an
@@ -242,8 +245,7 @@ jobs:
           APP_STORE_CONNECT_KEY_ID: ${{ vars.APP_STORE_CONNECT_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ vars.APP_STORE_CONNECT_ISSUER_ID }}
         run: |
-          uv run --no-project python scripts/notarize.py "build/release/$DMG"
-          xcrun stapler staple "build/release/$DMG"
+          uv run --no-project python scripts/notarize.py "build/release/$DMG" --staple "build/release/$DMG"
           xcrun stapler validate "build/release/$DMG"
           hdiutil verify "build/release/$DMG"
           cd build/release
@@ -411,7 +413,19 @@ jobs:
           foreach ($package in $packages) {
             $id = $package.Id.ToLowerInvariant()
             $archive = Join-Path $tools "$id.nupkg"
-            Invoke-WebRequest -Uri "https://api.nuget.org/v3-flatcontainer/$id/$($package.Version)/$id.$($package.Version).nupkg" -OutFile $archive
+            $uri = "https://api.nuget.org/v3-flatcontainer/$id/$($package.Version)/$id.$($package.Version).nupkg"
+            # NuGet's CDN fails now and then: three attempts, 15 and 30 seconds apart.
+            for ($attempt = 1; ; $attempt++) {
+              try {
+                Invoke-WebRequest -Uri $uri -OutFile $archive -TimeoutSec 300
+                break
+              } catch {
+                if ($attempt -ge 3) { throw }
+                $wait = 15 * [math]::Pow(2, $attempt - 1)
+                Write-Output "::warning::Downloading $($package.Id) failed (attempt $attempt of 3): $($_.Exception.Message); trying again in $wait s"
+                Start-Sleep -Seconds $wait
+              }
+            }
             $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $archive).Hash
             if ($hash -ne $package.Sha256) {
               throw "$($package.Id) $($package.Version) has SHA-256 $hash, not $($package.Sha256)"
