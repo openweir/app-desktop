@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from PySide6.QtGui import QFont, QFontDatabase, QGuiApplication
+from PySide6.QtGui import QFont, QFontDatabase, QGuiApplication, QRawFont
 
 DIRECTORY = Path(__file__).resolve().parent / "ui" / "fonts"
 BUNDLED = (
@@ -59,10 +59,26 @@ def register_fonts() -> None:
         QFont.removeSubstitutions(family)
         QFont.insertSubstitutions(family, [name for name in fallback if name != family])
     QFontDatabase.setApplicationEmojiFontFamilies(
-        ["Noto Color Emoji"] if "Noto Color Emoji" in loaded else []
+        [bundled_family("Noto Color Emoji")] if "Noto Color Emoji" in loaded else []
     )
     if "Inter" in loaded:
         font = app.font()
         font.setFamily("Inter")
         app.setFont(font)
     app.setProperty(_REGISTERED, True)
+
+
+def bundled_family(family: str) -> str:
+    """``family`` as Qt names the bundled file. Where the system has a font of the same name,
+    as Linux often has Noto Color Emoji, fontconfig tells the two apart by foundry ("Noto Color
+    Emoji [GOOG]") and either may answer the plain name, so the app names its own, as it gets
+    on macOS and Windows. The 'head' table, with the file's dates and checksum, says which."""
+    same = [name for name in QFontDatabase.families() if name.startswith(family + " [")]
+    if not same:
+        return family
+    files = [relative for relative, name in BUNDLED if name == family]
+    ours = {QRawFont(str(DIRECTORY / relative), 12).fontTable("head") for relative in files}
+    for name in same:
+        if QRawFont.fromFont(QFont(name)).fontTable("head") in ours:
+            return name
+    return family

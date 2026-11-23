@@ -21,6 +21,7 @@ from PySide6.QtGui import (
     QInputMethodEvent,
     QKeySequence,
     QPainter,
+    QRawFont,
     QTextLayout,
 )
 from PySide6.QtQml import QQmlComponent, QQmlEngine
@@ -29,7 +30,7 @@ from PySide6.QtTest import QTest
 from pytestqt.qtbot import QtBot
 
 from openweir.app import MAIN_QML
-from openweir.fonts import BUNDLED, DIRECTORY, register_fonts
+from openweir.fonts import BUNDLED, DIRECTORY, bundled_family, register_fonts
 from openweir.viewmodels.text_editing import TextEditing
 from tests.support.unicode import CLUSTERS, TEXT
 from tests.support.window import find
@@ -116,6 +117,14 @@ def test_text_presentation_is_not_forced_to_emoji() -> None:
     assert runs
     assert all(run.rawFont().familyName() != "Noto Color Emoji" for run in runs)
     assert all(0 not in run.glyphIndexes() for run in runs)
+
+
+def test_emoji_come_from_the_bundled_font() -> None:
+    """A system font of the same name (Linux's Noto Color Emoji) does not take its place."""
+    (family,) = QFontDatabase.applicationEmojiFontFamilies()
+    assert family == bundled_family("Noto Color Emoji")
+    ours = QRawFont(str(DIRECTORY / "noto-color-emoji/NotoColorEmoji-Regular.ttf"), 12)
+    assert QRawFont.fromFont(QFont(family)).fontTable("head") == ours.fontTable("head")
 
 
 @pytest.mark.parametrize("text", ["🌈", "🇯🇵", "👩🏽‍💻", "✈️", "1️⃣"])
