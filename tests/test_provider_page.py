@@ -320,10 +320,15 @@ def test_the_overview_notes_the_subscription_in_use(
 
     notice = find(overview, lambda i: i.property("text") == "3 天后到期")
     assert notice is not None
+    # 续费 is a link to the account page, on the subscription's provider (docs/accounts.md
+    # §7.5): the page opens the user center from there.
     renew = find(overview, lambda i: kind(i) == "LinkButton" and i.property("text") == "续费")
     assert renew is not None
     loaded.click(qtbot, renew)
-    assert opened == [f"{provider.base}/subscription?id=7"]
+    assert view_models.shell.property("currentPage") == "account"
+    assert view_models.account.property("providerId") == provider_id
+    assert opened == []
+    view_models.shell.setPage("overview")
 
     # Run out, with another subscription of the account that can be used: it is suggested,
     # and used only when the user says so.

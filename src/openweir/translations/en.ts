@@ -216,6 +216,382 @@
     </message>
 </context>
 <context>
+    <name>AccountPage</name>
+    <message>
+        <source>账户</source>
+        <translation>Account</translation>
+    </message>
+    <message>
+        <source>服务商</source>
+        <translation>Provider</translation>
+    </message>
+    <message>
+        <source>账户的更多操作</source>
+        <translation>More account actions</translation>
+    </message>
+    <message>
+        <source>当前订阅</source>
+        <translation>Current subscription</translation>
+    </message>
+    <message>
+        <source>正在读取…</source>
+        <translation>Loading…</translation>
+    </message>
+    <message>
+        <source>重新登录…</source>
+        <translation>Sign in again…</translation>
+    </message>
+    <message>
+        <source>这个账户还没有订阅</source>
+        <translation>This account has no subscriptions yet</translation>
+    </message>
+    <message>
+        <source>选购套餐</source>
+        <translation>Browse plans</translation>
+    </message>
+    <message>
+        <source>本期流量</source>
+        <translation>Traffic this period</translation>
+    </message>
+    <message>
+        <source>%1：%2</source>
+        <translation>%1: %2</translation>
+    </message>
+    <message>
+        <source>下次重置</source>
+        <translation>Next reset</translation>
+    </message>
+    <message>
+        <source>到期</source>
+        <translation>Expires</translation>
+    </message>
+    <message>
+        <source>设备</source>
+        <translation>Devices</translation>
+    </message>
+    <message>
+        <source>自动续费</source>
+        <translation>Auto-renew</translation>
+    </message>
+    <message>
+        <source>续费</source>
+        <translation>Renew</translation>
+    </message>
+    <message>
+        <source>更换套餐</source>
+        <translation>Change plan</translation>
+    </message>
+    <message>
+        <source>此账户的订阅（%1）</source>
+        <translation>Subscriptions of this account (%1)</translation>
+    </message>
+    <message>
+        <source> · %1</source>
+        <translation> · %1</translation>
+    </message>
+    <message>
+        <source>使用中</source>
+        <translation>In use</translation>
+    </message>
+    <message>
+        <source>使用</source>
+        <translation>Use</translation>
+    </message>
+    <message>
+        <source>使用 %1</source>
+        <translation>Use %1</translation>
+    </message>
+    <message>
+        <source>续费 %1</source>
+        <translation>Renew %1</translation>
+    </message>
+    <message>
+        <source>钱包</source>
+        <translation>Wallet</translation>
+    </message>
+    <message>
+        <source>余额</source>
+        <translation>Balance</translation>
+    </message>
+    <message>
+        <source>积分</source>
+        <translation>Points</translation>
+    </message>
+    <message>
+        <source>等级</source>
+        <translation>Level</translation>
+    </message>
+    <message>
+        <source>充值</source>
+        <translation>Top up</translation>
+    </message>
+    <message>
+        <source>明细</source>
+        <translation>History</translation>
+    </message>
+    <message>
+        <source>钱包明细</source>
+        <translation>Wallet history</translation>
+    </message>
+    <message>
+        <source>套餐</source>
+        <translation>Plans</translation>
+    </message>
+    <message>
+        <source>%1 · %2</source>
+        <translation>%1 · %2</translation>
+    </message>
+    <message>
+        <source> · </source>
+        <translation> · </translation>
+    </message>
+    <message>
+        <source>已售罄</source>
+        <translation>Sold out</translation>
+    </message>
+    <message>
+        <source>选购</source>
+        <translation>Buy</translation>
+    </message>
+    <message>
+        <source>选购 %1</source>
+        <translation>Buy %1</translation>
+    </message>
+    <message>
+        <source>订单</source>
+        <translation>Orders</translation>
+    </message>
+    <message>
+        <source>去支付</source>
+        <translation>Pay</translation>
+    </message>
+    <message>
+        <source>去支付 %1</source>
+        <translation>Pay for %1</translation>
+    </message>
+    <message>
+        <source>账户与安全</source>
+        <translation>Account and security</translation>
+    </message>
+    <message>
+        <source>密码与两步验证</source>
+        <translation>Password and two-factor</translation>
+    </message>
+    <message>
+        <source>登录设备</source>
+        <translation>Signed-in devices</translation>
+    </message>
+    <message>
+        <source>退出登录</source>
+        <translation>Sign out</translation>
+    </message>
+    <message>
+        <source>这个账户的订阅会从本机移除</source>
+        <translation>This account’s subscriptions are removed from this device</translation>
+    </message>
+    <message>
+        <source>刷新</source>
+        <translation>Refresh</translation>
+    </message>
+    <message>
+        <source>在用户中心打开</source>
+        <translation>Open in the user center</translation>
+    </message>
+</context>
+<context>
+    <name>AccountViewModel</name>
+    <message>
+        <source>正在同步…</source>
+        <translation>Syncing…</translation>
+    </message>
+    <message>
+        <source>需要重新登录 · {site}</source>
+        <translation>Sign in again · {site}</translation>
+    </message>
+    <message>
+        <source>账户已停用 · {site}</source>
+        <translation>Account disabled · {site}</translation>
+    </message>
+    <message>
+        <source>上次同步 {ago}</source>
+        <translation>Last synced {ago}</translation>
+    </message>
+    <message>
+        <source>未能同步 · {site}</source>
+        <translation>Couldn’t sync · {site}</translation>
+    </message>
+    <message>
+        <source>{account} · {site}</source>
+        <translation>{account} · {site}</translation>
+    </message>
+    <message>
+        <source>没有订阅链接</source>
+        <translation>No subscription link</translation>
+    </message>
+    <message>
+        <source>有效</source>
+        <translation>Active</translation>
+    </message>
+    <message>
+        <source>试用 · {status}</source>
+        <translation>Trial · {status}</translation>
+    </message>
+    <message>
+        <source>长期有效</source>
+        <translation>Never expires</translation>
+    </message>
+    <message>
+        <source>不重置</source>
+        <translation>No reset</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n 台在线 · 不限台数</source>
+        <translation>
+            <numerusform>%n online · no limit</numerusform>
+            <numerusform>%n online · no limit</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>{online} / {limit} 台在线</source>
+        <translation>{online} / {limit} online</translation>
+    </message>
+    <message>
+        <source>退出「{name}」？</source>
+        <translation>Sign out of “{name}”?</translation>
+    </message>
+    <message>
+        <source>{date} 到期</source>
+        <translation>Expires {date}</translation>
+    </message>
+    <message>
+        <source>重新登录后显示</source>
+        <translation>Shown after signing in again</translation>
+    </message>
+    <message>
+        <source>正在读取…</source>
+        <translation>Loading…</translation>
+    </message>
+    <message>
+        <source>{level} · 优惠 {percent}%</source>
+        <translation>{level} · {percent}% off</translation>
+    </message>
+    <message>
+        <source>/ 月</source>
+        <translation>/ month</translation>
+    </message>
+    <message>
+        <source>/ 季</source>
+        <translation>/ quarter</translation>
+    </message>
+    <message>
+        <source>/ 半年</source>
+        <translation>/ 6 months</translation>
+    </message>
+    <message>
+        <source>/ 年</source>
+        <translation>/ year</translation>
+    </message>
+    <message>
+        <source>流量包</source>
+        <translation>Traffic pack</translation>
+    </message>
+    <message>
+        <source>不限流量</source>
+        <translation>Unlimited traffic</translation>
+    </message>
+    <message>
+        <source>每月 {size}</source>
+        <translation>{size} a month</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n 台设备</source>
+        <translation>
+            <numerusform>%n device</numerusform>
+            <numerusform>%n devices</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>不限设备</source>
+        <translation>Unlimited devices</translation>
+    </message>
+    <message>
+        <source>新购</source>
+        <translation>New</translation>
+    </message>
+    <message>
+        <source>续费</source>
+        <translation>Renew</translation>
+    </message>
+    <message>
+        <source>更换套餐</source>
+        <translation>Change plan</translation>
+    </message>
+    <message>
+        <source>充值</source>
+        <translation>Top up</translation>
+    </message>
+    <message>
+        <source>月付</source>
+        <translation>Monthly</translation>
+    </message>
+    <message>
+        <source>季付</source>
+        <translation>Quarterly</translation>
+    </message>
+    <message>
+        <source>半年付</source>
+        <translation>Every 6 months</translation>
+    </message>
+    <message>
+        <source>年付</source>
+        <translation>Yearly</translation>
+    </message>
+    <message>
+        <source>一次性</source>
+        <translation>One-time</translation>
+    </message>
+    <message>
+        <source>已超时</source>
+        <translation>Timed out</translation>
+    </message>
+    <message>
+        <source>待支付</source>
+        <translation>Awaiting payment</translation>
+    </message>
+    <message>
+        <source>已完成</source>
+        <translation>Completed</translation>
+    </message>
+    <message>
+        <source>已取消</source>
+        <translation>Cancelled</translation>
+    </message>
+    <message>
+        <source>已退款</source>
+        <translation>Refunded</translation>
+    </message>
+    <message>
+        <source>账户已停用</source>
+        <translation>Account disabled</translation>
+    </message>
+    <message>
+        <source>需要重新登录</source>
+        <translation>Sign in again</translation>
+    </message>
+    <message>
+        <source>{used} · 不限流量</source>
+        <translation>{used} · unlimited</translation>
+    </message>
+    <message>
+        <source>暂无在售的套餐</source>
+        <translation>No plans on sale</translation>
+    </message>
+    <message>
+        <source>没有订单</source>
+        <translation>No orders</translation>
+    </message>
+</context>
+<context>
     <name>AutoUpdateField</name>
     <message>
         <source>自动更新</source>
@@ -4755,6 +5131,10 @@ Your subscriptions, settings, and credentials are kept; connecting again will re
     <message>
         <source>日志</source>
         <translation>Logs</translation>
+    </message>
+    <message>
+        <source>账户</source>
+        <translation>Account</translation>
     </message>
     <message>
         <source>设置</source>

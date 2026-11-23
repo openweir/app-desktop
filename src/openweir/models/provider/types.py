@@ -531,6 +531,8 @@ class OrderSummary:
     amount: int  # ``amount``: left to pay through a payment channel, minor units
     created_at: float  # ``createdAt``
     price: int = 0  # ``price``: the list price (a top-up: the amount added)
+    discount: int = 0  # ``discount``: the level's and a coupon's, minor units
+    credit: int = 0  # ``credit``: what is left of the plan changed from, minor units
     paid_amount: int = 0  # ``paidAmount``
     plan_id: str | None = None  # ``planId``
     plan_name: str = ""  # ``planName``; null (top-ups) is ""
@@ -542,6 +544,12 @@ class OrderSummary:
     @property
     def pending(self) -> bool:
         return self.status == ORDER_PENDING
+
+    @property
+    def total(self) -> int:
+        """What the order costs, however it is paid (balance, points or a payment channel),
+        as the user center's order list shows it."""
+        return max(0, self.price - self.discount - self.credit)
 
 
 # -- what AccountsService answers ----------------------------------------------------------------

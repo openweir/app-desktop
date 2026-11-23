@@ -501,8 +501,11 @@ def test_the_overview_tells_how_the_subscription_in_use_runs_out(
     assert profiles.property("canRenewActive")
     assert not profiles.property("activeNoticeDanger")
     assert profiles.property("suggestedName") == ""  # it still works
-    profiles.renewActive()
-    assert opened == [f"{scene.provider.base}/subscription?id=7"]
+    # 续费 goes to the account page, on the subscription's provider; the browser waits.
+    with scene.qtbot.waitSignal(profiles.accountRequested) as asked:
+        profiles.renewActive()
+    assert asked.args == [pid]
+    assert opened == []
 
     scene.provider.update_subscription(7, expireAt=iso(NOW + 30 * DAY), download=int(91 * GIB))
     scene.sync()

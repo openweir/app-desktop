@@ -1,4 +1,5 @@
-"""Text for numbers the screens show: rates, sizes, durations, latency, dates and versions.
+"""Text for numbers the screens show: rates, sizes, durations, latency, dates, versions and
+money.
 
 Dates follow the UI language: the patterns are translated and QLocale's default (set by
 i18n.Translations) names the months."""
@@ -6,10 +7,18 @@ i18n.Translations) names the months."""
 from __future__ import annotations
 
 import re
+from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QCoreApplication, QDate, QDateTime, QLocale
 
+if TYPE_CHECKING:
+    from openweir.models.provider.types import Currency
+
 _UNITS = ("B", "KB", "MB", "GB", "TB")
+# Decimal places of an amount in a currency other than the provider's own, which the site
+# does not describe: most currencies' minor unit is a hundredth.
+MONEY_DIGITS = 2
 # The timestamp and commit a Go pseudo-version adds to vX.Y.Z, vX.Y.Z-pre or vX.0.0.
 _PSEUDO_VERSION = re.compile(r"[-.](?:0\.)?\d{14}-[0-9A-Za-z]+$")
 
@@ -98,3 +107,19 @@ def version_number(version: str) -> str:
     which the core reports for the pinned kernel release (D38), and ``v1.19.33`` for a bare
     ``v1.19.33-0.20261103155416-c2de0f865c7e``."""
     return _PSEUDO_VERSION.sub("", version.strip().partition("+")[0])
+
+
+def money(amount: int, code: str, currency: Currency | None) -> str:
+    """An amount of minor units of the currency ``code`` as the account page shows it
+    (DESIGN.md "金额"): ``¥15.00`` with the provider's symbol and decimal places when it is the
+    provider's own ``currency`` (the site's), and ``USD 15.00`` by its code otherwise, as an
+    old order may be after the provider changed currency, or before the site was read. Thousands
+    are grouped: ``¥1,500.00``."""
+    own = currency is not None and currency.code == code
+    digits = currency.digits if own and currency is not None else MONEY_DIGITS
+    # Decimal, so that minor units never pick up a float's rounding.
+    value = f"{Decimal(abs(amount)).scaleb(-digits):,.{digits}f}"
+    sign = "-" if amount < 0 else ""
+    if own and currency is not None:
+        return f"{sign}{currency.symbol}{value}"
+    return f"{code} {sign}{value}" if code else f"{sign}{value}"

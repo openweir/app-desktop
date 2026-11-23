@@ -170,6 +170,7 @@ def shown_page(loaded: Loaded) -> str:
         "RoutingPage": "routing",
         "ConnectionsPage": "connections",
         "LogsPage": "logs",
+        "AccountPage": "account",
         "SettingsPage": "settings",
     }
     (shown,) = find_all(loaded.window.contentItem(), lambda i: kind(i) in pages)

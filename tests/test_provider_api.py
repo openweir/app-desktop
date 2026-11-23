@@ -596,6 +596,12 @@ def test_wallet_plans_and_orders(client: HttpProviderApi, provider: FakeProvider
     assert request.query == "page=1&pageSize=5"
     run(lambda: client.orders(provider.base, session.token, 1000))
     assert provider.requests_for("orders")[-1].query == "page=1&pageSize=100"
+    # The total, as the user center lists it, after a level's discount and a change's credit.
+    assert (orders[1].price, orders[1].discount, orders[1].credit) == (1500, 0, 0)
+    assert orders[1].total == 1500
+    provider.orders["user-1"][2].update(price=3000, discount=300, credit=1000)
+    changed = run(lambda: client.orders(provider.base, session.token, 5))[1]
+    assert (changed.discount, changed.credit, changed.total) == (300, 1000, 1700)
 
 
 def test_withdrawals_stay_out_of_orders(client: HttpProviderApi, provider: FakeProvider) -> None:

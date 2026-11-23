@@ -27,11 +27,16 @@ PAGES = (
         "icon": "connections",
     },
     {"id": "logs", "label": QT_TRANSLATE_NOOP("ShellViewModel", "日志"), "icon": "logs"},
+    {"id": "account", "label": QT_TRANSLATE_NOOP("ShellViewModel", "账户"), "icon": "account"},
     {"id": "settings", "label": QT_TRANSLATE_NOOP("ShellViewModel", "设置"), "icon": "settings"},
 )
 # Pages that list what only a running core answers: the sidebar leaves them out until the
 # tunnel runs (D27), and the window leaves them for the overview when it stops.
 TUNNEL_PAGES = frozenset({"proxies"})
+# Pages of the provider accounts: the sidebar lists them while there is one, signed in or
+# not (DESIGN.md "侧栏导航"), and the window leaves them for the subscriptions page, whose 添加
+# signs in again, when the last one signs out.
+ACCOUNT_PAGES = frozenset({"account"})
 SERVICE_POLL_MS = 10_000
 
 
@@ -56,9 +61,10 @@ class ShellViewModel(QObject):
     currentPageChanged = Signal()
     serviceChanged = Signal()
     tunnelChanged = Signal()
-    # The tunnel stopped under the current page, which gives way to the overview next; the
-    # window moves the keyboard focus off it first.
-    leavingPage = Signal()
+    # The current page goes from the sidebar and gives way to the page named next: the
+    # overview when the tunnel stopped under it, the subscriptions page when the last
+    # provider account signed out under it. The window moves the keyboard focus off it first.
+    leavingPage = Signal(str)
 
     def __init__(
         self,
@@ -71,6 +77,7 @@ class ShellViewModel(QObject):
         self._runner = runner
         self._current_page = "overview"
         self._tunnel_running = False
+        self._has_accounts = False
         # Rows update in place, so the other tabs keep their delegates and the keyboard focus.
         self._pages = KeyedListModel([f.name for f in fields(PageRow)], self)
         self._sync_pages()
@@ -97,7 +104,7 @@ class ShellViewModel(QObject):
     @Property(QObject, constant=True)
     def pages(self) -> KeyedListModel:
         """The sidebar's pages as PageRow items, in order; TUNNEL_PAGES only while the
-        tunnel runs."""
+        tunnel runs, ACCOUNT_PAGES only while there is a provider account."""
         return self._pages
 
     def _sync_pages(self) -> None:
@@ -110,7 +117,17 @@ class ShellViewModel(QObject):
         )
 
     def _shows(self, page: str) -> bool:
-        return self._tunnel_running or page not in TUNNEL_PAGES
+        if page in TUNNEL_PAGES:
+            return self._tunnel_running
+        if page in ACCOUNT_PAGES:
+            return self._has_accounts
+        return True
+
+    def _leave(self, page: str) -> None:
+        """Give the current page up for ``page``, the focus moved off it first."""
+        self.leavingPage.emit(page)
+        self._current_page = page
+        self.currentPageChanged.emit()
 
     def tunnel_running(self, running: bool) -> None:
         """Whether a running core answers: the tunnel is up and the connection switch is
@@ -119,11 +136,20 @@ class ShellViewModel(QObject):
             return
         self._tunnel_running = running
         if not running and self._current_page in TUNNEL_PAGES:
-            self.leavingPage.emit()
-            self._current_page = "overview"
-            self.currentPageChanged.emit()
+            self._leave("overview")
         self._sync_pages()
         self.tunnelChanged.emit()
+
+    def has_accounts(self, present: bool) -> None:
+        """Whether a provider account is here (AccountViewModel): ACCOUNT_PAGES show only
+        then. The last one signed out under the account page, the window goes to the
+        subscriptions page (docs/accounts.md §7.1)."""
+        if present == self._has_accounts:
+            return
+        self._has_accounts = present
+        if not present and self._current_page in ACCOUNT_PAGES:
+            self._leave("profiles")
+        self._sync_pages()
 
     @Property(bool, notify=tunnelChanged)
     def tunnelRunning(self) -> bool:
