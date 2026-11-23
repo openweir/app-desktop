@@ -508,6 +508,24 @@ def cramped(item: QQuickItem) -> list[set[str]]:
 
 
 @pytest.mark.parametrize("loaded", ["zh", "en"], indirect=True)
+def test_linux_hints_fit_the_smallest_window(qtbot: QtBot, loaded: Loaded) -> None:
+    """Without a tray (the offscreen platform has none, as GNOME without its extension) and
+    on a desktop without a system proxy the service can set (D63, D65)."""
+    window = loaded.window
+    window.setWidth(window.minimumWidth())
+    window.setHeight(window.minimumHeight())
+    settings = loaded.view_models.settings
+    settings._system_proxy_refused()
+    loaded.view_models.shell.setPage("settings")
+    qtbot.waitUntil(lambda: not settings.property("systemProxyAvailable"))
+    qtbot.wait(100)
+    shown = texts(window.contentItem())
+    assert settings.property("systemProxyNote") in shown
+    assert settings.property("closeActionDetail") in shown
+    assert cramped(window.contentItem()) == []
+
+
+@pytest.mark.parametrize("loaded", ["zh", "en"], indirect=True)
 def test_settings_page_fits_the_smallest_window(qtbot: QtBot, loaded: Loaded) -> None:
     window = loaded.window
     window.setWidth(window.minimumWidth())

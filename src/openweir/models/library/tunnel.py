@@ -11,12 +11,18 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import replace
 from typing import TYPE_CHECKING
 
-from openweir.host.base import HostError, RunOptions, SourceInspection, TunnelConfig
+from openweir.host.base import (
+    HostError,
+    RunOptions,
+    SourceInspection,
+    TunnelConfig,
+    system_proxy_unavailable,
+)
 from openweir.models import plans
 from openweir.models.library.core import has_rules, live_options
 from openweir.models.profiles import ProfileError
@@ -52,6 +58,24 @@ def _naming_switches(options: RunOptions) -> Iterator[None]:
 class Tunnel:
     def __init__(self, core: LibraryCore) -> None:
         self._core = core
+        self._system_proxy_listeners: list[Callable[[], None]] = []
+
+    def on_system_proxy_unavailable(self, listener: Callable[[], None]) -> None:
+        """Call ``listener`` when the host says it can never set this desktop's system proxy
+        (Linux, D63), on the thread that asked it: the asyncio loop's."""
+        self._system_proxy_listeners.append(listener)
+
+    @contextmanager
+    def _switches(self, options: RunOptions) -> Iterator[None]:
+        """A request to the host that turns on the switches in ``options``."""
+        try:
+            with _naming_switches(options):
+                yield
+        except HostError as error:
+            if system_proxy_unavailable(error):
+                for listener in list(self._system_proxy_listeners):
+                    listener()
+            raise
 
     async def deactivate_extension(self) -> None:
         """Serialize maintenance with profile changes and connecting; retain all local data."""
@@ -97,7 +121,7 @@ class Tunnel:
                     config = await core.current_config(options=options)
                 if config is None:
                     raise ProfileError("no_profile", "import a profile first")
-                with _naming_switches(options):
+                with self._switches(options):
                     report = await core.host.start(config)
             except BaseException:
                 if prepared:
@@ -197,7 +221,7 @@ class Tunnel:
         async with core.lock:
             if await core.running() is None:
                 return
-            with _naming_switches(RunOptions(system_proxy_enabled=enabled)):
+            with self._switches(RunOptions(system_proxy_enabled=enabled)):
                 await core.host.set_system_proxy(enabled)
 
     async def apply_settings(self, settings: Settings) -> None:
@@ -214,7 +238,7 @@ class Tunnel:
         config = await core.current_config(options=options)
         if config is None:
             raise ProfileError("no_profile", "import a profile first")
-        with _naming_switches(options):
+        with self._switches(options):
             report = await core.host.reload(config)
         if config.composition is not None:
             core.report = report

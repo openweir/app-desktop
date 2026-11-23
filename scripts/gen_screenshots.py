@@ -195,6 +195,7 @@ def _load(
         SimulatedFetcher(),
         appearance=Appearance("system", hints=SystemColorScheme(APPEARANCES[appearance])),
         login_item=InstalledLoginItem(),
+        tray_available=True,  # the menu bar's, as on a Mac
         updater=offline_updater(store.directory),
         credentials=MemoryCredentials(),
         icloud=ICloudProvider(FakeICloud()),

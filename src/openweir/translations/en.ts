@@ -953,6 +953,10 @@
         <translation>Connected, but couldn’t change the system proxy</translation>
     </message>
     <message>
+        <source>这个桌面不支持系统代理，仅 GNOME 和 KDE 可用</source>
+        <translation>This desktop doesn’t support the system proxy; only GNOME and KDE do</translation>
+    </message>
+    <message>
         <source>无法更新代理集合或规则集合</source>
         <translation>Couldn’t update the proxy or rule provider</translation>
     </message>
@@ -1031,6 +1035,10 @@
     <message>
         <source>只有在这台电脑上本地登录、正在使用的用户才能使用隧道</source>
         <translation>Only a user signed in and active at this computer can use the tunnel</translation>
+    </message>
+    <message>
+        <source>已连接，但这个桌面不支持系统代理，仅 GNOME 和 KDE 可用</source>
+        <translation>Connected, but this desktop doesn’t support the system proxy; only GNOME and KDE do</translation>
     </message>
     <message>
         <source>操作失败：{detail}</source>
@@ -4005,10 +4013,6 @@ prepend-rules:
         <translation>Open at login</translation>
     </message>
     <message>
-        <source>先断开连接，再退出</source>
-        <translation>Disconnects, then quits</translation>
-    </message>
-    <message>
         <source>系统扩展</source>
         <translation>System extension</translation>
     </message>
@@ -4119,10 +4123,6 @@ Your subscriptions, settings, and credentials are kept; connecting again will re
     <message>
         <source>关闭窗口时</source>
         <translation>When closing the window</translation>
-    </message>
-    <message>
-        <source>隧道继续运行</source>
-        <translation>The tunnel keeps running</translation>
     </message>
     <message>
         <source>关于</source>
@@ -4236,12 +4236,32 @@ Your subscriptions, settings, and credentials are kept; connecting again will re
         <translation>TCP handshake</translation>
     </message>
     <message>
+        <source>没有托盘；GNOME 装上 AppIndicator 扩展后可用</source>
+        <translation>No tray; on GNOME, the AppIndicator extension adds one</translation>
+    </message>
+    <message>
+        <source>没有托盘：先断开连接，再退出</source>
+        <translation>No tray: disconnects, then quits</translation>
+    </message>
+    <message>
+        <source>先断开连接，再退出</source>
+        <translation>Disconnects, then quits</translation>
+    </message>
+    <message>
+        <source>隧道继续运行</source>
+        <translation>The tunnel keeps running</translation>
+    </message>
+    <message>
         <source>仅安装版可用</source>
         <translation>Only in the installed app</translation>
     </message>
     <message>
         <source>需要在系统设置的登录项中允许</source>
         <translation>Allow it under Login Items in System Settings</translation>
+    </message>
+    <message>
+        <source>仅 GNOME 和 KDE 支持系统代理</source>
+        <translation>Only GNOME and KDE support the system proxy</translation>
     </message>
     <message>
         <source>包含所有网络时不可用</source>

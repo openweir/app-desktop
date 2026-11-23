@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import QCoreApplication
 
-from openweir.host.base import HostError
+from openweir.host.base import HostError, system_proxy_unavailable
 from openweir.i18n import QT_TRANSLATE_NOOP
 from openweir.models.profiles import ProfileError
 
@@ -44,6 +44,10 @@ _MESSAGES = {
     "system_proxy_failed": QT_TRANSLATE_NOOP("Feedback", "无法更改系统代理"),
     # Start or Reload took effect, but the system proxy could not follow.
     "started_without_system_proxy": QT_TRANSLATE_NOOP("Feedback", "已连接，但无法更改系统代理"),
+    # The Linux service sets the system proxy only on GNOME and KDE (D63).
+    "system_proxy_unavailable": QT_TRANSLATE_NOOP(
+        "Feedback", "这个桌面不支持系统代理，仅 GNOME 和 KDE 可用"
+    ),
     "provider_update_failed": QT_TRANSLATE_NOOP("Feedback", "无法更新代理集合或规则集合"),
     "mesh_login_failed": QT_TRANSLATE_NOOP("Feedback", "无法取得组网的登录链接"),
     # The Windows service could not take on the user who connects (docs/architecture.md §5.4).
@@ -79,6 +83,9 @@ _MESSAGES = {
 # claim_failed, or take_over_failed when it came with a take-over, with this text.
 NOT_LOCAL_SESSION = "only a user in an active session at this machine may own the tunnel"
 _NOT_LOCAL = QT_TRANSLATE_NOOP("Feedback", "只有在这台电脑上本地登录、正在使用的用户才能使用隧道")
+_STARTED_ON_UNSUPPORTED_DESKTOP = QT_TRANSLATE_NOOP(
+    "Feedback", "已连接，但这个桌面不支持系统代理，仅 GNOME 和 KDE 可用"
+)
 # Codes whose message (a parse error, an HTTP status) helps the user fix the problem.
 _WITH_DETAIL = {
     "invalid_config",
@@ -103,6 +110,8 @@ def failure_text(error: BaseException) -> str:
         return _failed(str(error))
     if error.code in ("claim_failed", "take_over_failed") and NOT_LOCAL_SESSION in error.message:
         return QCoreApplication.translate("Feedback", _NOT_LOCAL)
+    if error.code == "started_without_system_proxy" and system_proxy_unavailable(error):
+        return QCoreApplication.translate("Feedback", _STARTED_ON_UNSUPPORTED_DESKTOP)
     message = _MESSAGES.get(error.code)
     if message is None:
         return _failed(error.message)

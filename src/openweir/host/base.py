@@ -45,6 +45,23 @@ TAKEOVER_TUN = "tun"  # the macOS extension: always a TUN, never the system prox
 TAKEOVER_NONE = "none"  # the development service: neither, only the mixed port
 
 
+# The Linux service's answers on a desktop that keeps its proxy settings nowhere it can set
+# them (D63): system_proxy_unavailable to SetSystemProxy, and to a Start or a Reload that asked
+# for the system proxy, started_without_system_proxy with sysproxy.ErrUnsupportedDesktop's
+# text in its message.
+UNSUPPORTED_DESKTOP = "the desktop keeps no proxy settings OpenWeir can set"
+
+
+def system_proxy_unavailable(error: BaseException) -> bool:
+    """Whether ``error`` says that the host can never set this desktop's system proxy, as
+    opposed to failing this once."""
+    if not isinstance(error, HostError):
+        return False
+    if error.code == "system_proxy_unavailable":
+        return True
+    return error.code == "started_without_system_proxy" and UNSUPPORTED_DESKTOP in error.message
+
+
 def taken_over(options: RunOptions, takeover: str) -> RunOptions:
     """``options`` with the TUN and the system proxy a ``takeover`` host runs."""
     if takeover == TAKEOVER_TUN:

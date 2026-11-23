@@ -245,6 +245,9 @@ def test_english_failures() -> None:
     assert failure_text(remote) == local
     denied = HostError("not_authorized", "Error executing command as another user: Not authorized")
     assert failure_text(denied) == "Administrator authorization wasn’t granted"  # noqa: RUF001
+    desktop = HostError("system_proxy_unavailable", "the desktop keeps no proxy settings")
+    expected = "This desktop doesn’t support the system proxy; only GNOME and KDE do"  # noqa: RUF001
+    assert failure_text(desktop) == expected
 
 
 def test_linux_service_refusals() -> None:

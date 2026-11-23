@@ -3,7 +3,7 @@ UI language and appearance, what the desktop does (closing the window, opening a
 what is installed.
 
 The page's TUN and system proxy switches come from OverviewViewModel, which knows the
-running tunnel's state (D26).
+running tunnel's state (D26); this one says whether the system proxy can be set at all.
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ import sys
 from dataclasses import replace
 from typing import Any
 
-from PySide6.QtCore import Property, QObject, Signal, Slot
+from PySide6.QtCore import Property, QObject, Qt, Signal, Slot
 from PySide6.QtQml import QmlElement, QmlUncreatable
 
 from openweir import __version__
@@ -75,6 +75,8 @@ DELAY_TEST_LABELS = {
 }
 # Only macOS's NetworkExtension has the setting (D19).
 INCLUDE_ALL_NETWORKS = sys.platform == "darwin"
+# Opened at login, OpenWeir connects too (OverviewViewModel's login connection).
+CONNECTS_AT_LOGIN = sys.platform in ("win32", "linux")
 
 
 @QmlElement
@@ -86,6 +88,8 @@ class SettingsViewModel(QObject):
     appearanceChanged = Signal()  # the theme's appearance follows ``appearance``
     # Not ``changed``: that fires while the user types a port, which would undo the typing.
     mixedPortChanged = Signal()
+    # The host said it cannot set this desktop's system proxy, on the asyncio loop's thread.
+    _systemProxyRefused = Signal()
 
     def __init__(
         self,
@@ -95,7 +99,11 @@ class SettingsViewModel(QObject):
         runner: AsyncRunner,
         login_item: LoginItem,
         parent: QObject | None = None,
+        *,
+        tray_available: bool = True,
     ) -> None:
+        """``tray_available`` is DesktopViewModel's: without a tray, closing the window
+        quits."""
         super().__init__(parent)
         self._settings = settings
         # Whoever changes the settings, the page follows: this page, OverviewViewModel's
@@ -114,6 +122,12 @@ class SettingsViewModel(QObject):
         self._stack_error = ""
         self._error = ""
         self._info: HostInfo | None = None
+        self._tray = tray_available
+        self._system_proxy_available = True
+        self._systemProxyRefused.connect(
+            self._system_proxy_refused, Qt.ConnectionType.QueuedConnection
+        )
+        library.tunnel.on_system_proxy_unavailable(self._systemProxyRefused.emit)
 
     def start(self) -> None:
         self.refreshInfo()
@@ -183,15 +197,37 @@ class SettingsViewModel(QObject):
     # -- desktop -----------------------------------------------------------------------------
     @Property(str, notify=changed)
     def closeAction(self) -> str:
-        return self._current().close_action
+        """What closing the window does: without a tray it quits, whatever is stored
+        (DesktopViewModel.hideOnClose)."""
+        return self._current().close_action if self._tray else "quit"
 
     @Property("QVariantList", notify=optionsChanged)  # pyright: ignore[reportArgumentType]
-    def closeActionOptions(self) -> list[dict[str, str]]:
-        return [{"value": v, "label": self.tr(CLOSE_ACTION_LABELS[v])} for v in CLOSE_ACTIONS]
+    def closeActionOptions(self) -> list[dict[str, object]]:
+        options: list[dict[str, object]] = []
+        for value in CLOSE_ACTIONS:
+            option: dict[str, object] = {
+                "value": value,
+                "label": self.tr(CLOSE_ACTION_LABELS[value]),
+            }
+            if value == "tray" and not self._tray:
+                # Linux desktops without a StatusNotifier host, GNOME's among them unless the
+                # user added the extension (D65).
+                note = self.tr("没有托盘；GNOME 装上 AppIndicator 扩展后可用")
+                option.update(enabled=False, note=note)
+            options.append(option)
+        return options
+
+    @Property(str, notify=changed)
+    def closeActionDetail(self) -> str:
+        if not self._tray:
+            return self.tr("没有托盘：先断开连接，再退出")
+        if self._current().close_action == "quit":
+            return self.tr("先断开连接，再退出")
+        return self.tr("隧道继续运行")
 
     @Slot(str)
     def setCloseAction(self, action: str) -> None:
-        if action in CLOSE_ACTIONS:
+        if action in CLOSE_ACTIONS and (action != "tray" or self._tray):
             self._store(close_action=action)
 
     @Property(bool, notify=changed)
@@ -214,7 +250,7 @@ class SettingsViewModel(QObject):
             return self.tr("仅安装版可用")
         if self._login.needs_approval:
             return self.tr("需要在系统设置的登录项中允许")
-        if sys.platform == "win32":
+        if CONNECTS_AT_LOGIN:
             return self.tr("登录时打开并自动连接")
         return ""
 
@@ -250,6 +286,28 @@ class SettingsViewModel(QObject):
             self.changed.emit()
 
         self._runner.submit(action, done, failed)
+
+    # -- the system proxy --------------------------------------------------------------------
+    @Property(bool, notify=changed)
+    def systemProxyAvailable(self) -> bool:
+        """False once the host said it cannot set this desktop's system proxy: the Linux
+        service sets GNOME's and KDE's only (D63)."""
+        return self._system_proxy_available
+
+    @Property(str, notify=changed)
+    def systemProxyNote(self) -> str:
+        if self._system_proxy_available:
+            return ""
+        return self.tr("仅 GNOME 和 KDE 支持系统代理")
+
+    def _system_proxy_refused(self) -> None:
+        """The row turns off, and so does the setting, so that connecting no longer asks
+        for a system proxy that cannot be set. The row stays off until OpenWeir starts
+        again; the desktop may have gained the settings by then."""
+        self._system_proxy_available = False
+        if self._current().system_proxy:
+            self._store(system_proxy=False)
+        self.changed.emit()
 
     # -- run options -------------------------------------------------------------------------
     @Property(int, notify=mixedPortChanged)
