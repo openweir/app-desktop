@@ -133,9 +133,9 @@ func (p *linuxPlatform) MayClaim(caller peer.Identity) error {
 	return p.mayClaim(uid, callerPID(caller))
 }
 
-// callerPID is the caller's process, whose session decides a claim; 0 while peer.Identity
-// does not carry it, and then the user's display session decides alone.
-func callerPID(peer.Identity) uint32 { return 0 }
+// callerPID is the caller's process, whose session decides a claim. The verifier checked it
+// against the socket's peer and holds a pidfd for the connection, so it is still the UI.
+func callerPID(caller peer.Identity) uint32 { return caller.ProcessID }
 
 // mayClaim lets uid claim when process pid sits in an active local session of theirs. A
 // program the desktop started is often in no session at all, under the user's service manager

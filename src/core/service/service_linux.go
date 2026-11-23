@@ -25,7 +25,6 @@ import (
 	"github.com/openweir/app-desktop/src/core/internal/operation"
 	"github.com/openweir/app-desktop/src/core/internal/owner"
 	"github.com/openweir/app-desktop/src/core/internal/peer"
-	"github.com/openweir/app-desktop/src/core/internal/power"
 	"github.com/openweir/app-desktop/src/core/internal/product"
 	"github.com/openweir/app-desktop/src/core/internal/server"
 	"github.com/openweir/app-desktop/src/core/internal/tunclean"
@@ -219,30 +218,13 @@ func serveSystem(ctx context.Context, listener net.Listener, logger *slog.Logger
 	defer host.Close()
 	// Clients may already wait on the socket; the owner's tunnel comes back in the background.
 	host.Attach(dispatcher)
-	powerEvents := power.NewQueue()
-	sleep := func(sleeping bool) {
-		if sleeping {
-			powerEvents.Publish(power.Suspend)
-		} else {
-			powerEvents.Publish(power.ResumeAutomatic)
-		}
-	}
-	// logind's users are the service's sessions: a user's uid is their session ID.
-	if watch, err := machine.watch(ctx, host.SessionChanged, sleep); err != nil {
+	// logind's users are the service's sessions: a user's uid is their session ID. Sleep
+	// returns once the tunnel is down, and logind's delay lock is held until then.
+	if watch, err := machine.watch(ctx, host.SessionChanged, host.Sleep); err != nil {
 		logger.Warn("logind unavailable: sign-ins, sign-outs, sleep and wake go unnoticed", "error", err)
 	} else {
 		defer watch.Close()
 	}
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-powerEvents.Changed():
-				host.PowerChanged(powerEvents.Latest())
-			}
-		}
-	}()
 	if err := machine.ready(); err != nil {
 		return fmt.Errorf("tell systemd the service is ready: %w", err)
 	}
