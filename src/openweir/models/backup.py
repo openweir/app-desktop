@@ -4,20 +4,25 @@ document, to keep in a file or upload to a backup target, and its restore.
 A snapshot holds what the user made, nothing of this machine:
 
     profiles   subscriptions with their link and update setting, not what was downloaded;
-               local files with the config as imported (``config``)
+               local files with the config as imported (``config``); a provider account's
+               subscriptions with their provider and their id there, no link and no config
+    providers  the provider accounts signed in to (version 2, D59), without their sessions
     overrides  the global override and each profile's own
     routing    the routing mode, the profile and the plan in use, the info pattern, and
                every plan with its groups and rules
     mesh       the mesh networks added in the app, without their secrets
     settings   the settings whose scope is ``synced``
 
-Usage, cached downloads, local settings, tokens, the WARP account and the mesh networks'
-secrets stay out. Records keep
-their times. A deleted record is a tombstone, its key and times without what it held, so a
-removed subscription's link does not live on in the backups.
+Usage, cached downloads, what billing last said of a provider's subscriptions, local
+settings, tokens (the providers' sessions among them), the WARP account and the mesh
+networks' secrets stay out. Records keep their times. A deleted record is a tombstone, its
+key and times without what it held, so a removed subscription's link does not live on in
+the backups.
 
 A restore either replaces the local data, as if the user had just made it so, or merges
-it record by record: whichever side changed a record later wins, tombstones included.
+it record by record: whichever side changed a record later wins, tombstones included. It
+never leaves two providers at one origin, nor two profiles for one provider subscription
+(``_left_out``), nor a provider profile without its provider (``_settle_providers``).
 """
 
 from __future__ import annotations
@@ -27,22 +32,24 @@ import hashlib
 import json
 import platform
 import sqlite3
-from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Collection, Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, field, fields
 from pathlib import Path
 from typing import Any
 
 from openweir import __version__
 from openweir.host.base import MESH_KINDS
 from openweir.models.database import Database
-from openweir.models.profiles import KIND_FILE, KIND_SUBSCRIPTION, ProfileError
+from openweir.models.profiles import KIND_FILE, KIND_PROVIDER, KIND_SUBSCRIPTION, ProfileError
 from openweir.models.routing import GROUP_KINDS, MODES, RULE_KINDS
 from openweir.models.settings import SYNCED, Settings, accepted, scope
 
 FORMAT = "openweir-backup"
-# A change of the document raises it; decode keeps reading every earlier version.
-VERSION = 1
+# A change of the document raises it; decode keeps reading every earlier version, and an
+# app of an earlier version refuses it as newer_backup. 2 added the provider accounts.
+VERSION = 2
+ACCOUNTS_VERSION = 2  # the first version that holds provider accounts
 REPLACE = "replace"  # the local data becomes the snapshot's
 MERGE = "merge"  # record by record, the later change wins
 RESTORE_MODES = (MERGE, REPLACE)
@@ -95,7 +102,12 @@ class Snapshot:
         """Whether it holds nothing the user made, as from a database just created."""
         document = self.document
         routing = document["routing"]
-        records = (document["profiles"], document["overrides"], routing["plans"])
+        records = (
+            document["profiles"],
+            _providers(document),
+            document["overrides"],
+            routing["plans"],
+        )
         return not any(records) and not document["settings"] and routing["updated_at"] == 0
 
     @property
@@ -210,6 +222,17 @@ def export(connection: sqlite3.Connection, now: float, device: str, app_version:
         "device": device,
         "app_version": app_version,
         "profiles": _export_profiles(connection),
+        # Without the session, which the credential store keeps (D56): a provider restored
+        # elsewhere needs signing in again. ``user_id`` is what tells, at that sign-in,
+        # whether it is the same account, whose profiles it takes up again by remote id,
+        # or another one, which replaces them only once the user agrees (docs/accounts.md
+        # §2); it is the provider's id of the user and says no more than ``account``.
+        "providers": [
+            _record(row, ("id", "origin", "name", "account", "user_id", "position", "created_at"))
+            for row in connection.execute(
+                "SELECT * FROM providers ORDER BY deleted_at IS NOT NULL, position, created_at, id"
+            )
+        ],
         "overrides": [
             _record(row, ("scope", "yaml"))
             for row in connection.execute("SELECT * FROM overrides ORDER BY scope")
@@ -254,10 +277,16 @@ def _export_profiles(connection: sqlite3.Connection) -> list[dict[str, Any]]:
         (KIND_FILE,),
     ):
         extra: dict[str, Any] = {"in_pool": bool(row["in_pool"])}
-        if row["yaml"] is not None:  # a subscription's download stays here
-            extra["config"] = {"yaml": row["yaml"], "updated_at": row["config_updated_at"]}
-        columns = ("id", "name", "kind", "url", "path", "auto_update_hours", "position")
-        profiles.append(_record(row, (*columns, "created_at"), **extra))
+        if row["kind"] == KIND_PROVIDER:
+            # It has no link of its own (the provider's stays in memory, D57), and its
+            # config is downloaded again through the account, as a subscription's is.
+            source: tuple[str, ...] = ("provider_id", "remote_id")
+        else:
+            source = ("url", "path")
+            if row["yaml"] is not None:  # a subscription's download stays here
+                extra["config"] = {"yaml": row["yaml"], "updated_at": row["config_updated_at"]}
+        columns = ("id", "name", "kind", *source, "auto_update_hours", "position", "created_at")
+        profiles.append(_record(row, columns, **extra))
     return profiles
 
 
@@ -336,11 +365,27 @@ def _optional(check: Check) -> Check:
 _PROFILE: dict[str, Check] = {
     "id": _text,
     "name": _text,
-    "kind": _one_of(KIND_SUBSCRIPTION, KIND_FILE),
-    "url": _text,
-    "path": _text,
+    "kind": _text,  # one of _KINDS, KIND_PROVIDER only from ACCOUNTS_VERSION on
     "auto_update_hours": _integer,
     "in_pool": _flag,
+    "position": _integer,
+    "created_at": _time,
+    "updated_at": _time,
+}
+_KINDS = (KIND_SUBSCRIPTION, KIND_FILE, KIND_PROVIDER)
+# What a profile holds besides, by kind: a provider's names its provider and its subscription
+# there, like Profile does, and carries no link, path or config.
+_SOURCE: dict[str, Check] = {"url": _text, "path": _text}
+_PROVIDER_SOURCE: dict[str, Check] = {
+    "provider_id": lambda value: isinstance(value, str) and value != "",
+    "remote_id": _integer,
+}
+_PROVIDER: dict[str, Check] = {
+    "id": _text,
+    "origin": _text,
+    "name": _text,
+    "account": _text,
+    "user_id": _text,
     "position": _integer,
     "created_at": _time,
     "updated_at": _time,
@@ -402,6 +447,11 @@ def _deleted(record: Mapping[str, Any]) -> bool:
     return record.get("deleted_at") is not None
 
 
+def _providers(document: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """The snapshot's providers; none before ACCOUNTS_VERSION, whatever the document says."""
+    return document["providers"] if document["version"] >= ACCOUNTS_VERSION else []
+
+
 def _check(record: Any, checks: Mapping[str, Check], what: str) -> dict[str, Any]:
     if not isinstance(record, dict):
         raise BackupError("not_a_backup", f"{what} is not an object")
@@ -432,9 +482,25 @@ def _records(
 
 def _check_document(document: dict[str, Any]) -> None:
     _check(document, _HEADER_FIELDS, "the header")
+    version = document["version"]
+    kinds = _KINDS if version >= ACCOUNTS_VERSION else (KIND_SUBSCRIPTION, KIND_FILE)
     for profile in _records(document.get("profiles"), _PROFILE, "profiles"):
-        if "config" in profile and not _deleted(profile):
-            _check(profile["config"], _CONFIG, "a profile's config")
+        if _deleted(profile):
+            continue
+        if profile["kind"] not in kinds:
+            raise BackupError("not_a_backup", f"profiles: kind {profile['kind']!r}")
+        if profile["kind"] != KIND_PROVIDER:
+            _check(profile, _SOURCE, "profiles")
+            if "config" in profile:
+                _check(profile["config"], _CONFIG, "a profile's config")
+            continue
+        _check(profile, _PROVIDER_SOURCE, "profiles")
+        # A link here would be a secret in the backup, and the profile could not be loaded.
+        if any(name in profile for name in ("url", "path", "config")):
+            raise BackupError("not_a_backup", "profiles: a provider's with a link or a config")
+    if version >= ACCOUNTS_VERSION:
+        for _ in _records(document.get("providers"), _PROVIDER, "providers"):
+            pass
     for _ in _records(document.get("overrides"), _OVERRIDE, "overrides", key="scope"):
         pass
     routing = _check(document.get("routing"), _ROUTING, "routing")
@@ -462,8 +528,21 @@ class _Table:
 _PROFILES = _Table(
     "profiles",
     ("id",),
-    ("name", "kind", "url", "path", "auto_update_hours", "in_pool", "position"),
+    (
+        "name",
+        "kind",
+        "url",
+        "path",
+        "provider_id",
+        "remote_id",
+        "auto_update_hours",
+        "in_pool",
+        "position",
+    ),
     created_at=True,
+)
+_PROVIDERS = _Table(
+    "providers", ("id",), ("origin", "name", "account", "user_id", "position"), created_at=True
 )
 _OVERRIDES = _Table("overrides", ("scope",), ("yaml",))
 _PLANS = _Table("plans", ("id",), ("name", "fallback", "egress", "position"), created_at=True)
@@ -487,40 +566,219 @@ def _canonical(value: Any) -> str:
 
 
 def restore(connection: sqlite3.Connection, snapshot: Snapshot, mode: str, now: float) -> None:
-    """Write the snapshot's data into the database with ``mode``: REPLACE or MERGE."""
+    """Write the snapshot's data into the database with ``mode``: REPLACE or MERGE.
+
+    A snapshot older than ACCOUNTS_VERSION knows nothing of provider accounts, so even a
+    replace leaves the providers, their profiles and those profiles' overrides as they are.
+    A restored provider has no session here: it needs signing in again."""
     if mode not in RESTORE_MODES:
         raise ValueError(f"invalid restore mode: {mode!r}")
     document = snapshot.document
-    profiles = [_stored_profile(profile) for profile in document["profiles"]]
-    _restore_rows(connection, _PROFILES, profiles, mode, now)
+    accounts = document["version"] >= ACCOUNTS_VERSION
+    profile_scope = override_scope = None
+    if accounts:
+        left = _left_out(connection, document, mode)
+    else:
+        left = _LeftOut()
+        theirs = {
+            row[0]
+            for row in connection.execute(
+                "SELECT id FROM profiles WHERE kind = ?", (KIND_PROVIDER,)
+            )
+        }
+        profile_scope, override_scope = _not_in("id", theirs), _not_in("scope", theirs)
+    profiles = [
+        _stored_profile(profile)
+        for profile in document["profiles"]
+        if profile["id"] not in left.profiles
+    ]
+    _restore_rows(connection, _PROFILES, profiles, mode, now, scope=profile_scope)
     _restore_configs(connection, document["profiles"], mode, now)
-    _restore_rows(connection, _OVERRIDES, document["overrides"], mode, now)
+    overrides = [o for o in document["overrides"] if o["scope"] not in left.profiles]
+    _restore_rows(connection, _OVERRIDES, overrides, mode, now, scope=override_scope)
+    if accounts:
+        providers = [p for p in _providers(document) if p["id"] not in left.providers]
+        _restore_rows(connection, _PROVIDERS, providers, mode, now)
     routing = document["routing"]
     plans = [_stored_plan(plan) for plan in routing["plans"]]
     _restore_rows(connection, _PLANS, plans, mode, now)
     for plan in routing["plans"]:
         if _deleted(plan):
             continue
-        scoped = ("plan_id", plan["id"])
+        scoped = _where("plan_id", plan["id"])
         groups = [_stored_group(plan["id"], group) for group in plan["groups"]]
         _restore_rows(connection, _GROUPS, groups, mode, now, scope=scoped)
         rules = [_stored_rule(plan["id"], rule) for rule in plan["rules"]]
         _restore_rows(connection, _RULES, rules, mode, now, scope=scoped)
-    _restore_routing_state(connection, routing, mode, now)
+    in_use = left.moved.get(routing["profile_id"], routing["profile_id"])
+    _restore_routing_state(connection, {**routing, "profile_id": in_use}, mode, now)
     networks = [_stored_network(network) for network in document["mesh"]]
     _restore_rows(connection, _NETWORKS, networks, mode, now)
     _restore_settings(connection, document["settings"], mode, now)
-    # What was downloaded for a profile no longer there is a cache of nothing.
+    _settle_providers(connection, now)
+    # What was downloaded for a profile no longer there, or what billing said of it, is a
+    # cache of nothing.
     connection.execute(
         "DELETE FROM profile_contents WHERE profile_id NOT IN "
         "(SELECT id FROM profiles WHERE deleted_at IS NULL)"
     )
+    connection.execute(
+        "DELETE FROM provider_subscriptions WHERE profile_id NOT IN "
+        "(SELECT id FROM profiles WHERE deleted_at IS NULL AND kind = ?)",
+        (KIND_PROVIDER,),
+    )
+
+
+def _where(column: str, value: Any) -> Callable[[sqlite3.Row], bool]:
+    return lambda row: row[column] == value
+
+
+def _not_in(column: str, values: Collection[Any]) -> Callable[[sqlite3.Row], bool]:
+    return lambda row: row[column] not in values
 
 
 def _stored_profile(record: dict[str, Any]) -> dict[str, Any]:
     if _deleted(record):
         return record
-    return {**record, "in_pool": int(record["in_pool"])}
+    stored = {**record, "in_pool": int(record["in_pool"])}
+    if record["kind"] == KIND_PROVIDER:
+        return {**stored, "url": "", "path": ""}
+    return {**stored, "provider_id": None, "remote_id": None}
+
+
+# -- one provider per origin, one profile per subscription --------------------------------------
+@dataclass(frozen=True)
+class _LeftOut:
+    """What of a snapshot a restore leaves out (``_left_out``)."""
+
+    providers: frozenset[str] = frozenset()
+    profiles: frozenset[str] = frozenset()
+    # A profile left out, and the one here that stands for it: the same subscription of the
+    # same account. The profile in use follows.
+    moved: Mapping[str, str] = field(default_factory=dict)
+
+
+def _left_out(connection: sqlite3.Connection, document: Mapping[str, Any], mode: str) -> _LeftOut:
+    """What of the snapshot to leave out so that once it is restored, one provider at most
+    is signed in at an origin (D55) and one profile at most stands for a provider's
+    subscription.
+
+    Two devices that each signed in to an origin on their own have a provider each, with
+    profiles of their own for the same subscriptions, and merging one's snapshot into the
+    other would give two of each. The provider signed in here stays, and the snapshot's is
+    left out with its profiles and their overrides: this device keeps its session, which the
+    credential store holds by the provider's id, and nothing of either is marked deleted, so
+    the other device keeps its own as well when it merges this one's snapshot in turn. The
+    two go on with a provider each until one of them replaces its data or signs out. Where
+    neither was signed in here before (a replace, or a snapshot that held two), the first in
+    the snapshot's order stays. Two profiles for one subscription of one provider (each
+    device added one when it came up) are settled the same way."""
+    providers_here = _rows(connection, "providers")
+    providers = _live_after(providers_here, _providers(document), mode)
+    replaced: dict[str, str] = {}  # a provider left out, and the one at its origin that stays
+    for ids in _clashes(providers, ("origin",)):
+        stays = _staying(ids, providers, providers_here)
+        replaced.update((other, stays) for other in ids if other != stays)
+    of_replaced = [
+        record
+        for record in document["profiles"]
+        if not _deleted(record)
+        and record["kind"] == KIND_PROVIDER
+        and record["provider_id"] in replaced
+    ]
+    left = {record["id"] for record in of_replaced}
+    records = [record for record in document["profiles"] if record["id"] not in left]
+    profiles_here = _rows(connection, "profiles")
+    profiles = {
+        key: values
+        for key, values in _live_after(profiles_here, records, mode).items()
+        if values["kind"] == KIND_PROVIDER
+    }
+    moved: dict[str, str] = {}
+    standing: dict[tuple[str, int], str] = {}  # the profile that stays for a subscription
+    for key, values in profiles.items():
+        standing[(values["provider_id"], values["remote_id"])] = key
+    for ids in _clashes(profiles, ("provider_id", "remote_id")):
+        stays = _staying(ids, profiles, profiles_here)
+        standing[(profiles[stays]["provider_id"], profiles[stays]["remote_id"])] = stays
+        moved.update((other, stays) for other in ids if other != stays)
+    left |= moved.keys()
+    for record in of_replaced:
+        stays = replaced[record["provider_id"]]
+        user = providers[record["provider_id"]]["user_id"]
+        if user and user == providers[stays]["user_id"]:
+            here = standing.get((stays, record["remote_id"]))
+            if here is not None:
+                moved[record["id"]] = here
+    return _LeftOut(frozenset(replaced), frozenset(left), moved)
+
+
+def _rows(connection: sqlite3.Connection, table: str) -> dict[str, sqlite3.Row]:
+    return {row["id"]: row for row in connection.execute(f"SELECT * FROM {table}")}
+
+
+def _live_after(
+    stored: Mapping[str, sqlite3.Row], records: Iterable[Mapping[str, Any]], mode: str
+) -> dict[str, Any]:
+    """By id, the values of each record or row that is live once ``records`` are restored
+    with ``mode``, as _restore_rows decides: the record's where it wins, else the row's."""
+    incoming = {record["id"]: record for record in records}
+    live: dict[str, Any] = {}
+    for key in stored.keys() | incoming.keys():
+        row, record = stored.get(key), incoming.get(key)
+        values: Any = None
+        if mode == REPLACE:
+            if record is not None and not _deleted(record):
+                values = record
+        elif record is not None and (row is None or row["updated_at"] < record["updated_at"]):
+            if not _deleted(record):
+                values = record
+        elif row is not None and row["deleted_at"] is None:
+            values = row
+        if values is not None:
+            live[key] = values
+    return live
+
+
+def _clashes(live: Mapping[str, Any], columns: tuple[str, ...]) -> list[list[str]]:
+    """The ids of ``live`` that share the values of ``columns``, where more than one does."""
+    groups: dict[tuple[Any, ...], list[str]] = {}
+    for key, values in live.items():
+        groups.setdefault(tuple(values[column] for column in columns), []).append(key)
+    return [keys for keys in groups.values() if len(keys) > 1]
+
+
+def _staying(ids: Iterable[str], live: Mapping[str, Any], stored: Mapping[str, sqlite3.Row]) -> str:
+    """Of the ids that clash, the one live here before the restore, else the first in order."""
+
+    def order(key: str) -> tuple[bool, int, float, str]:
+        row = stored.get(key)
+        values = live[key]
+        here = row is not None and row["deleted_at"] is None
+        return (not here, values["position"], values["created_at"], key)
+
+    return min(ids, key=order)
+
+
+def _settle_providers(connection: sqlite3.Connection, now: float) -> None:
+    """Mark deleted, with their overrides, the provider profiles whose provider is not
+    signed in here once restored: a merge took another device's sign-out, which is later
+    than this provider's last change here, but a profile of it changed here later still.
+    Signing out removes the provider's profiles (docs/accounts.md §4.4), and so does this."""
+    orphans = [
+        row[0]
+        for row in connection.execute(
+            "SELECT id FROM profiles WHERE kind = ? AND deleted_at IS NULL AND provider_id "
+            "NOT IN (SELECT id FROM providers WHERE deleted_at IS NULL)",
+            (KIND_PROVIDER,),
+        )
+    ]
+    for table, key in (("profiles", "id"), ("overrides", "scope")):
+        connection.executemany(
+            f"UPDATE {table} SET deleted_at = ?, updated_at = ? "
+            f"WHERE {key} = ? AND deleted_at IS NULL",
+            [(now, now, orphan) for orphan in orphans],
+        )
 
 
 def _stored_plan(record: dict[str, Any]) -> dict[str, Any]:
@@ -560,11 +818,11 @@ def _restore_rows(
     mode: str,
     now: float,
     *,
-    scope: tuple[str, str] | None = None,
+    scope: Callable[[sqlite3.Row], bool] | None = None,
 ) -> None:
     """Merge or replace the rows of ``table`` with ``records``; ``scope`` limits the rows a
-    replace marks deleted to those with that column value, such as one plan's groups. A
-    record finds its row by key wherever it is, so a rule may move to another plan.
+    replace marks deleted to those it accepts, such as one plan's groups. A record finds its
+    row by key wherever it is, so a rule may move to another plan.
 
     A merge writes a record that is new here or changed later than the row, with its own
     times; a tombstone marks the row deleted, and is dropped when there is no row. A replace
@@ -602,7 +860,7 @@ def _restore_rows(
             _write_row(connection, table, record, now, exists=True)
     if mode == REPLACE:
         for key, row in stored.items():
-            in_scope = scope is None or row[scope[0]] == scope[1]
+            in_scope = scope is None or scope(row)
             if in_scope and key not in live and row["deleted_at"] is None:
                 connection.execute(
                     f"UPDATE {table.name} SET deleted_at = ?, updated_at = ? WHERE {key_match}",

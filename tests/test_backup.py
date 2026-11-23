@@ -13,10 +13,12 @@ from typing import Any
 
 import pytest
 
+from openweir.models import backup
 from openweir.models.backup import (
     MAX_SNAPSHOT_BYTES,
     MERGE,
     REPLACE,
+    VERSION,
     BackupError,
     Backups,
     Counts,
@@ -29,12 +31,15 @@ from openweir.models.database import TOMBSTONE_DAYS
 from openweir.models.library import ProfileLibrary
 from openweir.models.profiles import (
     KIND_FILE,
+    KIND_PROVIDER,
     KIND_SUBSCRIPTION,
     Profile,
     ProfileError,
     ProfileList,
     Usage,
 )
+from openweir.models.provider.store import ProviderStore
+from openweir.models.provider.types import ProviderRecord, RemoteSubscription
 from openweir.models.routing import (
     MODE_PLAN,
     MODE_PROFILE,
@@ -75,6 +80,7 @@ class Machine:
         self.store = ProfileStore(directory, clock=self.clock)
         self.routing = RoutingStore(self.store.database)
         self.settings = DatabaseSettingsStore(self.store.database)
+        self.providers = ProviderStore(self.store.database)
         self.backups = Backups(self.store.database, device=device, app_version="1.0.0")
         self.directory = directory
 
@@ -141,6 +147,94 @@ def plain(profiles: ProfileList) -> ProfileList:
     )
 
 
+ORIGIN = "https://panel.example.com"
+PROVIDER_LINK = "https://panel.example.com/api/v1/client/subscribe?token=provider-secret"
+
+
+def billing(remote_id: int, user: str = "user-1") -> RemoteSubscription:
+    """A subscription as billing describes it, with its link, which nothing stores."""
+    return RemoteSubscription(
+        id=remote_id,
+        plan_id="plan-only-in-billing",
+        status="active",
+        usable=True,
+        plan_name=f"套餐 {remote_id}",
+        user_id=user,
+        online_devices=2,
+        access="link",
+        url=PROVIDER_LINK,
+        urls=(PROVIDER_LINK,),
+    )
+
+
+def sign_in(
+    machine: Machine,
+    prefix: str,
+    *,
+    user: str = "user-1",
+    remotes: tuple[int, ...] = (7, 9),
+    active: int | None = None,
+) -> ProviderRecord:
+    """Sign in to ORIGIN as the accounts do (T3): the provider, a profile for each of its
+    subscriptions, named ``<prefix>-<remote id>``, after the others, then what billing said
+    of them. ``active``: the remote id whose profile is in use."""
+    record = machine.providers.add(ORIGIN, "示例服务商", "someone@example.com", user)
+    add_subscriptions(machine, record, prefix, remotes, active=active)
+    return record
+
+
+def add_subscriptions(
+    machine: Machine,
+    record: ProviderRecord,
+    prefix: str,
+    remotes: tuple[int, ...],
+    *,
+    active: int | None = None,
+) -> None:
+    current = machine.profiles()
+    added = tuple(
+        Profile(
+            id=f"{prefix}-{remote}",
+            name=f"套餐 {remote}",
+            kind=KIND_PROVIDER,
+            auto_update_hours=24,
+            provider_id=record.id,
+            remote_id=remote,
+        )
+        for remote in remotes
+    )
+    in_use = current.active if active is None else f"{prefix}-{active}"
+    machine.store.save(replace(current, profiles=(*current.profiles, *added), active=in_use))
+    machine.providers.save_subscriptions({p.id: billing(p.remote_id or 0) for p in added})
+
+
+def sign_out(machine: Machine, record: ProviderRecord) -> None:
+    """Sign out as the accounts do: the provider's profiles go, then the provider."""
+    current = machine.profiles()
+    gone = [p.id for p in current.profiles if p.provider_id == record.id]
+    kept = tuple(p for p in current.profiles if p.provider_id != record.id)
+    machine.store.save(replace(current, profiles=kept))
+    for profile_id in gone:
+        machine.store.delete_config(profile_id)
+    machine.providers.delete(record.id)
+
+
+def provider_ids(machine: Machine) -> list[str]:
+    """Every provider row, live or not: what a restore wrote or marked."""
+    return [row[0] for row in stored(machine.directory, "SELECT id FROM providers ORDER BY id")]
+
+
+def provider_profiles(machine: Machine) -> dict[str, tuple[str | None, int | None]]:
+    return {
+        p.id: (p.provider_id, p.remote_id) for p in machine.profiles().profiles if p.is_provider
+    }
+
+
+def cached(machine: Machine) -> list[str]:
+    rows = stored(machine.directory, "SELECT profile_id FROM provider_subscriptions")
+    return sorted(row[0] for row in rows)
+
+
 # -- what a snapshot holds ---------------------------------------------------------------------
 def test_a_snapshot_holds_the_users_data(tmp_path: Path) -> None:
     machine = Machine(tmp_path)
@@ -148,7 +242,7 @@ def test_a_snapshot_holds_the_users_data(tmp_path: Path) -> None:
     document = machine.at(1_234.5).snapshot().document
 
     assert document["format"] == "openweir-backup"
-    assert document["version"] == 1
+    assert document["version"] == 2
     assert document["created_at"] == 1_234.5
     assert (document["device"], document["app_version"]) == ("laptop", "1.0.0")
     a, b, c = document["profiles"]
@@ -186,6 +280,7 @@ def test_a_snapshot_holds_the_users_data(tmp_path: Path) -> None:
         "language": "en",
         "update_check": False,
     }
+    assert document["providers"] == []  # signed in to none
 
 
 def test_nothing_of_this_machine_goes_into_a_snapshot(tmp_path: Path) -> None:
@@ -272,8 +367,10 @@ def test_round_trip_through_a_file(tmp_path: Path) -> None:
 
 
 def document_of(tmp_path: Path) -> dict[str, Any]:
+    """Profiles a, b, c, then the provider's here-7 and here-9."""
     machine = Machine(tmp_path)
     populate(machine)
+    sign_in(machine, "here")
     return machine.snapshot().document
 
 
@@ -302,6 +399,23 @@ def broken(document: dict[str, Any], change: str) -> dict[str, Any]:
             broken["settings"][0]["updated_at"] = -1
         case "tombstone":
             broken["overrides"][0] = {"scope": "global", "deleted_at": 5}
+        case "provider_link":  # a provider profile's link stays in memory (D57)
+            broken["profiles"][3]["url"] = PROVIDER_LINK
+        case "provider_config":
+            broken["profiles"][3]["config"] = {"yaml": "proxies: []\n", "updated_at": 0}
+        case "provider_id":
+            broken["profiles"][3]["provider_id"] = ""
+        case "remote_id":
+            broken["profiles"][3]["remote_id"] = "7"
+        case "subscription_without_link":
+            del broken["profiles"][0]["url"]
+        case "providers":
+            del broken["providers"]
+        case "account":
+            broken["providers"][0]["account"] = None
+        case "provider_in_version_1":
+            broken["version"] = 1
+            del broken["providers"]
     return broken
 
 
@@ -319,6 +433,14 @@ def broken(document: dict[str, Any], change: str) -> dict[str, Any]:
         "mode",
         "setting",
         "tombstone",
+        "provider_link",
+        "provider_config",
+        "provider_id",
+        "remote_id",
+        "subscription_without_link",
+        "providers",
+        "account",
+        "provider_in_version_1",
     ],
 )
 def test_what_is_no_snapshot_is_refused(tmp_path: Path, change: str) -> None:
@@ -337,9 +459,20 @@ def test_other_files_are_refused(data: bytes) -> None:
 
 def test_a_newer_snapshot_is_refused(tmp_path: Path) -> None:
     document = document_of(tmp_path)
-    document["version"] = 2
+    document["version"] = VERSION + 1
     with pytest.raises(BackupError) as raised:
         Snapshot.decode(json.dumps(document).encode())
+    assert raised.value.code == "newer_backup"
+
+
+def test_an_app_of_version_1_refuses_a_version_2_snapshot(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """What 1.x does with a snapshot holding provider accounts: the same check, VERSION 1."""
+    data = Machine(tmp_path).snapshot().encode()
+    monkeypatch.setattr(backup, "VERSION", 1)
+    with pytest.raises(BackupError) as raised:
+        Snapshot.decode(data)
     assert raised.value.code == "newer_backup"
 
 
@@ -692,3 +825,324 @@ def test_restore_resets_local_fallback_only_when_accepting_routing(
     assert "resume_profile" not in snapshot.document["routing"]
     target.at(400).backups.restore(snapshot, mode)
     assert target.routing.state().resume_profile == (mode == MERGE and not incoming_newer)
+
+
+# -- provider accounts (D59) -------------------------------------------------------------------
+def test_a_snapshot_holds_providers_without_sessions_or_billing(tmp_path: Path) -> None:
+    machine = Machine(tmp_path)
+    populate(machine)
+    record = sign_in(machine.at(1_100), "here", active=7)
+    machine.store.write_override("here-7", "ipv6: false\n")
+    snapshot = machine.snapshot()
+    document = snapshot.document
+
+    assert document["providers"] == [
+        {
+            "id": record.id,
+            "origin": ORIGIN,
+            "name": "示例服务商",
+            "account": "someone@example.com",
+            "user_id": "user-1",
+            "position": 0,
+            "created_at": 1_100,
+            "updated_at": 1_100,
+        }
+    ]
+    profiles = {p["id"]: p for p in document["profiles"]}
+    # The provider and the subscription there, no link of its own, no config.
+    assert profiles["here-7"] == {
+        "id": "here-7",
+        "name": "套餐 7",
+        "kind": "provider",
+        "provider_id": record.id,
+        "remote_id": 7,
+        "auto_update_hours": 24,
+        "in_pool": True,
+        "position": 3,
+        "created_at": 1_100,
+        "updated_at": 1_100,
+    }
+    # The other kinds hold what they held in version 1, and nothing of providers.
+    assert set(profiles["a"]) == {
+        "id",
+        "name",
+        "kind",
+        "url",
+        "path",
+        "auto_update_hours",
+        "in_pool",
+        "position",
+        "created_at",
+        "updated_at",
+    }
+    assert document["routing"]["profile_id"] == "here-7"
+    assert {o["scope"] for o in document["overrides"]} == {"global", "b", "here-7"}
+    assert snapshot.info.counts == Counts(profiles=5, plans=1)
+    text = snapshot.encode().decode()
+    # Billing's cache and the link it gave stay here; the session is never in the database.
+    for absent in (PROVIDER_LINK, "provider-secret", "plan-only-in-billing", "online_devices"):
+        assert absent not in text, absent
+    assert cached(machine) == ["here-7", "here-9"]
+
+
+def test_a_provider_signed_out_of_is_a_tombstone(tmp_path: Path) -> None:
+    machine = Machine(tmp_path)
+    record = sign_in(machine, "here")
+    sign_out(machine.at(2_000), record)
+    document = machine.snapshot().document
+    assert document["providers"] == [{"id": record.id, "updated_at": 2_000, "deleted_at": 2_000}]
+    assert document["profiles"] == [
+        {"id": "here-7", "updated_at": 2_000, "deleted_at": 2_000},
+        {"id": "here-9", "updated_at": 2_000, "deleted_at": 2_000},
+    ]
+    assert ORIGIN not in machine.snapshot().encode().decode()
+
+
+def test_a_version_2_snapshot_round_trips(tmp_path: Path) -> None:
+    source = Machine(tmp_path / "a")
+    populate(source)
+    record = sign_in(source.at(1_100), "here", active=9)
+    path = tmp_path / "backup.json"
+    write_file(path, source.snapshot())
+    snapshot = read_file(path)
+    target = Machine(tmp_path / "b", now=50_000)
+
+    target.backups.restore(snapshot, REPLACE)
+
+    assert target.providers.providers() == source.providers.providers() == (record,)
+    # The profiles name their provider and subscription as before, without a config yet:
+    # it comes through the account once it is signed in to again.
+    assert provider_profiles(target) == {"here-7": (record.id, 7), "here-9": (record.id, 9)}
+    assert target.profiles().active == "here-9"
+    assert plain(target.profiles()) == plain(replace(source.profiles(), has_global_override=True))
+    assert cached(target) == []
+    assert target.snapshot().digest == source.snapshot().digest
+    # Restoring it again, either way, changes nothing.
+    target.at(60_000).backups.restore(snapshot, MERGE)
+    target.backups.restore(snapshot, REPLACE)
+    assert target.snapshot().digest == source.snapshot().digest
+
+
+def test_signing_in_is_something_to_back_up(tmp_path: Path) -> None:
+    machine = Machine(tmp_path)
+    assert machine.snapshot().empty
+    sign_in(machine, "here", remotes=())  # an account without subscriptions yet
+    assert not machine.snapshot().empty
+
+
+# A snapshot as 1.x wrote it, before provider accounts.
+VERSION_1 = {
+    "format": "openweir-backup",
+    "version": 1,
+    "created_at": 1_500.0,
+    "device": "old-laptop",
+    "app_version": "1.0.0",
+    "profiles": [
+        {
+            "id": "old",
+            "name": "旧订阅",
+            "kind": "subscription",
+            "url": LINK_A,
+            "path": "",
+            "auto_update_hours": 12,
+            "in_pool": True,
+            "position": 0,
+            "created_at": 1_000.0,
+            "updated_at": 1_000.0,
+        },
+        {"id": "gone", "updated_at": 1_200.0, "deleted_at": 1_200.0},
+    ],
+    "overrides": [{"scope": "global", "yaml": "mode: rule\n", "updated_at": 1_000.0}],
+    "routing": {
+        "mode": MODE_PROFILE,
+        "profile_id": "old",
+        "plan_id": None,
+        "info_pattern": None,
+        "updated_at": 1_000.0,
+        "plans": [],
+    },
+    "mesh": [],
+    "settings": [{"key": "language", "value": "en", "updated_at": 1_000.0}],
+}
+
+
+@pytest.mark.parametrize("mode", [REPLACE, MERGE])
+def test_a_version_1_snapshot_still_restores(tmp_path: Path, mode: str) -> None:
+    """It knows nothing of provider accounts: even a replace leaves them as they are."""
+    machine = Machine(tmp_path, now=2_000)
+    own = Profile(id="x", name="本机的", kind=KIND_SUBSCRIPTION, url="https://x.example.com/s")
+    machine.store.save(ProfileList((own,), "x"))
+    record = sign_in(machine, "here", active=7)
+    machine.store.write_override("here-7", "ipv6: false\n")
+    snapshot = Snapshot.decode(json.dumps(VERSION_1).encode())
+    assert snapshot.info.counts == Counts(profiles=1, plans=0)
+
+    machine.at(3_000).backups.restore(snapshot, mode)
+
+    ids = [p.id for p in machine.profiles().profiles]
+    assert ids == (
+        ["old", "here-7", "here-9"] if mode == REPLACE else ["old", "x", "here-7", "here-9"]
+    )
+    assert machine.profiles().get("old").url == LINK_A
+    assert machine.store.read_override(None) == "mode: rule\n"
+    assert machine.settings.reload().language == "en"
+    assert machine.providers.providers() == (record,)
+    assert provider_profiles(machine) == {"here-7": (record.id, 7), "here-9": (record.id, 9)}
+    assert machine.store.read_override("here-7") == "ipv6: false\n"
+    assert cached(machine) == ["here-7", "here-9"]
+    # A replace takes the snapshot's routing; a merge keeps this machine's, the later.
+    assert machine.profiles().active == ("old" if mode == REPLACE else "here-7")
+
+
+def test_a_restore_drops_what_billing_said_of_the_profiles_it_removes(tmp_path: Path) -> None:
+    other = Machine(tmp_path / "a")
+    populate(other)
+    machine = Machine(tmp_path / "b", now=2_000)
+    record = sign_in(machine, "here")
+    mine = machine.snapshot()
+    assert cached(machine) == ["here-7", "here-9"]
+
+    machine.at(3_000).backups.restore(mine, REPLACE)  # nothing to change
+    assert cached(machine) == ["here-7", "here-9"]
+
+    machine.backups.restore(other.snapshot(), REPLACE)  # signed in to nothing
+
+    assert cached(machine) == []
+    assert machine.providers.providers() == ()
+    assert provider_profiles(machine) == {}
+    assert provider_ids(machine) == [record.id]  # a tombstone, for the next merge elsewhere
+
+
+@pytest.fixture
+def two_devices(tmp_path: Path) -> tuple[Machine, Machine]:
+    """A laptop with the user's data, and a desktop that restored it before the laptop
+    signed in to a provider."""
+    laptop = Machine(tmp_path / "laptop", device="laptop")
+    populate(laptop)
+    desktop = Machine(tmp_path / "desktop", now=1_500, device="desktop")
+    desktop.backups.restore(laptop.snapshot(), REPLACE)
+    return laptop, desktop
+
+
+def test_merging_another_devices_sign_in_at_the_same_origin_keeps_this_ones(
+    two_devices: tuple[Machine, Machine],
+) -> None:
+    """Each device signed in on its own: each keeps its provider, its session and its
+    profiles, and the profile in use follows to this device's one for the subscription."""
+    laptop, desktop = two_devices
+    theirs = sign_in(desktop.at(2_000), "desktop", active=7)
+    mine = sign_in(laptop.at(2_500), "laptop", active=9)
+    laptop.store.write_override("laptop-9", "ipv6: false\n")
+
+    desktop.at(4_000).backups.restore(laptop.snapshot(), MERGE)
+
+    assert desktop.providers.providers() == (theirs,)
+    assert provider_ids(desktop) == [theirs.id]  # the laptop's left out, not marked deleted
+    assert provider_profiles(desktop) == {
+        "desktop-7": (theirs.id, 7),
+        "desktop-9": (theirs.id, 9),
+    }
+    assert desktop.profiles().active == "desktop-9"  # the laptop chose its 9 later
+    assert cached(desktop) == ["desktop-7", "desktop-9"]
+    assert stored(desktop.directory, "SELECT scope FROM overrides WHERE scope = 'laptop-9'") == []
+
+    # The other way round as well: no tombstone came back to take the laptop's.
+    laptop.at(5_000).backups.restore(desktop.snapshot(), MERGE)
+
+    assert laptop.providers.providers() == (mine,)
+    assert provider_ids(laptop) == [mine.id]
+    assert provider_profiles(laptop) == {"laptop-7": (mine.id, 7), "laptop-9": (mine.id, 9)}
+    assert laptop.profiles().active == "laptop-9"
+    assert cached(laptop) == ["laptop-7", "laptop-9"]
+
+
+def test_another_account_at_the_same_origin_is_left_out_as_well(
+    two_devices: tuple[Machine, Machine],
+) -> None:
+    laptop, desktop = two_devices
+    theirs = sign_in(desktop.at(2_000), "desktop", user="user-2", active=7)
+    sign_in(laptop.at(2_500), "laptop", active=9)
+
+    desktop.at(4_000).backups.restore(laptop.snapshot(), MERGE)
+
+    assert desktop.providers.providers() == (theirs,)
+    assert set(provider_profiles(desktop)) == {"desktop-7", "desktop-9"}
+    # Nothing here stands for the laptop's subscription in use: the library has the first
+    # profile with rules take over (storage.md §3).
+    assert desktop.profiles().active is None
+
+
+def test_a_provider_signed_in_to_again_elsewhere_replaces_the_one_signed_out_of(
+    two_devices: tuple[Machine, Machine],
+) -> None:
+    laptop, desktop = two_devices
+    first = sign_in(laptop.at(1_800), "first")
+    desktop.at(1_900).backups.restore(laptop.snapshot(), MERGE)
+    assert desktop.providers.providers() == (first,)
+    # The laptop signs out, and in again: another provider at the same origin.
+    sign_out(laptop.at(3_000), first)
+    again = sign_in(laptop.at(3_100), "again")
+
+    desktop.at(4_000).backups.restore(laptop.snapshot(), MERGE)
+
+    assert desktop.providers.providers() == (again,)
+    assert provider_profiles(desktop) == {"again-7": (again.id, 7), "again-9": (again.id, 9)}
+
+
+def test_replacing_takes_the_snapshots_provider(two_devices: tuple[Machine, Machine]) -> None:
+    laptop, desktop = two_devices
+    theirs = sign_in(desktop.at(2_000), "desktop", active=7)
+    mine = sign_in(laptop.at(2_500), "laptop", active=9)
+
+    desktop.at(4_000).backups.restore(laptop.snapshot(), REPLACE)
+
+    assert desktop.providers.providers() == (mine,)  # needs signing in again here
+    assert provider_ids(desktop) == sorted([mine.id, theirs.id])
+    assert provider_profiles(desktop) == {"laptop-7": (mine.id, 7), "laptop-9": (mine.id, 9)}
+    assert desktop.profiles().active == "laptop-9"
+    assert cached(desktop) == []
+
+
+def test_one_profile_stands_for_a_subscription(two_devices: tuple[Machine, Machine]) -> None:
+    """Both devices share a provider and each added a profile for a new subscription."""
+    laptop, desktop = two_devices
+    shared = sign_in(laptop.at(1_800), "shared", remotes=(7,))
+    desktop.at(1_900).backups.restore(laptop.snapshot(), MERGE)
+    add_subscriptions(laptop.at(3_000), shared, "laptop", (11,), active=11)
+    add_subscriptions(desktop.at(3_100), shared, "desktop", (11,))
+
+    desktop.at(4_000).backups.restore(laptop.snapshot(), MERGE)
+
+    assert provider_profiles(desktop) == {"shared-7": (shared.id, 7), "desktop-11": (shared.id, 11)}
+    assert desktop.profiles().active == "desktop-11"
+    assert stored(desktop.directory, "SELECT id FROM profiles WHERE id = 'laptop-11'") == []
+
+    laptop.at(5_000).backups.restore(desktop.snapshot(), MERGE)
+    assert provider_profiles(laptop) == {"shared-7": (shared.id, 7), "laptop-11": (shared.id, 11)}
+
+
+def test_a_sign_out_elsewhere_takes_the_providers_profiles_with_it(
+    two_devices: tuple[Machine, Machine],
+) -> None:
+    laptop, desktop = two_devices
+    shared = sign_in(laptop.at(1_800), "shared", active=7)
+    desktop.at(1_900).backups.restore(laptop.snapshot(), MERGE)
+    sign_out(laptop.at(3_000), shared)
+    # A sync here renamed one of its profiles after that, and the user gave it an override.
+    current = desktop.at(3_500).profiles()
+    renamed = replace(current.get("shared-7"), name="新名字")
+    desktop.store.save(current.put(renamed))
+    desktop.store.write_override("shared-7", "ipv6: false\n")
+
+    desktop.at(4_000).backups.restore(laptop.snapshot(), MERGE)
+
+    assert desktop.providers.providers() == ()
+    assert provider_profiles(desktop) == {}
+    rows = stored(desktop.directory, "SELECT id, deleted_at FROM profiles WHERE id = 'shared-7'")
+    assert rows == [("shared-7", 4_000)]
+    assert desktop.store.read_override("shared-7") == ""
+    assert cached(desktop) == []
+    # The laptop learns nothing new from it: the two agree.
+    laptop.at(5_000).backups.restore(desktop.snapshot(), MERGE)
+    assert provider_profiles(laptop) == {}
+    assert laptop.providers.providers() == ()
