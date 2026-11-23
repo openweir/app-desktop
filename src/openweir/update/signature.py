@@ -4,10 +4,13 @@ macOS asks ``codesign`` and ``spctl`` about the disk image and checks its Team I
 asks ``WinVerifyTrust`` about the installer and checks the signer's name and the extended key
 usage of OpenWeir's Artifact Signing certificate profile (D42). Both block: run them on a
 worker thread. A build without a Windows signer trusts an installer by its checksum alone.
+On Linux the release signs SHA256SUMS instead (D62), which is checked before it is trusted:
+the package's SHA-256 must then be the one it lists.
 """
 
 from __future__ import annotations
 
+import base64
 import ctypes
 import re
 import subprocess
@@ -15,10 +18,10 @@ import sys
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol, runtime_checkable
 
 from openweir import product
-from openweir.update.releases import UpdateError
+from openweir.update.releases import SIGNATURE_NAME, UpdateError
 
 # The Developer ID team of the disk image (apple/README.md), from product.json.
 APPLE_TEAM_ID = product.APPLE_TEAM_ID
@@ -31,6 +34,11 @@ APPLE_TEAM_ID = product.APPLE_TEAM_ID
 # from product.json, where the release build writes them (D47).
 WINDOWS_SIGNER = product.WINDOWS_SIGNER
 WINDOWS_SIGNER_EKU = product.WINDOWS_SIGNER_EKU
+# The Ed25519 public key that signs a Linux release's SHA256SUMS (D62): its 32 bytes in base64,
+# as src/core/internal/product's LinuxUpdateKey has it for the service's install helper. A build
+# without one, from product.json's empty placeholder, offers no installer.
+LINUX_UPDATE_KEY = product.LINUX_UPDATE_KEY
+SIGNATURE_BYTES = 64  # an Ed25519 signature, as it is
 
 CODESIGN = "/usr/bin/codesign"
 SPCTL = "/usr/sbin/spctl"
@@ -48,6 +56,16 @@ class Verifier(Protocol):
     def verify(self, path: Path) -> None:
         """Return when ``path`` is signed by the expected developer; raise UpdateError
         (``signature_invalid`` or ``signer_mismatch``) otherwise."""
+        ...
+
+
+@runtime_checkable
+class ChecksumsVerifier(Protocol):
+    """A verifier for a release that signs its SHA256SUMS rather than the installer."""
+
+    def verify_checksums(self, checksums: bytes, signature: bytes) -> None:
+        """Return when ``signature`` is the release's over ``checksums``, SHA256SUMS's bytes;
+        raise UpdateError (``signature_invalid``) otherwise."""
         ...
 
 
@@ -307,10 +325,66 @@ class ChecksumOnly:
         pass
 
 
-def default_verifier(system: str = sys.platform, signer: str = WINDOWS_SIGNER) -> Verifier | None:
-    """None where no installer is built (docs/release.md §1)."""
+class LinuxVerifier:
+    """A Linux package, which the release vouches for through SHA256SUMS: Ed25519 over its bytes
+    with the update key. Once SHA256SUMS checks out, the package's SHA-256 matching its line is
+    all there is to check; the service's install helper checks it all again as root before it
+    installs anything (D62)."""
+
+    signed = True
+
+    def __init__(self, key: Any) -> None:
+        """``key`` is cryptography's Ed25519PublicKey (linux_verifier)."""
+        self._key = key
+
+    def verify_checksums(self, checksums: bytes, signature: bytes) -> None:
+        from cryptography.exceptions import (  # pyright: ignore[reportMissingImports]
+            InvalidSignature,
+        )
+
+        if len(signature) != SIGNATURE_BYTES:
+            raise UpdateError(
+                "signature_invalid",
+                f"{SIGNATURE_NAME} has {len(signature)} bytes, not an Ed25519 signature's 64",
+            )
+        try:
+            self._key.verify(signature, checksums)
+        except InvalidSignature as error:
+            raise UpdateError(
+                "signature_invalid", f"{SIGNATURE_NAME} is not the update key's signature"
+            ) from error
+
+    def verify(self, path: Path) -> None:
+        pass  # its SHA-256 matched the signed SHA256SUMS as it downloaded
+
+
+def linux_verifier(key: str = LINUX_UPDATE_KEY) -> LinuxVerifier | None:
+    """None, so no installer, in a build without the update key, and where cryptography is
+    missing: it comes with keyring's Secret Service backend, which only Linux installs."""
+    if not key:
+        return None
+    try:
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import (  # pyright: ignore[reportMissingImports]
+            Ed25519PublicKey,
+        )
+    except ImportError:
+        return None
+    try:
+        raw = base64.b64decode(key, validate=True)
+        return LinuxVerifier(Ed25519PublicKey.from_public_bytes(raw))
+    except ValueError:  # binascii.Error is one
+        return None  # not a key: the release build checks it (scripts/sign_sums.py)
+
+
+def default_verifier(
+    system: str = sys.platform, signer: str = WINDOWS_SIGNER, linux_key: str = LINUX_UPDATE_KEY
+) -> Verifier | None:
+    """None where no installer is built (docs/release.md §1), and in a Linux build that cannot
+    check one."""
     if system == "darwin":
         return MacVerifier()
     if system == "win32":
         return WindowsVerifier(signer) if signer else ChecksumOnly()
+    if system == "linux":
+        return linux_verifier(linux_key)
     return None

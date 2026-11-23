@@ -6,6 +6,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 )
@@ -13,6 +14,21 @@ import (
 func main() {
 	if err := run(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		code := 1
+		if exit := (*exitError)(nil); errors.As(err, &exit) {
+			code = exit.code
+		}
+		os.Exit(code)
 	}
 }
+
+// exitError ends the process with code rather than 1, for a caller that tells failures apart:
+// the Linux UI reads -install-update's (update_linux.go).
+type exitError struct {
+	code int
+	err  error
+}
+
+func (e *exitError) Error() string { return e.err.Error() }
+
+func (e *exitError) Unwrap() error { return e.err }

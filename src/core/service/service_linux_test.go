@@ -101,11 +101,11 @@ func TestTheStateRootIsSystemds(t *testing.T) {
 // Only pkexec runs the take-over helper, once an administrator confirmed it.
 func TestTheTakeOverHelperRunsThroughPkexec(t *testing.T) {
 	for _, uid := range []string{"", "root", "-1"} {
-		if err := ranByPkexec(uid); err == nil {
+		if err := ranByPkexec("-take-over", uid); err == nil {
 			t.Errorf("PKEXEC_UID=%q accepted", uid)
 		}
 	}
-	if err := ranByPkexec("1000"); err != nil {
+	if err := ranByPkexec("-take-over", "1000"); err != nil {
 		t.Fatal(err)
 	}
 }

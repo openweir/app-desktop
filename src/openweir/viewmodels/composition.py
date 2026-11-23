@@ -144,6 +144,7 @@ def compose(
     icloud: ICloudProvider | None = None,
     google: GoogleDriveProvider | None = None,
     take_over: Callable[[], Coroutine[Any, Any, None]] | None = None,
+    update_result: int | None = None,
 ) -> ViewModels:
     """``clock`` dates profile updates and subscription expiry. The settings live in the
     profiles' database unless given. ``tray_available`` and ``start_hidden``: see DesktopViewModel.
@@ -153,7 +154,9 @@ def compose(
     ``credentials`` keeps the WARP account; the system's credential store by default.
     ``icloud`` is the iCloud backup of a packaged macOS app, ``google`` the Google Drive backup
     of a build with a Google OAuth client; automatic backup runs with either. ``take_over``
-    is an administrator's take-over of another user's tunnel (OverviewViewModel)."""
+    is an administrator's take-over of another user's tunnel (OverviewViewModel).
+    ``update_result`` is the Linux install helper's exit code, when the UI starts again after
+    it: the window opens on the settings page, whose version row says how it went."""
     runner = AsyncRunner()
     settings_store = settings or DatabaseSettingsStore(store.database)
     library = ProfileLibrary(
@@ -207,15 +210,18 @@ def compose(
         runner,
         logs.held,
         crash_directory=store.directory / "crashes",
+        update_result=update_result,
     )
+    if update_result is not None:
+        shell.setPage("settings")
 
-    def installer_opened(windows_installer: bool) -> None:
+    def installer_opened(service_keeps_tunnel: bool) -> None:
         """Go once the system has opened the update (D41, docs/release.md §3). Windows'
-        installer would close the UI with --quit anyway, and the service keeps the tunnel
-        through the upgrade (was_running). Nothing does that for a disk image: the old system
-        extension's tunnel would run on with no UI while the app is replaced, so OpenWeir quits
-        as 退出 OpenWeir does, disconnecting first."""
-        if windows_installer:
+        installer would close the UI with --quit anyway, as the Linux package's scripts would,
+        and the service keeps the tunnel through the upgrade (was_running). Nothing does that
+        for a disk image: the old system extension's tunnel would run on with no UI while the
+        app is replaced, so OpenWeir quits as 退出 OpenWeir does, disconnecting first."""
+        if service_keeps_tunnel:
             desktop.leave()
         else:
             desktop.quit()

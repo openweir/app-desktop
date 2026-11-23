@@ -35,6 +35,7 @@ from openweir.models.settings import DatabaseSettingsStore, SettingsStore, seed_
 from openweir.models.store import ProfileStore, default_data_dir
 from openweir.models.subscription import Fetcher, UrlFetcher
 from openweir.product import DISPLAY_NAME, PIPE_NAME
+from openweir.update.linux import UPDATE_RESULT_ARG
 from openweir.update.updater import Updater
 from openweir.viewmodels.appearance import Appearance, resolve_mode
 from openweir.viewmodels.composition import ViewModels, compose
@@ -52,10 +53,9 @@ DEV_SOCKET_ENV = "OPENWEIR_DEV_SOCKET"
 #   before it replaces the files (docs/ui.md §8) and the Linux package is to before an upgrade
 #   (D61); exits 0 once no UI runs. The tunnel stays as it is.
 # - UPDATE_RESULT_ARG: --update-result=<code>, the exit code of the Linux update helper that
-#   the UI ran through pkexec, from the shell that starts the UI again after it (D62).
-#   update_result reads it; nothing reports it yet.
+#   the UI ran through pkexec, from the shell that starts the UI again after it (D62,
+#   update/linux.py); the settings page's version row says what it means.
 QUIT_ARG = "--quit"
-UPDATE_RESULT_ARG = "--update-result"
 
 
 def update_result(arguments: Sequence[str]) -> int | None:
@@ -234,6 +234,7 @@ def main(
         icloud=bundled_provider(),
         google=google or configured_provider(KeyringCredentials()),
         take_over=default_take_over(host),
+        update_result=update_result(sys.argv[1:]),
     )
     engine = QQmlApplicationEngine()
     if not load_ui(engine, view_models):

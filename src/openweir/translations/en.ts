@@ -48,8 +48,32 @@
         <translation>The installer wasn’t signed by the OpenWeir developers</translation>
     </message>
     <message>
+        <source>发布没有附带校验和的签名</source>
+        <translation>The release has no signature for its checksums</translation>
+    </message>
+    <message>
         <source>安装包未签名，Windows 会提示“未知发布者”。安装器会请求管理员权限，打开后 OpenWeir 会退出。</source>
         <translation>The installer isn’t signed, so Windows will show an unknown publisher warning. The installer requests administrator permission. OpenWeir exits once the installer opens.</translation>
+    </message>
+    <message>
+        <source>安装包没有通过校验，更新没有安装</source>
+        <translation>The package didn’t pass verification, so the update wasn’t installed</translation>
+    </message>
+    <message>
+        <source>系统的包管理器没能装上更新，详见系统日志</source>
+        <translation>The system’s package manager couldn’t install the update. See the system log for details.</translation>
+    </message>
+    <message>
+        <source>已取消授权，更新没有安装</source>
+        <translation>Authorization was cancelled, so the update wasn’t installed</translation>
+    </message>
+    <message>
+        <source>没有取得管理员授权，更新没有安装</source>
+        <translation>Administrator authorization wasn’t granted, so the update wasn’t installed</translation>
+    </message>
+    <message>
+        <source>更新没有安装（退出码 {code}）</source>
+        <translation>The update wasn’t installed (exit code {code})</translation>
     </message>
     <message>
         <source>Python 依赖</source>
@@ -84,6 +108,10 @@
         <translation>Version {version} is available · No installer for this computer</translation>
     </message>
     <message>
+        <source>有新版本 {version} · 请从发布页下载安装包</source>
+        <translation>Version {version} is available · Download the package from the release page</translation>
+    </message>
+    <message>
         <source>正在下载 {percent}%</source>
         <translation>Downloading {percent}%</translation>
     </message>
@@ -94,6 +122,10 @@
     <message>
         <source>{version} 已下载并通过校验</source>
         <translation>{version} downloaded and verified</translation>
+    </message>
+    <message>
+        <source>已更新到 {version}</source>
+        <translation>Updated to {version}</translation>
     </message>
     <message>
         <source>正在检查…</source>
@@ -112,12 +144,20 @@
         <translation>Open installer…</translation>
     </message>
     <message>
+        <source>打开下载页</source>
+        <translation>Open download page</translation>
+    </message>
+    <message>
         <source>检查更新</source>
         <translation>Check for updates</translation>
     </message>
     <message>
         <source>打开 OpenWeir {version} 的安装包？</source>
         <translation>Open the OpenWeir {version} installer?</translation>
+    </message>
+    <message>
+        <source>OpenWeir 会先退出，系统随后请求管理员授权来安装更新；安装结束后 OpenWeir 会重新打开。</source>
+        <translation>OpenWeir exits first, then the system asks for administrator authorization to install the update. OpenWeir opens again when the installation ends.</translation>
     </message>
     <message>
         <source>安装器会请求管理员权限，打开后 OpenWeir 会退出。</source>

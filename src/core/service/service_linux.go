@@ -46,9 +46,6 @@ const (
 	takeOverWait = time.Minute
 )
 
-// errNotImplemented is what the release modes answer until they are written.
-var errNotImplemented = errors.New("not implemented yet")
-
 // errNewOwner ends the service for a new owner: mihomo's home is fixed for the life of a
 // process (§3.2), so the process exits cleanly and systemd starts it again (Restart=always).
 var errNewOwner = errors.New("the service has a new owner")
@@ -266,17 +263,17 @@ func takeOverAsRoot() error {
 	if err := requireRoot("-take-over", os.Geteuid()); err != nil {
 		return err
 	}
-	if err := ranByPkexec(os.Getenv("PKEXEC_UID")); err != nil {
+	if err := ranByPkexec("-take-over", os.Getenv("PKEXEC_UID")); err != nil {
 		return err
 	}
 	return takeOver(product.LinuxSocket)
 }
 
 // ranByPkexec checks for the uid of the user who asked, which pkexec sets: only the polkit
-// action, which has an administrator confirm, is to run the helper.
-func ranByPkexec(pkexecUID string) error {
+// action, which has an administrator confirm, is to run a helper mode.
+func ranByPkexec(mode, pkexecUID string) error {
 	if _, err := strconv.ParseUint(pkexecUID, 10, 32); err != nil {
-		return errors.New("-take-over runs through pkexec, which sets PKEXEC_UID")
+		return fmt.Errorf("%s runs through pkexec, which sets PKEXEC_UID", mode)
 	}
 	return nil
 }

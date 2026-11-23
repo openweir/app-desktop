@@ -22,6 +22,8 @@ from openweir.update.releases import (
 )
 
 MAX_CHECKSUMS_BYTES = 64 * 1024
+# SHA256SUMS.sig holds an Ed25519 signature's 64 bytes; the verifier refuses any other size.
+MAX_SIGNATURE_BYTES = 4 * 1024
 CHUNK_BYTES = 256 * 1024
 PARTIAL_SUFFIX = ".part"
 
@@ -42,8 +44,12 @@ def parse_checksums(text: str) -> dict[str, str]:
     return sums
 
 
-def fetch_checksums(asset: Asset, *, timeout_s: float = TIMEOUT_S) -> dict[str, str]:
-    body = read_limited(open_url(asset.url, timeout_s=timeout_s), MAX_CHECKSUMS_BYTES)
+def fetch_small(asset: Asset, limit: int, *, timeout_s: float = TIMEOUT_S) -> bytes:
+    """A small asset whole, such as SHA256SUMS: its bytes are what a signature covers."""
+    return read_limited(open_url(asset.url, timeout_s=timeout_s), limit)
+
+
+def decode_checksums(body: bytes) -> dict[str, str]:
     try:
         return parse_checksums(body.decode("utf-8"))
     except UnicodeDecodeError as error:

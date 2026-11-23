@@ -132,6 +132,21 @@ class FakeVerifier:
             raise self.error
 
 
+class FakeChecksumsVerifier(FakeVerifier):
+    """A Linux build's: it checks the signature on SHA256SUMS, as the update key would, and the
+    package only by its line there. ``checksums_error`` stands for a bad signature."""
+
+    def __init__(self, checksums_error: Exception | None = None) -> None:
+        super().__init__()
+        self.checksums_error = checksums_error
+        self.checked: list[tuple[bytes, bytes]] = []  # SHA256SUMS and its signature
+
+    def verify_checksums(self, checksums: bytes, signature: bytes) -> None:
+        self.checked.append((checksums, signature))
+        if self.checksums_error is not None:
+            raise self.checksums_error
+
+
 class OfflineReleases(ReleaseSource):
     """For tests that build the whole UI: an automatic check must never reach GitHub."""
 
