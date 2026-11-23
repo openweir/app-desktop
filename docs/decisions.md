@@ -1,6 +1,6 @@
 # 决策
 
-本文记录 OpenWeir 的设计决策。代码注释和其他文档按编号引用它们（如"D19"），所以编号不变、不重用；新的决策从 D60
+本文记录 OpenWeir 的设计决策。代码注释和其他文档按编号引用它们（如"D19"），所以编号不变、不重用；新的决策从 D68
 接着编号。每条只写结论，理由和细节在"详见"一栏的文档里。
 
 ## 待决策
@@ -71,3 +71,11 @@
 | D57 | 服务商的配置每次更新都先读账单：接入方式为 `app` 或 `both` 时带令牌读 `/proxy/subscriptions/{id}/config`，为 `link` 时下载账单给的链接，不带令牌、不跟随重定向，链接只在内存里，不进数据库、备份和错误信息。到期、停用或不可用时保留上次的原文、不再下载，也从不自动换用别的订阅，只在概览提示。账户请求都在界面进程里以当前用户身份发出，令牌不进服务和系统扩展，交给它们的只有拼好的配置 | [accounts.md](accounts.md) §5 |
 | D58 | 购买、续费、换套餐、充值、支付、改密码和两步验证都在服务商的用户中心（浏览器）里完成。应用只读显示权益、钱包、套餐和订单，唯一能改的是自动续费开关；打开网页后，窗口重新激活时和之后 10 分钟内重新同步，显示同步后的结果 | [accounts.md](accounts.md) §6 |
 | D59 | 备份快照升到 v2：加入服务商（`id`、`origin`、站点名、账户名、`user_id`、`position` 和时间，删除的是墓碑）和 `kind=provider` 的配置（`provider_id`、`remote_id`，没有链接和原文），不含令牌、订阅链接和账单缓存。v1 照样能恢复，旧版本读 v2 报 `newer_backup`。恢复出来的服务商要重新登录，登录同一个 `user_id` 后按 `remote_id` 对上原来的配置 | [accounts.md](accounts.md) §8、[storage.md](storage.md) §3 |
+| D60 | Linux 的特权部分是以 root 运行、带沙箱的 systemd 系统服务 `openweir.service`，由 `openweir.socket`（`/run/openweir/control.sock`）按需激活，开机时也启动。它运行与 Windows 服务相同的 Go 代码（属主、分发器、帧协议），控制协议不变。不做 setcap 的辅助程序，v1 也不提供只用系统代理的模式 | [architecture.md](architecture.md)"Linux（进行中）" |
+| D61 | Linux 提供 x86_64 和 arm64 的 `.deb`、`.rpm`（nfpm 打包），装到 `/opt/openweir`，包格式记在 `/opt/openweir/package-format`；不提供 AppImage、Flatpak、Snap | [architecture.md](architecture.md)"Linux（进行中）" |
+| D62 | Linux 的更新：应用内检查和下载，再经 pkexec 运行服务自带的安装辅助进程（`openweir-service -install-update`）安装。发布用 Ed25519 给 `SHA256SUMS` 签名（`SHA256SUMS.sig`）；公钥是发布环境的变量 `OPENWEIR_LINUX_UPDATE_KEY`，构建时写进 `product.json` 的 `signing.linuxUpdateKey` 并链接进服务，私钥是机密 `OPENWEIR_LINUX_UPDATE_SIGNING_KEY`。没有公钥的构建不提供安装。控制协议不增加更新方法 | [architecture.md](architecture.md)"Linux（进行中）" |
+| D63 | Linux 的系统代理由服务经属主的用户管理器（`systemd-run --user --machine=<用户>@.host`）设置，在 GNOME 和 KDE 上可用，崩溃后和登录时像 Windows 一样写回；其他桌面上这一行不可用。新安装只用 TUN 接管（D46 扩展到 Linux） | [architecture.md](architecture.md)"Linux（进行中）" |
+| D64 | Linux 上用系统的窗口装饰（服务端装饰；GNOME 上用 Qt 的 Wayland 装饰插件），不画自己的标题栏按钮；侧栏顶部用新的 `sidebar-top-linux`（16px） | [architecture.md](architecture.md)"Linux（进行中）" |
+| D65 | Linux 上有 StatusNotifier 宿主时才有托盘。没有时（如没装 AppIndicator 扩展的 GNOME）关闭窗口就退出并断开（D41），「留在托盘」不可选，并提示需要的扩展 | [architecture.md](architecture.md)"Linux（进行中）" |
+| D66 | Linux 上只有 logind 里活动的本地会话（非远程、class 为 user）中的用户能认领隧道。接管经 pkexec 以 `auth_admin` 确认，只对 sudo、wheel、admin 组的成员显示；确认后辅助进程以 root 连接，服务让出属主，再由管理员的界面认领。TUN 对整台机器生效，v1 不按用户（include-uid）分流 | [architecture.md](architecture.md)"Linux（进行中）" |
+| D67 | Linux 的 TUN 固定为设备 `openweir0`、路由表 9347、策略路由规则 9347–9357（`product.json` 的 `linux` 段）：服务让每份配置都用它们，`-cleanup` 在服务启动前和停止后按它们删掉崩溃留下的规则、路由表和 systemd-resolved 设置。它们避开了 mihomo 与 sing-box 的默认值（表 2022、规则从 9000 起）、Tailscale（表 52、规则 5210–5270）、strongSwan（220）、wg-quick（51820）和内核自己的表与规则，所以清理删不到别的隧道的；9347 和混合端口（D53）一样是 "WEIR" | [architecture.md](architecture.md)"Linux（进行中）" |

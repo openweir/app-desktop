@@ -771,6 +771,31 @@ macOS 不监听任何 socket，控制消息全部走 Network Extension 自带的
 - 做法与 hypervpn 一致，见它的 `NetworkExtensionManager.swift`（`providerExchange`）和
   `PacketTunnelProvider.swift`（`handleAppMessage`）。
 
+## Linux（进行中）
+
+Linux 版正在开发，还没有发布。已定的决策是 D60–D67；完整的设计等实现落地后写成本文单独的一节，这里先记下
+已经定下的结构和约定，代码里标着"Linux (in progress)"的地方都指这里。
+
+- **特权部分**（D60）：`openweir-service` 作为 root 运行的 systemd 系统服务 `openweir.service`，由
+  `openweir.socket` 按需激活，开机时也启动，单元带沙箱选项。它跑的是 Windows 服务那套 Go 代码（属主、分发器、
+  帧协议），控制协议不变。套接字是 `/run/openweir/control.sock`，服务经 `SO_PEERCRED` 和 `/proc/<pid>/exe`
+  校验对端，只接受 `/opt/openweir/openweir`。服务的根目录是 `/var/lib/openweir`，属主的 home 在其下的
+  `users/<uid>`。
+- **服务的运行方式**：`-system`（在 systemd 下运行；加 `-foreground` 时自己监听套接字）、`-cleanup`（单元的
+  `ExecStartPre` 和 `ExecStopPost`）、`-take-over` 和 `-install-update`（界面经 pkexec 运行）。`-socket` 仍是
+  开发服务（第 11 节），不变。
+- **TUN**（D67）：设备 `openweir0`，路由表 9347，策略路由规则从 9347 到 9357。服务把每份配置的 TUN 固定在这里，
+  `-cleanup`（`internal/tunclean`）在服务启动前和停止后删掉崩溃留下的规则、路由表和 systemd-resolved 设置，
+  不会碰到别的隧道。
+- **属主**（D66）：只有 logind 里活动的本地会话能认领；会话、睡眠和唤醒来自 logind（`internal/logind`）。
+  管理员经 pkexec 接管时，辅助进程以 root 连接，root 不成为属主：服务让出属主，再由管理员的界面认领。
+- **安装包与界面**：`.deb` 和 `.rpm` 装到 `/opt/openweir`，包格式记在 `/opt/openweir/package-format`（D61）；
+  更新经 pkexec 安装 Ed25519 签名过的包（D62）；系统代理只在 GNOME 和 KDE 上可用（D63）。界面用系统的窗口
+  装饰（D64），没有托盘时关闭窗口就退出（D65）。界面的命令行参数 `--background`、`--quit`、
+  `--update-result=<code>` 见 `src/openweir/app.py`。
+- **标识**：路径、单元名、TUN 设备和路由表号都在 `product.json` 的 `linux` 段；Go 经 `product_gen.go`
+  （`product.Linux*`）、界面经 `openweir.product`（`LINUX_*`）读取。
+
 ## 7. Python UI
 
 - 分层参考 hypervpn：视图（QML）→ ViewModel → models → 宿主客户端。asyncio 事件循环运行在后台线程，结果
