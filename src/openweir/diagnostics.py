@@ -4,7 +4,10 @@ GetInfo and GetStatus, the core's recent warnings and errors and the settings wi
 What leaves the machine is chosen by allow lists, never by removing what looks secret: a
 profile contributes counts and flags, not its name, link, path or text; an override only
 whether it exists. Every setting is listed as exported or withheld, and a test fails when
-a new one is neither, so adding a setting means deciding.
+a new one is neither, so adding a setting means deciding. A provider account contributes
+whether it is signed in, and its profiles their access mode and status from billing
+(docs/accounts.md §8), never the provider's address or name, the account, the user id, the
+token or a link.
 
 The core's log is the exception, free text that cannot be listed field by field, so it is
 cut down instead: no info or debug lines, which name every site visited, and no URLs. A
@@ -22,7 +25,7 @@ import platform
 import re
 import sys
 import zipfile
-from collections.abc import Awaitable, Sequence
+from collections.abc import Awaitable, Mapping, Sequence
 from dataclasses import asdict, dataclass, field, fields
 from datetime import UTC, datetime
 from pathlib import Path
@@ -34,9 +37,21 @@ from PySide6.QtCore import qVersion
 from openweir import __version__
 from openweir.desktop.login import PACKAGED
 from openweir.host.base import HostError, HostInfo, HostStatus, LogEntry, TunnelHost
+from openweir.models.credentials import CredentialError, ProviderTokens
 from openweir.models.library import Routing
 from openweir.models.logs import export_text, rank
-from openweir.models.profiles import ProfileList
+from openweir.models.profiles import Profile, ProfileError, ProfileList
+from openweir.models.provider.store import ProviderStore
+from openweir.models.provider.types import (
+    ACCESS_APP,
+    ACCESS_BOTH,
+    ACCESS_LINK,
+    STATUS_ACTIVE,
+    STATUS_DISABLED,
+    STATUS_EXPIRED,
+    ProviderState,
+    RemoteSubscription,
+)
 from openweir.models.settings import Settings
 
 # Settings written as they are, and settings only said to be set or not.
@@ -67,6 +82,21 @@ LOG_LEVEL = "warning"  # the lowest level of the core's lines in mihomo.log
 # that ends a sentence or a Go error ("Get \"https://…\": EOF").
 _URL = re.compile(r"\b([A-Za-z][A-Za-z0-9+.-]*)://[^\s\"'<>]*[^\s\"'<>.,:;!?)\]}]")
 LOG_NOTE = "# Warnings and errors only; every URL is written as scheme://<redacted>.\n"
+# The values of billing's access mode and status written as they are; billing's text is the
+# provider's, so any other is written as "other".
+ACCESS_MODES = frozenset({ACCESS_LINK, ACCESS_BOTH, ACCESS_APP})
+STATUSES = frozenset({STATUS_ACTIVE, STATUS_DISABLED, STATUS_EXPIRED})
+
+
+@dataclass(frozen=True)
+class Accounts:
+    """The provider accounts as the archive tells of them (read_accounts)."""
+
+    states: tuple[ProviderState, ...] = ()  # each provider's, in their order
+    # What billing last said of each provider profile, by profile id. Only its access mode,
+    # status and whether it is usable are written.
+    billing: Mapping[str, RemoteSubscription] = field(default_factory=dict)
+    error: str = ""  # the code of a failure to read the database; then nothing else is known
 
 
 @dataclass(frozen=True)
@@ -81,6 +111,33 @@ class Snapshot:
     logs: Sequence[LogEntry]
     language: str  # the UI's, "zh" or "en"
     crashes: dict[str, Any] = field(default_factory=dict)  # metadata only, never raw reports
+    accounts: Accounts | None = None  # None when they were not read
+
+
+def read_accounts(store: ProviderStore, tokens: ProviderTokens) -> Accounts:
+    """Each provider's state, from whether the credential store holds a session for it, and
+    what billing last said of its profiles. Blocking: call it on a worker thread. The token
+    read goes no further than telling it is there; a failure to read the credential store
+    is the state it gives (credentials_unavailable), and of the database only its code."""
+    try:
+        providers = store.providers()
+        states = tuple(_state(tokens, provider.id) for provider in providers)
+        billing = {
+            stored.profile_id: stored.subscription
+            for provider in providers
+            for stored in store.subscriptions(provider.id)
+        }
+    except ProfileError as error:
+        return Accounts(error=error.code)
+    return Accounts(states, billing)
+
+
+def _state(tokens: ProviderTokens, provider_id: str) -> ProviderState:
+    try:
+        token = tokens.load(provider_id)
+    except CredentialError:
+        return ProviderState.CREDENTIALS_UNAVAILABLE
+    return ProviderState.SIGN_IN_REQUIRED if token is None else ProviderState.SIGNED_IN
 
 
 def archive_name(now: float) -> str:
@@ -139,23 +196,57 @@ def settings(snapshot: Snapshot) -> dict[str, Any]:
     return {
         "settings": values,
         "profiles": [
-            {
-                "position": position,
-                "kind": profile.kind,
-                "active": profile.id == profiles.active,
-                "in_pool": profile.in_pool,
-                "auto_update_hours": profile.auto_update_hours,
-                "proxy_count": profile.proxy_count,
-                "has_usage": profile.usage is not None,
-                "has_override": profile.has_override,
-                "updated_at": int(profile.updated_at),
-                "update_failed": profile.id in profiles.update_failed,
-            }
+            _profile(snapshot, position, profile)
             for position, profile in enumerate(profiles.profiles, start=1)
         ],
         "global_override": profiles.has_global_override,
         "routing": _routing(snapshot.routing),
+        "accounts": _accounts(snapshot.accounts),
     }
+
+
+def _profile(snapshot: Snapshot, position: int, profile: Profile) -> dict[str, Any]:
+    profiles = snapshot.profiles
+    written: dict[str, Any] = {
+        "position": position,
+        "kind": profile.kind,
+        "active": profile.id == profiles.active,
+        "in_pool": profile.in_pool,
+        "auto_update_hours": profile.auto_update_hours,
+        "proxy_count": profile.proxy_count,
+        "has_usage": profile.usage is not None,
+        "has_override": profile.has_override,
+        "updated_at": int(profile.updated_at),
+        "update_failed": profile.id in profiles.update_failed,
+    }
+    if profile.is_provider:
+        accounts = snapshot.accounts
+        billing = None if accounts is None else accounts.billing.get(profile.id)
+        written["billing"] = None if billing is None else _billing(billing)
+    return written
+
+
+def _billing(subscription: RemoteSubscription) -> dict[str, Any]:
+    return {
+        "access": _known(subscription.access, ACCESS_MODES),
+        "status": _known(subscription.status, STATUSES),
+        "usable": subscription.usable,
+    }
+
+
+def _known(value: str, known: frozenset[str]) -> str | None:
+    """``value`` when it is one of ``known``; None when billing gave none, else "other"."""
+    if not value:
+        return None
+    return value if value in known else "other"
+
+
+def _accounts(accounts: Accounts | None) -> dict[str, Any] | None:
+    if accounts is None:
+        return None
+    if accounts.error:
+        return {"error": accounts.error}
+    return {"providers": len(accounts.states), "states": [s.value for s in accounts.states]}
 
 
 def _routing(routing: Routing) -> dict[str, Any]:
