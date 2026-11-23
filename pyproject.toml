@@ -10,6 +10,9 @@ authors = [
 ]
 requires-python = ">=3.14.7"
 dependencies = [
+    # The Linux updater checks SHA256SUMS.sig with it (D62); keyring's Secret Service backend
+    # brings it there too, but not to be relied on.
+    "cryptography; sys_platform == 'linux'",
     "httpx>=0.28.1,<1",
     "keyring>=25.7.0",
     "protobuf==6.33.4",
