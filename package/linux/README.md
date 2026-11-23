@@ -34,9 +34,12 @@ root 拥有所有文件和目录，`/opt/openweir` 里只有 root 可写：服�
 - 每个 ELF 文件的架构（`e_machine`）都是目标架构；需要的 `GLIBC_`、`GLIBCXX_`、`CXXABI_` 版本不超过构建镜像的
   （x64：2.35、3.4.30、1.3.13；arm64：2.39、3.4.33、1.3.15）。
 - 目录树里只有目录、普通文件和不出树的相对链接；模式统一为 0755/0644，不允许组或他人可写、setuid/setgid。
+- 窗口离不开的 Qt 插件都在：`platforms` 的 `libqwayland.so`、`libqxcb.so`，Wayland 的 `libxdg-shell.so` 和标题栏装饰
+  `libadwaita.so`（要 QtSvg、QtDBus）、`libbradient.so`（D64）。
 - 依赖：读每个 ELF 的 `readelf -d`（NEEDED），树里带的库之外，只能是 `system-libraries.toml` 列出的系统库，
   否则构建失败。列出的库不进 Nuitka 的产物；只被这些系统库需要、树里没人用的库（如 libdbus 带来的 libsystemd）
-  构建时删掉并打印出来。`.deb` 依赖 Debian 的包名（libc6 带最低的 glibc 版本），`.rpm` 依赖 soname 本身
+  构建时删掉并打印出来。界面用 ctypes 按 soname 加载的库（X11 窗口激活用的 `libxcb.so.1`）readelf 看不到，在列表里标
+  `loaded_by_name`，总是依赖。`.deb` 依赖 Debian 的包名（libc6 带最低的 glibc 版本），`.rpm` 依赖 soname 本身
   （`libfoo.so.1()(64bit)` 和最高的 `GLIBC_` 等版本），再加 `systemd` 和 pkexec。推荐安装彩色 emoji 字体
   （`fonts-noto-color-emoji` / `google-noto-color-emoji-fonts`），Linux 上界面用系统的字体画 emoji。
 - 有 `dpkg-deb` 时核对 `.deb` 的控制字段和所有条目归 root。

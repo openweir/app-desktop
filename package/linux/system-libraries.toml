@@ -9,6 +9,9 @@
 #   provide whatever they call the package, plus the newest GLIBC_, GLIBCXX_ and CXXABI_
 #   versions the files need, as rpmbuild would.
 #
+# loaded_by_name marks a library the UI loads by its soname at run time (ctypes), which readelf
+# cannot see; the packages always depend on it.
+#
 # A soname that a file needs, that the tree does not carry and that is not listed here stops
 # the build: bundle the library, or add it here once the oldest distributions supported
 # (Ubuntu 22.04 and Debian 12 on x86_64, Ubuntu 24.04 and Debian 13 on arm64) ship it.
@@ -105,9 +108,11 @@ sonames = ["libICE.so.6"]
 deb = "libsm6"
 sonames = ["libSM.so.6"]
 
+# Qt's xcb plugin needs it, and the UI's X11 window activation loads it with ctypes.
 [[library]]
 deb = "libxcb1"
 sonames = ["libxcb.so.1"]
+loaded_by_name = true
 
 [[library]]
 deb = "libxcb-cursor0"

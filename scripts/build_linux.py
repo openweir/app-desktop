@@ -99,6 +99,16 @@ REQUIRED = (
     "openweir/licenses/THIRD_PARTY_NOTICES.txt",
     *(f"{GEODATA}/{name}" for name in build_apple.GEO_FILES),
 )
+# The Qt plugins the window cannot do without, by their family and file, wherever Nuitka puts
+# them: both display servers, the xdg-shell windows of Wayland and the decorations D64 asks for
+# there (adwaita, which needs QtSvg and QtDBus, and the plain bradient).
+REQUIRED_PLUGINS = (
+    "platforms/libqwayland.so",
+    "platforms/libqxcb.so",
+    "wayland-shell-integration/libxdg-shell.so",
+    "wayland-decoration-client/libadwaita.so",
+    "wayland-decoration-client/libbradient.so",
+)
 
 ELF_MAGIC = b"\x7fELF"
 EM_X86_64 = 62
@@ -162,6 +172,8 @@ class Library:
     sonames: tuple[str, ...]
     # The symbol version prefix whose newest need goes into the .deb dependency, as "GLIBC_".
     versions: str | None = None
+    # Loaded by its soname at run time (ctypes), which readelf does not see: always depended on.
+    loaded_by_name: bool = False
 
 
 @dataclass(frozen=True)
@@ -177,7 +189,12 @@ class SystemLibraries:
 def load_system_libraries(path: Path = SYSTEM_LIBRARIES) -> SystemLibraries:
     data = tomllib.loads(path.read_text(encoding="utf-8"))
     libraries = tuple(
-        Library(item["deb"], tuple(item["sonames"]), item.get("versions"))
+        Library(
+            item["deb"],
+            tuple(item["sonames"]),
+            item.get("versions"),
+            item.get("loaded_by_name", False),
+        )
         for item in data["library"]
     )
     seen: set[str] = set()
@@ -338,7 +355,12 @@ def dependencies(
             "the system; leave it out of the build"
         )
     unknown: dict[str, list[str]] = {}
-    used: set[str] = set()
+    used = {
+        soname
+        for library in libraries.libraries
+        if library.loaded_by_name
+        for soname in library.sonames
+    }
     for info in infos:
         for soname in info.needed:
             if soname in provided:
@@ -431,6 +453,10 @@ def check_tree(tree: Path, arch: str) -> int:
         path = tree / name
         if path.is_symlink() or not path.is_file():
             raise BuildError(f"{tree.name} has no {name}")
+    files = {path.relative_to(tree).as_posix() for path in tree.rglob("*") if path.is_file()}
+    for plugin in REQUIRED_PLUGINS:
+        if not any(name == plugin or name.endswith(f"/{plugin}") for name in files):
+            raise BuildError(f"{tree.name} has no Qt plugin {plugin}")
     resolved_tree = tree.resolve()
     count = 0
     for path in [tree, *sorted(tree.rglob("*"))]:
@@ -530,11 +556,13 @@ QT_PLUGINS = (
     "wayland-shell-integration",
     "xcbglintegrations",
 )
-# Secure storage through the Secret Service (keyring's backend) and the updater's signature
-# check (cryptography's Ed25519): both are imported only on Linux, some of it lazily.
+# Secure storage through the Secret Service (keyring's backend), the tray's check for a
+# StatusNotifier host (jeepney) and the updater's signature check (cryptography's Ed25519): all
+# imported only on Linux, some of it lazily.
 INCLUDED_MODULES = (
     "keyring.backends.SecretService",
     "jeepney",
+    "jeepney.bus_messages",
     "jeepney.io.blocking",
     "cryptography.exceptions",
     "cryptography.hazmat.primitives.asymmetric.ed25519",

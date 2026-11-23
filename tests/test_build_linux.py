@@ -6,6 +6,7 @@ on Linux in CI; here every ELF file and readelf answer is made up."""
 from __future__ import annotations
 
 import configparser
+import fnmatch
 import json
 import os
 import shutil
@@ -46,7 +47,15 @@ def _tree(root: Path, machine: int = build_linux.EM_AARCH64) -> Path:
     qml.mkdir(parents=True)
     (qml / "libqtquick2plugin.so").write_bytes(_elf(machine))
     (qml / "qmldir").write_text("module QtQuick\n")
+    for plugin in build_linux.REQUIRED_PLUGINS:
+        path = tree / "PySide6" / "qt-plugins" / plugin
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(_elf(machine))
     return tree
+
+
+# The ELF files _tree() makes.
+ELF_FILES = 4 + len(build_linux.REQUIRED_PLUGINS)
 
 
 # -- ELF files and readelf --------------------------------------------------------------------
@@ -127,6 +136,7 @@ def test_read_tree_asks_readelf_about_each_elf_file(tmp_path: Path) -> None:
     infos = build_linux.read_tree(tree, readelf)
     assert [info.path for info in infos] == [
         "PySide6/qml/QtQuick/libqtquick2plugin.so",
+        *sorted(f"PySide6/qt-plugins/{plugin}" for plugin in build_linux.REQUIRED_PLUGINS),
         build_linux.CRONET,
         build_linux.SERVICE,
         build_linux.CLIENT,
@@ -248,6 +258,22 @@ def test_an_unknown_soname_stops_the_build() -> None:
     assert build_linux.dependencies(infos, _libraries(), {"libxcb-util.so.1"}).deb[0] == "libc6"
 
 
+def test_a_library_loaded_by_name_is_always_a_dependency() -> None:
+    # The X11 activation loads libxcb with ctypes; readelf cannot see that.
+    libraries = build_linux.SystemLibraries(
+        (
+            build_linux.Library("libc6", ("libc.so.6",), "GLIBC_"),
+            build_linux.Library("libxcb1", ("libxcb.so.1",), loaded_by_name=True),
+        ),
+        (),
+        (),
+    )
+    infos = [build_linux.ElfInfo("openweir-ui", None, ("libc.so.6",))]
+    found = build_linux.dependencies(infos, libraries)
+    assert found.deb == ("libc6", "libxcb1")
+    assert found.rpm == ("libc.so.6()(64bit)", "libxcb.so.1()(64bit)")
+
+
 def test_a_system_library_must_not_be_carried() -> None:
     infos = [
         build_linux.ElfInfo("openweir-ui", None, ("libglib-2.0.so.0",)),
@@ -265,6 +291,7 @@ def test_the_system_library_list() -> None:
     for name in ("libc.so.6", "ld-linux-x86-64.so.2", "ld-linux-aarch64.so.1", "libEGL.so.1"):
         assert name in by_soname
     assert by_soname["libc.so.6"].versions == "GLIBC_"
+    assert by_soname["libxcb.so.1"].loaded_by_name
     # Ubuntu 24.04's t64 name, with the old one for 22.04 and Debian 12.
     assert by_soname["libglib-2.0.so.0"].deb == "libglib2.0-0t64 | libglib2.0-0"
     assert {"systemd", "pkexec | policykit-1"} <= set(libraries.requires_deb)
@@ -345,7 +372,7 @@ def test_modes_become_root_only_writable(tmp_path: Path) -> None:
     assert mode(tree / "LICENSE") == 0o644
     assert mode(tree / build_linux.CLIENT) == 0o755
     assert mode(script) == 0o755
-    assert build_linux.check_tree(tree, "arm64") == 4
+    assert build_linux.check_tree(tree, "arm64") == ELF_FILES
 
 
 @POSIX
@@ -382,7 +409,7 @@ def test_the_tree_check_refuses_what_the_service_would(tmp_path: Path) -> None:
     (tree / "LICENSE").unlink()
     license_.write_text("GPL")
     license_.chmod(0o644)
-    assert build_linux.check_tree(tree, "arm64") == 4
+    assert build_linux.check_tree(tree, "arm64") == ELF_FILES
 
 
 @POSIX
@@ -391,7 +418,7 @@ def test_links_stay_inside_the_tree(tmp_path: Path) -> None:
     build_linux.normalize_modes(tree)
     lib = tree / "PySide6" / "qml" / "QtQuick"
     (lib / "inside.so").symlink_to("libqtquick2plugin.so")
-    assert build_linux.check_tree(tree, "arm64") == 4
+    assert build_linux.check_tree(tree, "arm64") == ELF_FILES
     (tmp_path / "outside").write_text("x")
     for link in ("../../../../outside", str(tmp_path / "outside"), "/usr/lib/libc.so.6"):
         escape = lib / "escape"
@@ -402,6 +429,34 @@ def test_links_stay_inside_the_tree(tmp_path: Path) -> None:
     (lib / "dangling").symlink_to("missing.so")
     with pytest.raises(BuildError, match="which is missing"):
         build_linux.check_tree(tree, "arm64")
+
+
+@POSIX
+def test_the_tree_needs_the_windows_qt_plugins(tmp_path: Path) -> None:
+    tree = _tree(tmp_path)
+    build_linux.normalize_modes(tree)
+    (tree / "PySide6" / "qt-plugins" / "wayland-decoration-client" / "libadwaita.so").unlink()
+    with pytest.raises(BuildError, match=r"no Qt plugin wayland-decoration-client/libadwaita\.so"):
+        build_linux.check_tree(tree, "arm64")
+
+
+def test_nothing_the_window_needs_is_left_out() -> None:
+    # The platforms, Wayland's shell and decorations (adwaita needs QtSvg and QtDBus), and the
+    # D-Bus tray, wherever Nuitka puts them.
+    patterns = (
+        *build_linux.EXCLUDED,
+        *build_linux.system_patterns(build_linux.load_system_libraries()),
+    )
+    needed = [
+        *(f"PySide6/qt-plugins/{plugin}" for plugin in build_linux.REQUIRED_PLUGINS),
+        *(f"PySide6/Qt/plugins/{plugin}" for plugin in build_linux.REQUIRED_PLUGINS),
+        *(
+            f"PySide6/Qt/lib/libQt6{name}.so.6"
+            for name in ("Core", "Gui", "DBus", "Svg", "WaylandClient", "XcbQpa", "Widgets")
+        ),
+    ]
+    for path in needed:
+        assert not [pattern for pattern in patterns if fnmatch.fnmatch(path, pattern)], path
 
 
 @pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="no FIFOs")
@@ -470,6 +525,7 @@ def test_the_ui_build_includes_secure_storage_and_the_signature_check(
     assert f"--output-filename={product.LINUX_UI_EXECUTABLE}" in command
     for module in (
         "keyring.backends.SecretService",
+        "jeepney",
         "jeepney.io.blocking",
         "cryptography.hazmat.primitives.asymmetric.ed25519",
     ):
@@ -646,6 +702,8 @@ def test_the_desktop_file_opens_the_ui_for_every_url_scheme() -> None:
     assert desktop["Exec"] == f"{product.LINUX_UI_PATH} %u"
     assert desktop["TryExec"] == product.LINUX_UI_PATH
     assert desktop["Icon"] == product.LINUX_DESKTOP_ID
+    # Launchers hand out activation tokens to applications that say so.
+    assert desktop["StartupNotify"] == "true"
     schemes = [
         item.removeprefix("x-scheme-handler/") for item in desktop["MimeType"].split(";") if item
     ]
