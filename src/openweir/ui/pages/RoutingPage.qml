@@ -180,6 +180,7 @@ ScrollView {
                     current: page.tab
                     accessibleName: qsTr("方案内容")
                     Accessible.role: Accessible.PageTabList
+                    segmentRole: Accessible.PageTab
                     onPicked: value => page.tab = value
                 }
 

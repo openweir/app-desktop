@@ -162,6 +162,40 @@ def test_custom_controls_tell_their_role_and_state(qtbot: QtBot, loaded: Loaded)
 
 
 @pytest.mark.usefixtures("screen_reader")
+def test_a_switch_between_views_is_a_tab_list(qtbot: QtBot, loaded: Loaded) -> None:
+    """The plan's 规则 / 策略组 switch shows another view of the plan: a tab list whose
+    segments are tabs, unlike the radio buttons of other segmented controls (DESIGN.md
+    "分段控件")."""
+    routing = loaded.view_models.routing
+    page = show_page(qtbot, loaded, "routing")
+    with qtbot.waitSignal(routing.routingChanged):
+        routing.setMode("plan")
+    qtbot.wait(100)
+    (views,) = find_all(
+        page, lambda i: kind(i) == "SegmentedControl" and accessible(i).name == "方案内容"
+    )
+    assert accessible(views).role == Role.PageTabList
+
+    def tabs() -> list[tuple[QAccessible.Role, str, bool]]:
+        segments = find_all(views, lambda i: kind(i) == "Segment")
+        return [(accessible(s).role, accessible(s).name, accessible(s).selected) for s in segments]
+
+    assert tabs() == [(Role.PageTab, "规则", True), (Role.PageTab, "策略组", False)]
+    page.setProperty("tab", "groups")
+    qtbot.wait(50)
+    assert tabs() == [(Role.PageTab, "规则", False), (Role.PageTab, "策略组", True)]
+
+    (mode,) = find_all(
+        page, lambda i: kind(i) == "SegmentedControl" and accessible(i).name == "分流方式"
+    )
+    assert accessible(mode).role == Role.Grouping
+    radios = find_all(mode, lambda i: accessible(i).role == Role.RadioButton)
+    assert len(radios) == 2
+    assert not any(accessible(r).selected for r in radios)
+    assert loaded.warnings == []
+
+
+@pytest.mark.usefixtures("screen_reader")
 def test_the_undo_hint_is_read_out_as_it_shows(qtbot: QtBot, loaded: Loaded) -> None:
     """The hint takes the status text's place without taking the focus, so it is announced
     (DESIGN.md "撤销提示")."""
