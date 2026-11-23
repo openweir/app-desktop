@@ -9,7 +9,7 @@ from dataclasses import dataclass
 
 from PySide6.QtCore import QEvent, QPoint, QPointF, QRectF, Qt
 from PySide6.QtGui import QAccessible, QGuiApplication, QKeyEvent, QWheelEvent
-from PySide6.QtQml import QQmlApplicationEngine
+from PySide6.QtQml import QQmlApplicationEngine, QQmlEngine, QQmlExpression
 from PySide6.QtQuick import QQuickItem, QQuickWindow
 from PySide6.QtTest import QTest
 from pytestqt.qtbot import QtBot
@@ -121,6 +121,15 @@ class Loaded:
         item = self.window.activeFocusItem()
         assert item is not None
         return item
+
+    def announcements(self) -> list[str]:
+        """What the window tells screen readers from now on without moving the focus, oldest
+        first: the messages ScreenReader.qml announces."""
+        context = QQmlEngine.contextForObject(self.window)
+        reader, _ = QQmlExpression(context, self.window, "ScreenReader").evaluate()
+        heard: list[str] = []
+        reader.announced.connect(heard.append)
+        return heard
 
     def focused_text(self) -> str | None:
         item = self.window.activeFocusItem()

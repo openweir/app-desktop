@@ -410,10 +410,15 @@ ColumnLayout {
         Keys.onUpPressed: scrollBy(-rowHeight)
         Keys.onDownPressed: scrollBy(rowHeight)
         Keys.onPressed: event => {
-            if (event.key === Qt.Key_PageUp || event.key === Qt.Key_PageDown) {
+            if (event.key === Qt.Key_PageUp || event.key === Qt.Key_PageDown)
                 scrollBy((event.key === Qt.Key_PageUp ? -1 : 1) * list.height * 0.9)
-                event.accepted = true
-            }
+            else if (event.key === Qt.Key_Home)
+                list.positionViewAtBeginning()
+            else if (event.key === Qt.Key_End)
+                list.positionViewAtEnd()
+            else
+                return
+            event.accepted = true
         }
 
         FocusRing {

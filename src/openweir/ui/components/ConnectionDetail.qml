@@ -34,87 +34,67 @@ AppPopover {
             }
         }
 
+        // A fixed list of fields whose values follow the connection: they change every
+        // second while the popover is open, the fields stay.
         ColumnLayout {
             Layout.fillWidth: true
             spacing: Theme.space1
 
-            Repeater {
-                model: [
-                    {
-                        label: qsTr("网络"),
-                        value: popover.info.protocol,
-                        mono: false
-                    },
-                    {
-                        label: qsTr("来源"),
-                        value: popover.info.source,
-                        mono: true
-                    },
-                    {
-                        label: qsTr("目标"),
-                        value: popover.info.destination,
-                        mono: true
-                    },
-                    {
-                        label: qsTr("进程"),
-                        value: popover.info.process,
-                        mono: false
-                    },
-                    {
-                        label: qsTr("规则"),
-                        value: popover.info.ruleName ? qsTr("%1（%2）").arg(popover.info.ruleName).arg(popover.info.rule) : popover.info.rule,
-                        mono: !popover.info.ruleName
-                    },
-                    {
-                        label: qsTr("链路"),
-                        value: popover.info.chain,
-                        mono: false
-                    },
-                    {
-                        label: qsTr("下载"),
-                        value: popover.info.download + " · " + popover.info.downRate,
-                        mono: true
-                    },
-                    {
-                        label: qsTr("上传"),
-                        value: popover.info.upload + " · " + popover.info.upRate,
-                        mono: true
-                    },
-                    {
-                        label: qsTr("开始时间"),
-                        value: popover.info.started,
-                        mono: true
-                    },
-                    {
-                        label: qsTr("时长"),
-                        value: popover.info.duration,
-                        mono: true
-                    }
-                ]
+            Field {
+                label: qsTr("网络")
+                value: popover.info.protocol ?? ""
+            }
 
-                RowLayout {
-                    id: field
+            Field {
+                label: qsTr("来源")
+                value: popover.info.source ?? ""
+                mono: true
+            }
 
-                    required property var modelData
+            Field {
+                label: qsTr("目标")
+                value: popover.info.destination ?? ""
+                mono: true
+            }
 
-                    Layout.fillWidth: true
-                    spacing: Theme.space3
+            Field {
+                label: qsTr("进程")
+                value: popover.info.process ?? ""
+            }
 
-                    DetailText {
-                        Layout.preferredWidth: popover.labelWidth
-                        text: field.modelData.label
-                        role: Theme.type.caption
-                        color: Theme.textMuted
-                        wrapMode: Text.Wrap
-                    }
+            Field {
+                label: qsTr("规则")
+                value: popover.info.ruleName ? qsTr("%1（%2）").arg(popover.info.ruleName).arg(popover.info.rule) : popover.info.rule ?? ""
+                mono: !popover.info.ruleName
+            }
 
-                    DetailText {
-                        Layout.fillWidth: true
-                        text: field.modelData.value ?? ""
-                        role: field.modelData.mono ? Theme.type.dataSm : Theme.type.bodySm
-                        color: field.modelData.mono ? Theme.textSecondary : Theme.text
-                    }
-                }
+            Field {
+                label: qsTr("链路")
+                value: popover.info.chain ?? ""
+            }
+
+            Field {
+                label: qsTr("下载")
+                value: popover.info.id ? popover.info.download + " · " + popover.info.downRate : ""
+                mono: true
+            }
+
+            Field {
+                label: qsTr("上传")
+                value: popover.info.id ? popover.info.upload + " · " + popover.info.upRate : ""
+                mono: true
+            }
+
+            Field {
+                label: qsTr("开始时间")
+                value: popover.info.started ?? ""
+                mono: true
+            }
+
+            Field {
+                label: qsTr("时长")
+                value: popover.info.duration ?? ""
+                mono: true
             }
         }
 
@@ -134,5 +114,31 @@ AppPopover {
     component DetailText: AccessibleText {
         Layout.alignment: Qt.AlignTop
         wrapMode: Text.WrapAnywhere
+    }
+
+    component Field: RowLayout {
+        id: field
+
+        property string label
+        property string value
+        property bool mono
+
+        Layout.fillWidth: true
+        spacing: Theme.space3
+
+        DetailText {
+            Layout.preferredWidth: popover.labelWidth
+            text: field.label
+            role: Theme.type.caption
+            color: Theme.textMuted
+            wrapMode: Text.Wrap
+        }
+
+        DetailText {
+            Layout.fillWidth: true
+            text: field.value
+            role: field.mono ? Theme.type.dataSm : Theme.type.bodySm
+            color: field.mono ? Theme.textSecondary : Theme.text
+        }
     }
 }

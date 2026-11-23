@@ -2,7 +2,10 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls.Basic
 
-// 2–4 mutually exclusive options: segmented-track and segmented-item(-selected).
+// 2–4 mutually exclusive options: segmented-track and segmented-item(-selected). Screen
+// readers hear a group of radio buttons; a switch between views of the same content is a
+// tab list instead, with Accessible.role PageTabList and `segmentRole` PageTab, whose
+// selected segment is the selected tab (DESIGN.md "分段控件", "读屏").
 Rectangle {
     id: root
 
@@ -10,6 +13,7 @@ Rectangle {
     property string current
     property bool allowReselect: false
     property string accessibleName
+    property int segmentRole: Accessible.RadioButton
     signal picked(string value)
 
     implicitWidth: row.implicitWidth + 4
@@ -100,8 +104,9 @@ Rectangle {
         leftPadding: Theme.space3
         rightPadding: Theme.space3
         checked: selected  // what screen readers hear; clicking does not toggle it
-        Accessible.role: Accessible.RadioButton
+        Accessible.role: root.segmentRole
         Accessible.name: modelData.label
+        Accessible.selected: root.segmentRole === Accessible.PageTab && selected
         onClicked: {
             if (!selected || root.allowReselect)
                 root.picked(modelData.value)

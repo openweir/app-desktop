@@ -76,6 +76,14 @@ def test_profile_groups_and_rules_scroll_independently(
     loaded.key(qtbot, Qt.Key.Key_PageDown)
     assert offset(rule_list) > rule_offset
     assert offset(group_list) == group_offset
+    # Home and End go to the first and the last rule (DESIGN.md "只读规则表").
+    loaded.key(qtbot, Qt.Key.Key_End)
+    assert rule_list.property("atYEnd")
+    assert find_all(rule_list, lambda item: item.property("match") == "DOMAIN,rule-499.example")
+    loaded.key(qtbot, Qt.Key.Key_Home)
+    assert offset(rule_list) == 0
+    assert offset(group_list) == group_offset
+    loaded.key(qtbot, Qt.Key.Key_PageDown)
 
     search.forceActiveFocus()
     loaded.type(qtbot, "rule-499")

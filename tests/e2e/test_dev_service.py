@@ -150,13 +150,13 @@ def test_pages_show_the_core(app: App) -> None:
     assert app.prop(overview, "nodeDelay") == ""  # not tested yet
     app.until(lambda: app.prop(overview, "downTotal") not in ("—", "0 B"))
     app.until(lambda: app.prop(overview, "downRate") not in ("—", "0 B/s"))
-    (recent,) = app.prop(overview, "recent")
-    assert (recent["host"], recent["route"]) == (destination, "节点选择 · node-a")
-    app.until(lambda: app.prop(overview, "recent")[0]["rate"] != "0 B/s")
+    (recent,) = app.rows_of(overview, "recent")
+    assert (recent.host, recent.route) == (destination, "节点选择 · node-a")
+    app.until(lambda: app.rows_of(overview, "recent")[0].rate != "0 B/s")
     rates = set()
     for _ in range(6):
         app.qtbot.wait(500)
-        rates.add(app.prop(overview, "recent")[0]["rate"])
+        rates.add(app.rows_of(overview, "recent")[0].rate)
     assert "0 B/s" not in rates  # the stream never stops
     app.screenshot("overview")
 

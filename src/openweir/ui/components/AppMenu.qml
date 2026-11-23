@@ -13,6 +13,9 @@ Menu {
 
     property Item trigger
     property int triggerFocusReason: Qt.OtherFocusReason
+    // The control the menu opened from, which the window gives focus back to as the menu
+    // closes; the trigger too, unless retarget() moved it.
+    property Item openedFrom
     property real minimumWidth: 0  // a dropdown's list is at least as wide as the dropdown
     // Where a right-click asked for the menu, in the overlay, while openContext() runs.
     property point pointer
@@ -66,6 +69,7 @@ Menu {
     // trigger that is destroyed, such as a removed row's button; the new trigger's counts.
     function openAt(anchor: Item, x: real) {
         trigger = anchor
+        openedFrom = anchor
         triggerFocusReason = Focus.reasonAfter(anchor)
         if (atPointer)
             popupAtPointer(anchor, anchor.mapFromItem(anchor.Overlay.overlay, pointer.x, pointer.y))
@@ -77,6 +81,7 @@ Menu {
     // it. Focus comes back to where it was when the menu closes.
     function openAtPointer(anchor: Item, position: point) {
         trigger = anchor
+        openedFrom = anchor
         triggerFocusReason = Qt.OtherFocusReason
         popupAtPointer(anchor, position)
     }
@@ -122,12 +127,25 @@ Menu {
     margins: Theme.overlayMargin
     padding: Theme.space1
 
-    // A focused menu hands focus back to the window as it closes, which returns it to a
-    // trigger that had it, but without the reason that shows the focus ring. A dialog that
-    // an item opened keeps its focus.
+    // An item moved the row the menu opened from, as 上移 moves a rule: the row's control
+    // now shows its neighbour, so focus goes back to `item`, where the row is now, instead
+    // (DESIGN.md "可排序列表"). Dialogs that the items open still return to `item`.
+    function retarget(item: Item) {
+        trigger = item
+    }
+
+    // A focused menu hands focus back to the window as it closes, which returns it to the
+    // control it opened from that had it, but without the reason that shows the focus ring;
+    // a retargeted trigger takes it from there. A dialog that an item opened keeps its focus.
     onClosed: {
         placedAnchor = null
-        if (trigger && trigger.activeFocus && triggerFocusReason !== Qt.OtherFocusReason) {
+        const from = openedFrom
+        openedFrom = null
+        if (!trigger || !from?.activeFocus)
+            return
+        if (trigger !== from) {
+            trigger.forceActiveFocus(triggerFocusReason)
+        } else if (triggerFocusReason !== Qt.OtherFocusReason) {
             trigger.focus = false
             trigger.forceActiveFocus(triggerFocusReason)
         }

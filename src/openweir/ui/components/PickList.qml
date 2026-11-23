@@ -5,9 +5,10 @@ import QtQuick.Layouts
 
 // A searchable list's box (DESIGN.md "可搜索列表"): rows with a check box, a name and a
 // note, in a bordered box that scrolls; with `sectioned`, category titles stick to the top.
-// One Tab stop: the arrows move the highlight and Space checks the row. The model's rows
-// carry itemId, name, note, picked and added (in use already, so disabled), and `category`
-// when sectioned.
+// One Tab stop: the arrows move the highlight past the rows in use already, and Space checks
+// the row. The focus stays on the box, so screen readers are told the row the highlight
+// moves to, and its new state when Space checks it. The model's rows carry itemId, name,
+// note, picked and added (in use already, so disabled), and `category` when sectioned.
 FocusScope {
     id: root
 
@@ -19,9 +20,38 @@ FocusScope {
     property bool empty
     signal toggled(string id)
 
+    // Moves the highlight to the next row from it that can be checked, `delta` rows at a
+    // time; rows past the view are made to be read. The row it moved to, if any.
+    function step(delta: int): PickRow {
+        for (let i = list.currentIndex + delta; i >= 0 && i < list.count; i += delta) {
+            if (!list.itemAtIndex(i))
+                list.positionViewAtIndex(i, ListView.Contain)
+            const row = list.itemAtIndex(i) as PickRow
+            if (row && !row.added) {
+                list.currentIndex = i
+                list.positionViewAtIndex(i, ListView.Contain)
+                return row
+            }
+        }
+        list.positionViewAtIndex(list.currentIndex, ListView.Contain)
+        return null
+    }
+
+    // The row the highlight moved to takes the focus without screen readers hearing of it,
+    // unlike the row the list's focus first lands on.
+    function announce(row: PickRow) {
+        if (row)
+            ScreenReader.announce(root, ScreenReader.join([row.name, row.picked ? qsTr("已勾选") : qsTr("未勾选"), row.note]))
+    }
+
     activeFocusOnTab: true
     Accessible.role: Accessible.List
     Accessible.name: accessibleName
+    // The highlight does not rest on a row in use already.
+    onActiveFocusChanged: {
+        if (activeFocus && (list.currentItem as PickRow)?.added && !step(1))
+            step(-1)
+    }
 
     Rectangle {
         anchors.fill: parent
@@ -44,7 +74,7 @@ FocusScope {
         clip: true
         focus: true
         boundsBehavior: Flickable.StopAtBounds
-        keyNavigationEnabled: true
+        keyNavigationEnabled: false
         highlightMoveDuration: 0
         section.property: root.sectioned ? "category" : ""
         section.criteria: ViewSection.FullString
@@ -68,6 +98,8 @@ FocusScope {
                 color: Theme.textMuted
             }
         }
+        Keys.onUpPressed: root.announce(root.step(-1))
+        Keys.onDownPressed: root.announce(root.step(1))
         Keys.onSpacePressed: {
             const row = currentItem as PickRow
             if (row && !row.added)
@@ -117,6 +149,10 @@ FocusScope {
         onClicked: {
             list.currentIndex = index
             root.toggled(itemId)
+        }
+        onPickedChanged: {
+            if (ListView.isCurrentItem && root.activeFocus)
+                root.announce(row)
         }
 
         contentItem: RowLayout {

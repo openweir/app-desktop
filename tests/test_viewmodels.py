@@ -277,7 +277,7 @@ def test_overview_actions(qtbot: QtBot, view_models: ViewModels) -> None:
     assert not prop(overview, "connected")
     assert (prop(overview, "connectionOn"), prop(overview, "connectionDetail")) == (False, "")
     assert (prop(overview, "statusTitle"), prop(overview, "statusDetail")) == ("未连接", "")
-    assert prop(overview, "recent") == []
+    assert rows(overview, "recent") == []
     assert prop(overview, "downRate") == "—"
 
     # While stopped the switches show, and change, what the next connection asks for.

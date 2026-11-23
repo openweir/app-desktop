@@ -102,7 +102,7 @@ ColumnLayout {
                             focusPolicy: groupRow.custom ? Qt.StrongFocus : Qt.NoFocus
                             Accessible.role: groupRow.custom ? Accessible.Button : Accessible.StaticText
                             Accessible.name: groupRow.custom ? qsTr("编辑「%1」").arg(groupRow.name) : groupRow.name
-                            Accessible.description: [groupRow.caption, groupRow.warning].filter(part => part !== "").join("，")
+                            Accessible.description: ScreenReader.join([groupRow.caption, groupRow.warning])
                             onClicked: {
                                 if (!groupRow.custom)
                                     return

@@ -7,6 +7,7 @@ navigation turned on in the system settings.
 import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QAccessible
+from PySide6.QtQml import QQmlEngine, QQmlExpression
 from PySide6.QtQuick import QQuickItem
 from pytestqt.qtbot import QtBot
 
@@ -23,6 +24,7 @@ PAGE_TYPES = {
     "settings": "SettingsPage",
 }
 Role = QAccessible.Role
+COMMA = "，"  # noqa: RUF001  # between the parts of what a screen reader is told
 
 
 def show_page(qtbot: QtBot, loaded: Loaded, page: str) -> QQuickItem:
@@ -157,6 +159,92 @@ def test_custom_controls_tell_their_role_and_state(qtbot: QtBot, loaded: Loaded)
     select = loaded.item(lambda i: kind(i) == "AppSelect")
     assert (accessible(select).role, accessible(select).name) == (Role.ComboBox, "TUN 协议栈")
     assert accessible(select).description == "mips"
+    assert loaded.warnings == []
+
+
+@pytest.mark.usefixtures("screen_reader")
+def test_a_switch_between_views_is_a_tab_list(qtbot: QtBot, loaded: Loaded) -> None:
+    """The plan's 规则 / 策略组 switch shows another view of the plan: a tab list whose
+    segments are tabs, unlike the radio buttons of other segmented controls (DESIGN.md
+    "分段控件")."""
+    routing = loaded.view_models.routing
+    page = show_page(qtbot, loaded, "routing")
+    with qtbot.waitSignal(routing.routingChanged):
+        routing.setMode("plan")
+    qtbot.wait(100)
+    (views,) = find_all(
+        page, lambda i: kind(i) == "SegmentedControl" and accessible(i).name == "方案内容"
+    )
+    assert accessible(views).role == Role.PageTabList
+
+    def tabs() -> list[tuple[QAccessible.Role, str, bool]]:
+        segments = find_all(views, lambda i: kind(i) == "Segment")
+        return [(accessible(s).role, accessible(s).name, accessible(s).selected) for s in segments]
+
+    assert tabs() == [(Role.PageTab, "规则", True), (Role.PageTab, "策略组", False)]
+    page.setProperty("tab", "groups")
+    qtbot.wait(50)
+    assert tabs() == [(Role.PageTab, "规则", False), (Role.PageTab, "策略组", True)]
+
+    (mode,) = find_all(
+        page, lambda i: kind(i) == "SegmentedControl" and accessible(i).name == "分流方式"
+    )
+    assert accessible(mode).role == Role.Grouping
+    radios = find_all(mode, lambda i: accessible(i).role == Role.RadioButton)
+    assert len(radios) == 2
+    assert not any(accessible(r).selected for r in radios)
+    assert loaded.warnings == []
+
+
+@pytest.mark.usefixtures("screen_reader")
+@pytest.mark.parametrize(
+    ("loaded", "version", "joined"),
+    [("zh", "版本 {}", f"OpenAI{COMMA}订阅 A"), ("en", "Version {}", "OpenAI, 订阅 A")],
+    indirect=["loaded"],
+)
+def test_names_built_from_parts_follow_the_language(
+    qtbot: QtBot, loaded: Loaded, version: str, joined: str
+) -> None:
+    """Translators choose the word order of a name built around a value, and the separator
+    between the parts a screen reader reads (DESIGN.md "英文文案")."""
+    about = loaded.view_models.about
+    page = show_page(qtbot, loaded, "settings")
+    value = find(page, lambda i: i.property("text") == about.property("version"))
+    assert value is not None
+    assert accessible(value).name == version.format(about.property("version"))
+
+    context = QQmlEngine.contextForObject(loaded.window)
+    expression = QQmlExpression(
+        context, loaded.window, 'ScreenReader.join(["OpenAI", "", "订阅 A"])'
+    )
+    assert expression.evaluate()[0] == joined
+    assert loaded.warnings == []
+
+
+@pytest.mark.usefixtures("screen_reader")
+def test_the_undo_hint_is_read_out_as_it_shows(qtbot: QtBot, loaded: Loaded) -> None:
+    """The hint takes the status text's place without taking the focus, so it is announced
+    (DESIGN.md "撤销提示")."""
+    routing = loaded.view_models.routing
+    show_page(qtbot, loaded, "routing")
+    with qtbot.waitSignal(routing.routingChanged):
+        routing.setMode("plan")
+    rows = routing.plan_rules().property("rows")
+    qtbot.waitUntil(lambda: len(rows.rows) == 6)
+    heard = loaded.announcements()
+    rule = rows.rows[0]
+    routing.plan_rules().removeRule(rule.id)
+    qtbot.waitUntil(lambda: heard == [f"已删除「{rule.name}」"])
+    header = loaded.item(lambda i: kind(i) == "PageHeader")
+    hint = find(header, lambda i: accessible(i).name == f"已删除「{rule.name}」")
+    assert hint is not None
+    assert accessible(hint).role == Role.StaticText
+
+    # Undoing puts the rule back; the status text that returns is not announced.
+    routing.undo()
+    qtbot.waitUntil(lambda: len(rows.rows) == 6 and routing.property("undoText") == "")
+    qtbot.wait(50)
+    assert heard == [f"已删除「{rule.name}」"]
     assert loaded.warnings == []
 
 
@@ -319,6 +407,39 @@ def test_deleting_a_row_focuses_the_one_that_takes_its_place(qtbot: QtBot, loade
     assert loaded.warnings == []
 
 
+def test_moving_a_rule_from_its_menu_keeps_the_focus_on_it(qtbot: QtBot, loaded: Loaded) -> None:
+    """上移 and 下移 reorder the rows in place: the focus follows the rule to its new row
+    (DESIGN.md "可排序列表")."""
+    routing = loaded.view_models.routing
+    show_page(qtbot, loaded, "routing")
+    with qtbot.waitSignal(routing.routingChanged):
+        routing.setMode("plan")
+    rows = routing.plan_rules().property("rows")
+    qtbot.waitUntil(lambda: len(rows.rows) == 6)
+    qtbot.wait(100)
+    first, second = rows.rows[0].name, rows.rows[1].name
+    page = loaded.item(lambda i: kind(i) == "RoutingPage")
+
+    def more(name: str) -> QQuickItem:
+        found = find(page, lambda i: accessible_name(i) == f"「{name}」的更多操作")
+        assert found is not None
+        return found
+
+    top, below = more(first), more(second)
+    open_menu_item(qtbot, loaded, top, "下移")
+    qtbot.waitUntil(lambda: [r.name for r in rows.rows[:2]] == [second, first])
+    qtbot.waitUntil(lambda: accessible_name(loaded.focused()) == f"「{first}」的更多操作")
+    assert loaded.focused() is below  # the second row shows it now
+    assert below.property("visualFocus")
+
+    open_menu_item(qtbot, loaded, below, "上移")
+    qtbot.waitUntil(lambda: [r.name for r in rows.rows[:2]] == [first, second])
+    qtbot.waitUntil(lambda: loaded.focused() is top)
+    assert accessible_name(top) == f"「{first}」的更多操作"
+    assert top.property("visualFocus")
+    assert loaded.warnings == []
+
+
 def test_saving_an_override_returns_to_the_rows_more_button(qtbot: QtBot, loaded: Loaded) -> None:
     profiles = loaded.view_models.profiles
     show_page(qtbot, loaded, "profiles")
@@ -367,4 +488,82 @@ def test_lists_keep_the_focus_while_they_update(qtbot: QtBot, loaded: Loaded) ->
     assert loaded.focused() is node
     loaded.key(qtbot, Qt.Key.Key_Down)
     assert loaded.focused().property("name") != "日本 01"  # the arrows move between nodes
+    assert loaded.warnings == []
+
+
+@pytest.mark.usefixtures("screen_reader")
+def test_the_row_the_arrows_select_in_a_table_is_read_out(qtbot: QtBot, loaded: Loaded) -> None:
+    """The table keeps the focus while the arrows move the selection, so the row it moves
+    to is announced as the row itself reads (DESIGN.md "表格", "读屏")."""
+    connections = loaded.view_models.connections
+    page = show_page(qtbot, loaded, "connections")
+    table = find(page, lambda i: accessible(i).role == Role.Table)
+    assert table is not None
+    table.forceActiveFocus(Qt.FocusReason.TabFocusReason)
+    heard = loaded.announcements()
+
+    def selected_row() -> QQuickItem:
+        selected = connections.property("detail")["id"]
+        return loaded.item(lambda i: i.property("connectionId") == selected)
+
+    loaded.key(qtbot, Qt.Key.Key_Down)
+    first = accessible(selected_row())
+    assert connections.property("selectedIndex") == 0
+    loaded.key(qtbot, Qt.Key.Key_Down)
+    second = accessible(selected_row())
+    assert connections.property("selectedIndex") == 1
+    # The rates and the duration in the description change every second.
+    assert [said.split(f"{COMMA}规则 ")[0] for said in heard] == [first.name, second.name]
+    for said, row in zip(heard, (first, second), strict=True):
+        assert said.startswith(f"{row.name}{COMMA}规则 ")
+
+    loaded.key(qtbot, Qt.Key.Key_Home)
+    loaded.key(qtbot, Qt.Key.Key_Home)  # the selection does not move: nothing to say
+    assert len(heard) == 3
+    assert loaded.focused() is table
+    assert loaded.warnings == []
+
+
+@pytest.mark.usefixtures("screen_reader")
+def test_a_searchable_lists_arrows_skip_rows_in_use(qtbot: QtBot, loaded: Loaded) -> None:
+    """The highlight passes over the services the plan has already, and the row it moves to
+    is announced, as Space's change is (DESIGN.md "可搜索列表")."""
+    routing = loaded.view_models.routing
+    show_page(qtbot, loaded, "routing")
+    with qtbot.waitSignal(routing.routingChanged):
+        routing.setMode("plan")
+    editor = routing._editor
+    with qtbot.waitSignal(editor.opened):
+        editor.openAdd()
+    editor.setKind("service")
+    qtbot.wait(100)
+    rows = editor.property("services").rows
+    # The plan has the first few services: 私有网络, 国内常用, 广告, OpenAI and so on.
+    first = next(n for n, row in enumerate(rows) if not row.added)
+    assert first > 0
+    assert not rows[first + 1].added
+
+    (box,) = loaded.overlay_items(lambda i: kind(i) == "PickList" and accessible(i).name == "服务")
+    view = find(box, lambda i: kind(i) == "QQuickListView")
+    assert view is not None
+    search = loaded.overlay_items(lambda i: kind(i) == "SearchField" and i.isVisible())[0]
+    search.forceActiveFocus(Qt.FocusReason.TabFocusReason)
+    heard = loaded.announcements()
+    # ↓ in the search box enters the list, on its first row that can be checked; the row
+    # that takes the focus is read out as such.
+    loaded.key(qtbot, Qt.Key.Key_Down)
+    assert view.property("currentIndex") == first
+    assert loaded.focused().property("name") == rows[first].name
+    assert heard == []
+    # The arrows move the focus among the rows without screen readers hearing of it.
+    loaded.key(qtbot, Qt.Key.Key_Down)
+    assert view.property("currentIndex") == first + 1
+    loaded.key(qtbot, Qt.Key.Key_Up)
+    loaded.key(qtbot, Qt.Key.Key_Up)  # only rows in use above: it stays
+    assert view.property("currentIndex") == first
+    assert heard == [f"{rows[first + 1].name}{COMMA}未勾选", f"{rows[first].name}{COMMA}未勾选"]
+
+    loaded.key(qtbot, Qt.Key.Key_Space)
+    qtbot.waitUntil(lambda: editor.property("services").rows[first].picked)
+    assert heard[-1] == f"{rows[first].name}{COMMA}已勾选"
     assert loaded.warnings == []
