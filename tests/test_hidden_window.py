@@ -20,7 +20,7 @@ from PySide6.QtQuick import QQuickItem, QQuickWindow
 from pytestqt.qtbot import QtBot
 
 from openweir.app import load_ui
-from openweir.desktop.titlebar import MAC, WINDOWS
+from openweir.desktop.titlebar import LINUX, MAC, WINDOWS
 from openweir.host.base import HostError
 from openweir.models.store import ProfileStore
 from openweir.viewmodels.appearance import Appearance
@@ -184,7 +184,7 @@ def test_a_dialog_left_open_keeps_its_page(qtbot: QtBot, loaded: Loaded) -> None
     assert loaded.warnings == []
 
 
-@pytest.fixture(params=[MAC, WINDOWS])
+@pytest.fixture(params=[MAC, WINDOWS, LINUX])
 def style(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> str:
     """The window's title bar in this style, whatever system the tests run on, as in
     test_titlebar.py. Request it before ``loaded``."""

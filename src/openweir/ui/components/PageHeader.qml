@@ -4,7 +4,7 @@ import QtQuick.Layouts
 
 // The one-line page header: title, a short status, actions, then header-rule. It sits in the
 // window's title band (DESIGN.md "顶部区域"): the band's empty parts around it move the window,
-// and on Windows it leaves the caption buttons their room.
+// and on Windows it leaves the caption buttons their room. macOS and Linux have none in the band.
 Item {
     id: header
 

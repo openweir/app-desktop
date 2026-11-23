@@ -68,8 +68,9 @@ ApplicationWindow {
     minimumHeight: Theme.windowMinHeight
     visible: !desktopViewModel.startHidden
     title: Qt.application.name
-    // No system title bar: the sidebar and the pages run up to the top edge, under the title
-    // band (DESIGN.md "顶部区域"), which keeps clear of the traffic lights itself.
+    // No system title bar on macOS and Windows: the sidebar and the pages run up to the top
+    // edge, under the title band (DESIGN.md "顶部区域"), which keeps clear of the traffic lights
+    // itself. Linux keeps the system's title bar, the band below it.
     flags: desktopViewModel.titleBar.windowFlags
     topPadding: 0
     color: Theme.background
@@ -115,7 +116,8 @@ ApplicationWindow {
     Component.onCompleted: {
         desktopViewModel.titleBar.attach(window)
         // Qt keeps the frame a window with a title bar would have, so the window grew by the
-        // title bar it does not show; the design's size is the whole window.
+        // title bar it does not show; the design's size is the whole window, or on Linux what
+        // the system's frame holds.
         width = Theme.windowDefaultWidth
         height = Theme.windowDefaultHeight
     }
@@ -336,7 +338,8 @@ ApplicationWindow {
         }
     }
 
-    // Last, so that they are above the pages and Tab reaches them after the page.
+    // Last, so that they are above the pages and Tab reaches them after the page. Windows only:
+    // the system draws macOS's and Linux's.
     CaptionButtons {
         anchors.top: parent.top
         anchors.right: parent.right

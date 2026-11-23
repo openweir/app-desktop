@@ -9,6 +9,8 @@ QtObject {
     property TitleBar titleBar
     readonly property bool mac: titleBar?.style === "mac"
     readonly property bool windows: titleBar?.style === "windows"
+    // The system's title bar is above the band, with its own buttons.
+    readonly property bool linux: titleBar?.style === "linux"
 
     function toggleMaximized(window: Window) {
         if (window.visibility === Window.Maximized)
@@ -17,7 +19,8 @@ QtObject {
             window.showMaximized()
     }
 
-    // A double-click on an empty part of the band: macOS does what the system settings say.
+    // A double-click on an empty part of the band: macOS does what the system settings say;
+    // Windows and Linux maximize.
     function doubleClicked(window: Window) {
         const action = titleBar?.doubleClickAction() ?? "zoom"
         if (action === "minimize")

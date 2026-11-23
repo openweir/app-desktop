@@ -43,9 +43,12 @@ Rectangle {
         // macOS: the mark sits just below the traffic lights, which the system places in the
         // title bar the safe area covers, clearing them by space-2. Windows: the app's name is on
         // the title band's centre line, level with the page title and the caption buttons.
-        anchors.topMargin: TitleBand.mac
-            ? Math.max(Theme.sidebarTopMacos, root.SafeArea.margins.top + Theme.space2)
-            : Theme.sidebarTopWindows
+        // Linux: level with the page title too, below the system's title bar.
+        anchors.topMargin: {
+            if (TitleBand.mac)
+                return Math.max(Theme.sidebarTopMacos, root.SafeArea.margins.top + Theme.space2)
+            return TitleBand.linux ? Theme.sidebarTopLinux : Theme.sidebarTopWindows
+        }
         anchors.bottomMargin: Theme.space5
         anchors.leftMargin: 14
         anchors.rightMargin: 15

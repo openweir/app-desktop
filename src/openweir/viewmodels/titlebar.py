@@ -7,11 +7,22 @@ calls ``attach`` for them once it is complete.
 
 from __future__ import annotations
 
-from PySide6.QtCore import Property, QEvent, QObject, QRect, QRectF, Qt, Signal, Slot
+from PySide6.QtCore import (
+    Property,
+    QCoreApplication,
+    QEvent,
+    QObject,
+    QRect,
+    QRectF,
+    Qt,
+    Signal,
+    Slot,
+)
 from PySide6.QtGui import QGuiApplication, QPlatformSurfaceEvent, QWindow
 from PySide6.QtQml import QmlElement, QmlUncreatable
 
 from openweir.desktop.titlebar import (
+    LINUX,
     MAC,
     WINDOWS,
     ZOOM,
@@ -20,6 +31,7 @@ from openweir.desktop.titlebar import (
     double_click_action,
     hide_mac_title,
     mac_double_click_preference,
+    use_wayland_decoration,
     window_flags,
 )
 
@@ -35,8 +47,12 @@ class TitleBar(QObject):
     maximizeClicked = Signal()  # Windows: the maximize button was clicked, through the hit test
 
     def __init__(self, style: str, parent: QObject | None = None) -> None:
-        """``style`` is ``mac`` or ``windows`` (desktop.titlebar.titlebar_style)."""
+        """``style`` is ``mac``, ``windows`` or ``linux`` (desktop.titlebar.titlebar_style).
+        On Wayland this names the decoration the system's title bar is drawn with: Qt reads it
+        as it makes the window, which is before ``attach``."""
         super().__init__(parent)
+        if style == LINUX and QGuiApplication.platformName().startswith("wayland"):
+            use_wayland_decoration(QCoreApplication.libraryPaths())
         self._style = style
         self._maximize_area = QRectF()
         self._maximize_hovered = False
@@ -65,7 +81,8 @@ class TitleBar(QObject):
         """Do what Qt leaves to the platform for ``window``, the main window. This creates the
         native window if it is still hidden. On macOS the window gives up its native window
         while it hides (desktop/memory.py); the one Qt creates as it shows again is set up the
-        same way. Windows keeps its native window."""
+        same way. Windows keeps its native window. Linux needs nothing: the system draws the
+        title bar."""
         platform = QGuiApplication.platformName()
         if self._style == MAC and platform == "cocoa":
             hide_mac_title(int(window.winId()))

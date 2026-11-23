@@ -1,8 +1,9 @@
 """The main window's own title bar on each platform (DESIGN.md "顶部区域", docs/ui.md §8).
 
-The window hides the system title bar and runs its content up to the top edge with Qt's
-ExpandedClientAreaHint and NoTitleBarBackgroundHint; Main.qml lays out the 48px title band and
-moves the window from its empty parts. This module covers what Qt leaves to the platform:
+Main.qml lays out the 48px title band and moves the window from its empty parts. On macOS and
+Windows the window hides the system title bar and runs its content up to the top edge with Qt's
+ExpandedClientAreaHint and NoTitleBarBackgroundHint. This module covers what Qt leaves to the
+platform:
 
 - macOS keeps the traffic lights, which the system draws and places. Qt leaves the window
   title showing in the middle of the band, so it is hidden (``titleVisibility``) through
@@ -14,6 +15,12 @@ moves the window from its empty parts. This module covers what Qt leaves to the 
   style without the button hints (the taskbar minimizes the window, Snap and the system menu
   offer both) and answers the hit test itself, so that the maximize button is the system's:
   hovering it opens Snap Layouts. Alt+Space opens the system menu.
+- Linux keeps the system's title bar and its buttons (D64): the window manager draws them
+  (server-side decorations), and on a compositor that leaves them to the application, as GNOME's
+  does on Wayland, Qt's decoration plugin. Qt picks Adwaita's on its own only where it
+  recognises the desktop as GNOME, so ``wayland_decoration`` names it for every GNOME session,
+  such as Ubuntu's ``ubuntu:GNOME``, unless the user chose one. The window's content keeps the
+  48px band below the title bar, without caption buttons.
 
 viewmodels/titlebar.py hands this to Main.qml; on other Qt platforms, such as the tests'
 offscreen one, the window gets the layout without these calls.
@@ -22,7 +29,10 @@ offscreen one, the window gets the layout without these calls.
 from __future__ import annotations
 
 import ctypes
+import os
 import sys
+from collections.abc import Iterable, Mapping
+from pathlib import Path
 from typing import Any, Protocol
 
 from PySide6.QtCore import QAbstractNativeEventFilter, QCoreApplication, QPointF, QRectF, Qt
@@ -31,6 +41,7 @@ from openweir.desktop.objc import ObjC
 
 MAC = "mac"
 WINDOWS = "windows"
+LINUX = "linux"
 
 # What a double-click on the title band does.
 ZOOM = "zoom"
@@ -39,11 +50,15 @@ NONE = "none"
 
 
 def titlebar_style(platform: str = sys.platform) -> str:
-    """The title band follows macOS on macOS and Windows everywhere else."""
-    return MAC if platform == "darwin" else WINDOWS
+    """The title band follows the system: macOS, Linux, and Windows everywhere else."""
+    if platform == "darwin":
+        return MAC
+    return LINUX if platform.startswith("linux") else WINDOWS
 
 
 def window_flags(style: str) -> Qt.WindowType:
+    if style == LINUX:
+        return Qt.WindowType.Window  # the system's title bar, with its buttons
     flags = (
         Qt.WindowType.Window
         | Qt.WindowType.ExpandedClientAreaHint
@@ -59,6 +74,41 @@ def double_click_action(preference: str | None) -> str:
     """macOS's AppleActionOnDoubleClick: "Minimize", "None", or one that zooms ("Maximize",
     the default, and macOS 15's "Fill")."""
     return {"Minimize": MINIMIZE, "None": NONE}.get(preference or "", ZOOM)
+
+
+# -- Linux -----------------------------------------------------------------------------------
+DECORATION_ENV = "QT_WAYLAND_DECORATION"
+DECORATION_DIR = "wayland-decoration-client"
+# Qt's own plugins, in the order we want them: Adwaita looks like GNOME's own windows and follows
+# its light or dark style; Bradient is plain but always there.
+GNOME_DECORATIONS = ("adwaita", "bradient")
+
+
+def wayland_decoration(environ: Mapping[str, str], plugins: Iterable[str]) -> str | None:
+    """The decoration plugin to name in QT_WAYLAND_DECORATION, or None to leave Qt's choice:
+    on GNOME, Adwaita's if Qt has it, else Bradient's; elsewhere, and when the user set the
+    variable, nothing. ``plugins`` are the file names in Qt's wayland-decoration-client
+    folders. A compositor that draws the title bar itself, as KDE's does, needs none."""
+    if DECORATION_ENV in environ:
+        return None
+    desktops = environ.get("XDG_CURRENT_DESKTOP", "").upper().split(":")
+    if "GNOME" not in desktops:
+        return None
+    names = {name.split(".", 1)[0].removeprefix("lib") for name in plugins}
+    return next((plugin for plugin in GNOME_DECORATIONS if plugin in names), None)
+
+
+def use_wayland_decoration(library_paths: Iterable[str]) -> None:
+    """Name the decoration (``wayland_decoration``) in this process's environment. Qt reads
+    the variable as it decorates a window, so this comes before the window is made."""
+    plugins: list[str] = []
+    for path in library_paths:
+        folder = Path(path) / DECORATION_DIR
+        if folder.is_dir():
+            plugins.extend(entry.name for entry in folder.iterdir())
+    plugin = wayland_decoration(os.environ, plugins)
+    if plugin is not None:
+        os.environ[DECORATION_ENV] = plugin
 
 
 # -- macOS -----------------------------------------------------------------------------------
