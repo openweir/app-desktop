@@ -599,6 +599,7 @@ EXCLUDED = (
     # The native Controls style, which on Linux is built on Fusion: the UI uses the Basic
     # style and Templates only.
     "*Qt6QuickControls2Native*",
+    "*/qml/QtQuick/Controls/Native/*",
     "*/qml/QtQuick/NativeStyle/*",
     "*/networkinformation/*",
     # FFmpeg, for Qt Multimedia.
