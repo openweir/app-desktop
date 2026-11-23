@@ -5,7 +5,8 @@ import QtQuick.Layouts
 
 // dialog (DESIGN.md "Components → 对话框"): a modal box on the scrim with a one-line title,
 // a body and a right-aligned button row in the platform's order (buttons are declared
-// cancel first, as on macOS; Windows shows them mirrored).
+// cancel first, as on macOS; Windows shows them mirrored). `leadingButtons`, such as a
+// step's 上一步, sit apart at the row's left end on either platform.
 //
 // Esc rejects. Enter runs the focused button, or `defaultButton` when focus is elsewhere.
 // Focus starts on `initialFocus`, stays inside while the dialog shows and goes back to
@@ -20,6 +21,7 @@ Dialog {
     property int returnFocusReason: Qt.OtherFocusReason
     default property alias content: body.data
     property alias buttons: buttonRow.data
+    property alias leadingButtons: leadingRow.data
     property bool holdsFocus: false  // from opening until it starts to close
 
     // Opens the dialog; `from` gets focus back afterwards, with its focus ring if it had one.
@@ -108,12 +110,26 @@ Dialog {
         }
 
         RowLayout {
-            id: buttonRow
-
-            Layout.alignment: Qt.AlignRight
+            Layout.fillWidth: true
             Layout.topMargin: Theme.space5
-            layoutDirection: Qt.platform.os === "windows" ? Qt.RightToLeft : Qt.LeftToRight
             spacing: Theme.space2
+
+            RowLayout {
+                id: leadingRow
+
+                spacing: Theme.space2
+            }
+
+            Item {
+                Layout.fillWidth: true
+            }
+
+            RowLayout {
+                id: buttonRow
+
+                layoutDirection: Qt.platform.os === "windows" ? Qt.RightToLeft : Qt.LeftToRight
+                spacing: Theme.space2
+            }
         }
     }
 

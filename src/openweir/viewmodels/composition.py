@@ -30,6 +30,7 @@ from openweir.viewmodels.desktop import DesktopViewModel
 from openweir.viewmodels.logs import LogsViewModel
 from openweir.viewmodels.overview import OverviewViewModel
 from openweir.viewmodels.profiles import ProfilesViewModel
+from openweir.viewmodels.provider_sign_in import ProviderSignInViewModel
 from openweir.viewmodels.proxies import ProxiesViewModel
 from openweir.viewmodels.routing import RoutingViewModel
 from openweir.viewmodels.settings import SettingsViewModel
@@ -56,6 +57,7 @@ class ViewModels:
     about: AboutViewModel
     backup: BackupViewModel
     system_extension: SystemExtensionViewModel
+    provider_sign_in: ProviderSignInViewModel
     geo_updates: GeoUpdates
 
     def initial_properties(self) -> dict[str, object]:
@@ -74,6 +76,7 @@ class ViewModels:
             "aboutViewModel": self.about,
             "backupViewModel": self.backup,
             "systemExtensionViewModel": self.system_extension,
+            "providerSignInViewModel": self.provider_sign_in,
         }
 
     def start(self) -> None:
@@ -103,13 +106,19 @@ class ViewModels:
         self.about.retranslate()
         self.backup.retranslate()
         self.system_extension.retranslate()
+        self.provider_sign_in.retranslate()
 
     def open_link(self, link: str) -> None:
         """An install link arrived (docs/release.md §7): show the window and the import form
-        with its subscription filled in; the user imports from there."""
+        with its subscription filled in; the user imports from there. A provider's sign-in
+        link (docs/accounts.md §2) opens the sign-in dialog with its address filled in, over
+        the page that shows; the user signs in from there."""
         self.desktop.showWindow()
-        self.shell.setPage("profiles")
         parsed = links.parse(link)
+        if isinstance(parsed, links.ProviderLink):
+            self.provider_sign_in.open(parsed.origin)
+            return
+        self.shell.setPage("profiles")
         if parsed is None:
             self.profiles.rejectLink()
         else:
@@ -124,6 +133,7 @@ class ViewModels:
         self.desktop.stop()
         self.about.stop()
         self.backup.stop()
+        self.provider_sign_in.stop()
         self.runner.shutdown(finalize=self.host.close)
 
 
@@ -190,6 +200,7 @@ def compose(
     )
     proxies = ProxiesViewModel(host, runner, settings_store)
     profiles = ProfilesViewModel(library, runner, clock)
+    provider_sign_in = ProviderSignInViewModel(library, runner, clock)
     routing = RoutingViewModel(library, runner, settings_store)
     connections = ConnectionsViewModel(host, runner)
     logs = LogsViewModel(host, runner)
@@ -268,6 +279,13 @@ def compose(
     profiles.applied.connect(overview.refreshGroups)
     profiles.applied.connect(proxies.refresh)
     profiles.applied.connect(profiles_applied)
+    # Signing in to a provider adds its subscriptions as profiles, and using one of them
+    # changes what the tunnel runs (docs/accounts.md §7.3).
+    provider_sign_in.profilesChanged.connect(profiles.reload)
+    provider_sign_in.profilesChanged.connect(routing.reload)
+    provider_sign_in.applied.connect(overview.refreshGroups)
+    provider_sign_in.applied.connect(proxies.refresh)
+    provider_sign_in.applied.connect(profiles_applied)
     # One page's change of the pool or the routing shows on the other (routing.md §4.2).
     profiles.routingChanged.connect(routing.reload)
     profiles.routingRequested.connect(lambda: shell.setPage("routing"))
@@ -320,5 +338,6 @@ def compose(
         about,
         backup,
         system_extension,
+        provider_sign_in,
         GeoUpdates(host, GeoDownloader(store.directory / "geodata-cache")),
     )
