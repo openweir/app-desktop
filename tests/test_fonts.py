@@ -33,8 +33,8 @@ from openweir.app import MAIN_QML
 from openweir.fonts import (
     BUNDLED,
     DIRECTORY,
+    EMOJI_BUNDLED,
     bundled_family,
-    colour_emoji_family,
     paints_in_colour,
     register_fonts,
 )
@@ -126,16 +126,20 @@ def test_text_presentation_is_not_forced_to_emoji() -> None:
     assert all(0 not in run.glyphIndexes() for run in runs)
 
 
-def test_emoji_come_from_the_bundled_font_where_qt_paints_it() -> None:
-    """A system font of the same name (Linux's Noto Color Emoji) does not take the bundled
-    one's place by chance; only a Qt that cannot paint the bundled one in colour uses another."""
+def test_emoji_come_from_a_colour_font_qt_paints() -> None:
+    """The bundled font where Qt paints it, rather than a system font of the same name
+    (Linux's Noto Color Emoji); where it cannot, the bundled font is gone again and a system
+    colour font Qt paints takes its place."""
     (family,) = QFontDatabase.applicationEmojiFontFamilies()
-    assert family == colour_emoji_family()
-    bundled = bundled_family("Noto Color Emoji")
-    if paints_in_colour(bundled):
-        assert family == bundled
+    assert paints_in_colour(family)
+    app = QGuiApplication.instance()
+    assert app is not None
+    if app.property(EMOJI_BUNDLED):
+        assert family == bundled_family("Noto Color Emoji")
         ours = QRawFont(str(DIRECTORY / "noto-color-emoji/NotoColorEmoji-Regular.ttf"), 12)
         assert QRawFont.fromFont(QFont(family)).fontTable("head") == ours.fontTable("head")
+    else:
+        assert sys.platform.startswith("linux")
 
 
 @pytest.mark.parametrize("text", ["🌈", "🇯🇵", "👩🏽‍💻", "✈️", "1️⃣"])
