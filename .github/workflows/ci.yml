@@ -316,14 +316,29 @@ jobs:
       - name: Format
         if: runner.os != 'Windows'
         run: test -z "$(gofmt -l .)"
+      # A run's logs need a signed-in account, its annotations don't: a failing go test also
+      # repeats its failures as error annotations.
       - name: Vet and test
+        shell: bash
         run: |
           go vet ./...
-          go test ./...
+          go test ./... 2>&1 | tee "$RUNNER_TEMP/go-test.log" || {
+            status=$?
+            grep -E '^(--- FAIL|FAIL|panic:)|^[[:space:]]+[[:alnum:]_./-]+_test\.go:[0-9]+:' "$RUNNER_TEMP/go-test.log" |
+              head -30 | sed -e 's/%/%25/g' -e 's/^/::error title=go test::/'
+            exit "$status"
+          }
       - name: Race detector
         # Go 1.27's race runtime supports Windows amd64, not Windows arm64.
         if: runner.os != 'Windows' || runner.arch != 'ARM64'
-        run: go test -race ./...
+        shell: bash
+        run: |
+          go test -race ./... 2>&1 | tee "$RUNNER_TEMP/go-race.log" || {
+            status=$?
+            grep -E '^(--- FAIL|FAIL|panic:|WARNING: DATA RACE)|^[[:space:]]+[[:alnum:]_./-]+_test\.go:[0-9]+:' "$RUNNER_TEMP/go-race.log" |
+              head -30 | sed -e 's/%/%25/g' -e 's/^/::error title=go test -race::/'
+            exit "$status"
+          }
       - name: Fork outbounds (macOS native Cronet)
         if: runner.os == 'macOS'
         run: go test -race -tags with_gvisor,with_naive -run '^TestFork' ./internal/engine
