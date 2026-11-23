@@ -18,7 +18,7 @@ func TestCategories(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Equal(sites.GetNames(), []string{"cn", "openai", "private", "telegram"}) || len(sites.GetSha256()) != 64 {
+	if !slices.Equal(sites.GetNames(), []string{"cn", "geolocation-!cn", "openai", "private", "telegram"}) || len(sites.GetSha256()) != 64 {
 		t.Fatalf("geosite = %v", sites)
 	}
 	ips, err := Categories(filepath.Join(dir, "GeoIP.dat"))

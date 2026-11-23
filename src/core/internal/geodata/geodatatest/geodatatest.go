@@ -12,13 +12,15 @@ import (
 )
 
 // Sites and IPs are the categories Write puts in the files. mihomo checks the files with
-// "cn", and the base section's DNS reads "cn" and "private".
+// "cn", the base section's DNS reads "cn" and "private", and the DNS of api-edge's OpenWeir
+// template (testdata/openweir-template.yaml) reads "geolocation-!cn".
 var (
 	Sites = map[string][]string{
-		"cn":       {"example.cn", "baidu.com"},
-		"private":  {"localhost.localdomain"},
-		"telegram": {"telegram.org", "t.me"},
-		"openai":   {"openai.com", "chatgpt.com"},
+		"cn":              {"example.cn", "baidu.com"},
+		"private":         {"localhost.localdomain"},
+		"telegram":        {"telegram.org", "t.me"},
+		"openai":          {"openai.com", "chatgpt.com"},
+		"geolocation-!cn": {"example.com", "google.com"},
 	}
 	IPs = map[string][]string{
 		"cn":       {"1.0.1.0/24"},

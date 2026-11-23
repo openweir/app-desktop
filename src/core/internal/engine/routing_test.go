@@ -300,7 +300,7 @@ func TestInspectSourceAndGeoCategories(t *testing.T) {
 		t.Fatal(err)
 	}
 	sites := categories.GetGeosite()
-	if !slices.Equal(sites.GetNames(), []string{"cn", "openai", "private", "telegram"}) ||
+	if !slices.Equal(sites.GetNames(), []string{"cn", "geolocation-!cn", "openai", "private", "telegram"}) ||
 		len(sites.GetSha256()) != 64 || sites.GetUpdatedAtUnixMs() == 0 {
 		t.Fatalf("geosite = %v", sites)
 	}
