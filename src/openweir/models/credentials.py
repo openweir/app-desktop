@@ -1,7 +1,8 @@
 """Credentials in the system's credential store, not in the database or a backup (decision
 D14): the macOS keychain, the Windows Credential Manager. The first one kept there is the
 WARP exit's account (docs/exits.md §3.2); a new device registers one of its own. The mesh
-networks' secrets follow (docs/mesh.md §10.2).
+networks' secrets follow (docs/mesh.md §10.2), and the provider accounts' sessions
+(docs/accounts.md §4.1).
 
 Code depends on ``CredentialStore``; ``KeyringCredentials`` is the system's store through
 the keyring package. The tests swap ``system_keyring`` for one in memory, so they never
@@ -12,7 +13,7 @@ from __future__ import annotations
 
 import json
 import sys
-from dataclasses import asdict, fields
+from dataclasses import asdict, dataclass, field, fields
 from typing import Protocol
 
 from keyring.backend import KeyringBackend
@@ -24,6 +25,7 @@ from openweir.models.profiles import ProfileError
 SERVICE = "OpenWeir"
 WARP_ACCOUNT = "warp-account"
 MESH_SECRET = "mesh:{id}"  # a mesh network's secrets
+PROVIDER_TOKEN = "provider:{id}"  # a provider account's session, by ProviderRecord.id
 
 
 class CredentialError(ProfileError):
@@ -161,3 +163,52 @@ class MeshSecrets:
 
     def delete(self, network_id: str) -> None:
         self._store.delete(MESH_SECRET.format(id=network_id))
+
+
+@dataclass(frozen=True)
+class ProviderToken:
+    """A provider account's session as stored: Better Auth's bearer token, kept out of
+    ``repr`` so that no log or crash record shows it, and the provider's id of the user it
+    signed in (D56)."""
+
+    token: str = field(repr=False)
+    user_id: str
+
+
+class ProviderTokens:
+    """Each provider account's session, as compact JSON ``{"token": …, "user_id": …}`` under
+    ``provider:<provider id>`` (docs/accounts.md §4.1). Nothing else keeps the token: not the
+    database, a backup, diagnostics or a log. A store that cannot be read or written raises
+    CredentialError ``credentials_unavailable``, which the accounts read as "unknown for
+    now" rather than signed out."""
+
+    def __init__(self, store: CredentialStore) -> None:
+        self._store = store
+
+    def load(self, provider_id: str) -> ProviderToken | None:
+        """The stored session; None when there is none, or none this version reads."""
+        text = self._store.read(PROVIDER_TOKEN.format(id=provider_id))
+        if text is None:
+            return None
+        try:
+            stored = json.loads(text)
+        except ValueError:
+            return None
+        if not isinstance(stored, dict):
+            return None
+        token, user_id = stored.get("token"), stored.get("user_id")
+        if not isinstance(token, str) or not isinstance(user_id, str) or not token or not user_id:
+            return None
+        return ProviderToken(token, user_id)
+
+    def save(self, provider_id: str, token: ProviderToken) -> None:
+        if not token.token or not token.user_id:
+            raise ValueError("a provider session has a token and a user id")
+        value = {"token": token.token, "user_id": token.user_id}
+        self._store.write(
+            PROVIDER_TOKEN.format(id=provider_id), json.dumps(value, separators=(",", ":"))
+        )
+
+    def delete(self, provider_id: str) -> None:
+        """Remove the session; nothing happens when there is none."""
+        self._store.delete(PROVIDER_TOKEN.format(id=provider_id))

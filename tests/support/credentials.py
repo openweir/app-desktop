@@ -3,7 +3,7 @@ Credential Manager."""
 
 from __future__ import annotations
 
-from openweir.models.credentials import CredentialError
+from openweir.models.credentials import CredentialError, ProviderTokens
 
 
 class MemoryKeyring:
@@ -45,3 +45,13 @@ class MemoryCredentials:
     def delete(self, key: str) -> None:
         self._check()
         self.secrets.pop(key, None)
+
+
+class MemoryProviderTokens(ProviderTokens):
+    """ProviderTokens in memory, stored as the system's store would keep them:
+    ``credentials.secrets`` holds the JSON under ``provider:<id>``, and ``credentials.fail``
+    locks the keychain."""
+
+    def __init__(self) -> None:
+        self.credentials = MemoryCredentials()
+        super().__init__(self.credentials)

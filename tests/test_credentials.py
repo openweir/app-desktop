@@ -1,4 +1,8 @@
-"""The credential store (decision D14) and the WARP account in it (docs/exits.md §3.2)."""
+"""The credential store (decision D14), the WARP account in it (docs/exits.md §3.2) and the
+provider accounts' sessions (docs/accounts.md §4.1)."""
+
+import json
+import logging
 
 import pytest
 
@@ -8,9 +12,11 @@ from openweir.models.credentials import (
     WARP_ACCOUNT,
     CredentialError,
     KeyringCredentials,
+    ProviderToken,
+    ProviderTokens,
     WarpAccounts,
 )
-from tests.support.credentials import MemoryCredentials, MemoryKeyring
+from tests.support.credentials import MemoryCredentials, MemoryKeyring, MemoryProviderTokens
 
 ACCOUNT = WarpAccount(
     device_id="a1b2c3d4-0000-4000-8000-000000000000",
@@ -74,3 +80,104 @@ def test_keyring_failures_become_credential_errors(keyring: MemoryKeyring) -> No
     with pytest.raises(CredentialError) as raised:
         KeyringCredentials().write("k", "secret")
     assert raised.value.code == "credentials_unavailable"
+
+
+# -- provider accounts ----------------------------------------------------------------------
+SESSION = ProviderToken("bearer-secret-0123456789abcdef", "user-1")
+
+
+def test_a_provider_session_round_trips_under_its_provider(keyring: MemoryKeyring) -> None:
+    tokens = ProviderTokens(KeyringCredentials())
+    assert tokens.load("p1") is None
+    tokens.save("p1", SESSION)
+    tokens.save("p2", ProviderToken("other", "user-9"))
+    # Compact JSON under provider:<provider id> in the OpenWeir service (D56).
+    stored = keyring.secrets[(SERVICE, "provider:p1")]
+    assert stored == '{"token":"bearer-secret-0123456789abcdef","user_id":"user-1"}'
+    assert len(stored.encode("utf-16-le")) < 2560  # what Windows keeps of a credential
+    assert tokens.load("p1") == SESSION
+    tokens.save("p1", ProviderToken("renewed", "user-1"))
+    assert tokens.load("p1") == ProviderToken("renewed", "user-1")
+    tokens.delete("p1")
+    tokens.delete("p1")  # nothing to delete
+    assert tokens.load("p1") is None
+    assert tokens.load("p2") == ProviderToken("other", "user-9")
+
+
+def test_a_provider_token_is_never_shown(caplog: pytest.LogCaptureFixture) -> None:
+    tokens = MemoryProviderTokens()
+    with caplog.at_level(logging.DEBUG):
+        tokens.save("p1", SESSION)
+        loaded = tokens.load("p1")
+    assert SESSION.token not in repr(loaded)
+    assert SESSION.token not in repr(SESSION)
+    assert "user-1" in repr(SESSION)
+    assert SESSION.token not in caplog.text
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "not json",
+        "[]",
+        "{}",
+        '{"token": "t"}',
+        '{"user_id": "u"}',
+        '{"token": "", "user_id": "u"}',
+        '{"token": "t", "user_id": ""}',
+        '{"token": 1, "user_id": "u"}',
+    ],
+)
+def test_a_session_this_version_cannot_read_is_none(text: str) -> None:
+    tokens = MemoryProviderTokens()
+    tokens.credentials.secrets["provider:p1"] = text
+    assert tokens.load("p1") is None
+
+
+def test_later_fields_of_a_session_are_ignored() -> None:
+    tokens = MemoryProviderTokens()
+    value = {"token": "t", "user_id": "u", "later": True}
+    tokens.credentials.secrets["provider:p1"] = json.dumps(value)
+    assert tokens.load("p1") == ProviderToken("t", "u")
+
+
+@pytest.mark.parametrize("session", [ProviderToken("", "u"), ProviderToken("t", "")])
+def test_an_empty_session_is_not_stored(session: ProviderToken) -> None:
+    tokens = MemoryProviderTokens()
+    with pytest.raises(ValueError, match="a token and a user id"):
+        tokens.save("p1", session)
+    assert tokens.credentials.secrets == {}
+
+
+def test_a_locked_store_is_unavailable_not_signed_out() -> None:
+    """A locked keychain is no missing token: the accounts wait instead of asking for a new
+    sign-in (ProviderState.CREDENTIALS_UNAVAILABLE)."""
+    tokens = MemoryProviderTokens()
+    tokens.save("p1", SESSION)
+    tokens.credentials.fail = True
+    for call in (
+        lambda: tokens.load("p1"),
+        lambda: tokens.save("p1", SESSION),
+        lambda: tokens.delete("p1"),
+    ):
+        with pytest.raises(CredentialError) as raised:
+            call()
+        assert raised.value.code == "credentials_unavailable"
+    tokens.credentials.fail = False
+    assert tokens.load("p1") == SESSION
+
+
+def test_a_locked_system_keyring_is_unavailable(keyring: MemoryKeyring) -> None:
+    from keyring.errors import KeyringLocked
+
+    tokens = ProviderTokens(KeyringCredentials())
+    tokens.save("p1", SESSION)
+
+    def locked(*_: object) -> None:
+        raise KeyringLocked("the keychain is locked")
+
+    keyring.get_password = locked  # type: ignore[method-assign]
+    with pytest.raises(CredentialError) as raised:
+        tokens.load("p1")
+    assert raised.value.code == "credentials_unavailable"
+    assert SESSION.token not in str(raised.value)
