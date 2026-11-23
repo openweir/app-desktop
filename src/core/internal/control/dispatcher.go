@@ -22,6 +22,7 @@ import (
 	"github.com/openweir/app-desktop/src/core/internal/operation"
 	"github.com/openweir/app-desktop/src/core/internal/peer"
 	"github.com/openweir/app-desktop/src/core/internal/product"
+	"github.com/openweir/app-desktop/src/core/internal/sysproxy"
 	"github.com/openweir/app-desktop/src/core/internal/warp"
 )
 
@@ -47,6 +48,7 @@ const (
 	// could only show as it is (docs/architecture.md §4.3).
 	CodeInboundFailed             = "inbound_failed"
 	CodeSystemProxyFailed         = "system_proxy_failed"
+	CodeSystemProxyUnavailable    = "system_proxy_unavailable"
 	CodeStartedWithoutSystemProxy = "started_without_system_proxy"
 	CodeProviderUpdateFailed      = "provider_update_failed"
 	CodeMeshLoginFailed           = "mesh_login_failed"
@@ -574,7 +576,12 @@ func (d *Dispatcher) systemProxy(enabled bool) *controlpb.Response {
 	if response := d.systemProxyServed(); response != nil {
 		return response
 	}
-	return d.result(coded(CodeSystemProxyFailed, d.host.SetSystemProxy(enabled)))
+	err := d.host.SetSystemProxy(enabled)
+	if errors.Is(err, sysproxy.ErrUnsupportedDesktop) {
+		// Trying again will not help: the UI turns the row off instead (Linux, D63).
+		return failure(CodeSystemProxyUnavailable, err.Error())
+	}
+	return d.result(coded(CodeSystemProxyFailed, err))
 }
 
 // systemProxyServed is nil when this host can turn the system proxy on, and the refusal

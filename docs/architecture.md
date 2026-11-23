@@ -468,6 +468,7 @@ Windows 上 UI 断线后按退避间隔重连，并重新建立订阅。
 | `apply_failed` | 配置没有生效：macOS 扩展没能把 TUN 交给 mihomo；`message` 是原因 | 是 |
 | `inbound_failed` | 端口或 TUN 没有打开：`Start`、`Reload` 前试开的新端口被占用，或应用后 mihomo 没能打开（原因只在它的日志里）。`message` 只列出它们，如 `mixed-port 9347, TUN`，由界面措辞。`Start` 时内核停在失败状态；`Reload` 试开失败时保留原来的配置，应用后才失败时其余部分照常生效 | 是 |
 | `system_proxy_failed` | Windows 服务没能写属主的系统代理，或没能写回他原来的设置（`SetSystemProxy`；`Stop` 时隧道已经断开） | 是 |
+| `system_proxy_unavailable` | Linux 上属主的桌面没有服务能写的代理设置（只支持 GNOME 和 KDE，D63），`SetSystemProxy` 开不了系统代理；界面把这一行设为不可用 | 否 |
 | `started_without_system_proxy` | `Start` 或 `Reload` 已经生效，隧道在运行，但系统代理没能按 `RunOptions` 更改 | 是 |
 | `provider_update_failed` | mihomo 没能更新 provider；`message` 是它的原文 | 是 |
 | `mesh_login_failed` | 组网出站没有给出登录链接 | 是 |
