@@ -318,14 +318,31 @@ v1 只做原生登录（D56）：
 
 ## 8. 存储、备份与诊断
 
-- **备份快照 v2**（D59，`models/backup.py`）：加入 `providers`，字段为 `id`、`origin`、`name`、`account`、`user_id`、
-  `position`、`created_at`、`updated_at`，删除的记为墓碑；配置可以是 `kind: "provider"`，带 `provider_id` 和
-  `remote_id`，没有 `url` 和原文。不含令牌、链接和 `provider_subscriptions`。v1 的快照照样能恢复；旧版本读 v2 报
-  `newer_backup`。
-- **恢复**：恢复出来的服务商是 `sign_in_required`，它的配置没有原文（D27 已处理没有原文的配置）。重新登录同一个
-  `user_id` 后按 `remote_id` 对上配置；登录的是另一个账户时按第 2 节先问是否替换，替换会移除恢复出来的配置。
-- **诊断**只写白名单里的内容：服务商的个数；每个服务商的状态（`ProviderState`）；每份服务商配置的接入方式和条件。
-  不写 origin、邮箱、用户 id、令牌和链接。
+- **备份快照 v2**（D59，`models/backup.py`，格式见 [storage.md](storage.md) 第 3 节）：加入 `providers`，字段为
+  `id`、`origin`、`name`、`account`、`user_id`、`position`、`created_at`、`updated_at`，退出登录的记为墓碑；配置
+  可以是 `kind: "provider"`，带 `provider_id` 和 `remote_id`，没有 `url`、`path` 和原文。不含令牌、链接和
+  `provider_subscriptions`。带 `user_id` 是因为恢复后重新登录要靠它分辨是不是同一个账户（下一条）；它是服务商那边的
+  用户 id，不比 `account` 多透露什么。v1 的快照照样能恢复，而且不动本机的服务商和它们的配置（"替换"也一样）；1.x
+  读 v2 报 `newer_backup`。
+- **恢复**：恢复出来的服务商是 `sign_in_required`，它的配置留着 `provider_id` 和 `remote_id`，没有原文（D27 已处理
+  没有原文的配置），账单缓存也没有，要等登录后的同步。重新登录时 `by_origin` 找到恢复出来的记录：同一个 `user_id`
+  就把令牌存在它的 id 下，同步按 `remote_id` 对上配置；登录的是另一个账户时按第 2 节先问是否替换，替换会移除恢复
+  出来的配置。
+- **一个 origin 一个服务商**：两台设备各自登录同一个服务商后互相合并，本机登录着的留下，快照里的那个连同它的配置和
+  覆写不写进来，不留墓碑，所以两台设备都不用重新登录，也不会互相删掉对方的账户；正在用的配置换成本机同一账户、
+  同一 `remote_id` 的那个。同一份订阅在两台设备上各有一个配置时同理。另一台设备退出登录后，合并它的快照会移除
+  这里的这个服务商和它的全部配置（退出登录的墓碑更新时）。细节见 [storage.md](storage.md) 第 3 节"恢复"。
+- 恢复之后，`AccountsService` 要从数据库重新读服务商，并删掉已不在的服务商留在凭据库里的令牌（"替换"或合并来的
+  退出登录会让本机的服务商记录变成墓碑）。
+- **诊断**（`diagnostics.read_accounts`，在工作线程上读）只写白名单里的内容，在 `settings.json` 里：
+  - `accounts`：服务商的个数（`providers`）和每个的状态（`states`）：`signed_in`（凭据库里有令牌）、
+    `sign_in_required`（没有）、`credentials_unavailable`（读凭据库出错）。令牌只用来判断有没有，不写出去；读数据库
+    出错时只写 `{"error": "storage_failed"}`。没读（导出时没传进来）是 `null`；
+  - 每份 `kind` 为 `provider` 的配置多一项 `billing`：上次同步的接入方式（`access`）、状态（`status`）和是否可用
+    （`usable`），还没同步过是 `null`。接入方式和状态是服务商给的文字，只写应用认识的值（`link`、`both`、`app`；
+    `active`、`disabled`、`expired`），其余写 `other`。
+
+  不写 origin、站点名、邮箱或账户名、用户 id、令牌、套餐名和任何链接，凭据库和数据库报错的原话也不写。
 
 ## 9. 隐私
 

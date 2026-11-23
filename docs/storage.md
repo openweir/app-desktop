@@ -62,7 +62,7 @@
 | `state` | 只属于本机的状态（`key`、`value`（JSON）、`updated_at`）：每个备份目标上次上传的快照摘要（`backup_digest:<目标 id>`）；VPN Gate 出口的服务器列表、在用的服务器和近一小时失效的服务器（`vpngate`，exits.md 5.2 节） |
 | `backup_targets` | 已开启的备份目标：`id`、提供方、显示用的账户名、上次成功备份的时间、上次的错误、`created_at`、`updated_at`、`deleted_at`。不存令牌（见 4 节） |
 | `providers` | 登录过的服务商（数据库 v4，[accounts.md](accounts.md) 5.1 节）：`id`、`origin`、`name`（站点名）、`account`（显示的账户名）、`user_id`（服务商的用户 id）、`position`、`created_at`、`updated_at`、`deleted_at`。退出登录是软删除。令牌不在这里，在系统凭据库 |
-| `provider_subscriptions` | 服务商的每份配置上次同步时的账单（数据库 v4）：`profile_id`、`data`（`RemoteSubscription.record()` 的 JSON，不含订阅链接）、`synced_at`。这是本机缓存，不进备份；配置删除时（`delete_config`）、服务商退出登录时一并删除 |
+| `provider_subscriptions` | 服务商的每份配置上次同步时的账单（数据库 v4）：`profile_id`、`data`（`RemoteSubscription.record()` 的 JSON，不含订阅链接）、`synced_at`。这是本机缓存，不进备份；配置删除时（`delete_config`）、服务商退出登录时、恢复备份后配置已不在时一并删除 |
 | `mesh_networks` | 应用内添加的组网网络：`id`、`kind`（`tailscale` / `zerotier` / `easytier`）、`name`、`via`、`settings`（JSON，不含凭据）、`position`、`created_at`、`updated_at`、`deleted_at`。凭据在系统凭据库（mesh.md 10.2 节） |
 
 当前使用的配置存在 `routing_state` 里，作为"订阅自带"时用的配置（routing.md 第 9 节），不在 `state` 里。
@@ -84,11 +84,17 @@ D13 定下的方式是**备份与恢复**，不做多设备双向同步：
 
 **快照内容**：一个 UTF-8 的 JSON 文档（`models/backup.py`），包含以下字段：
 
-- `format`（固定为 `"openweir-backup"`）、`version`（目前为 1）、`created_at`（Unix 秒）、`device`（设备名，取主机名并去掉
-  `.local`）、`app_version`；
+- `format`（固定为 `"openweir-backup"`）、`version`（目前为 2；1 是加入服务商账户之前的格式，D59）、`created_at`
+  （Unix 秒）、`device`（设备名，取主机名并去掉 `.local`）、`app_version`；
 - `profiles`：配置列表，按列表顺序。每条有 `id`、`name`、`kind`、`url`、`path`、`auto_update_hours`、`in_pool`、
   `position`、`created_at`、`updated_at`。订阅只存链接和更新设置，不存下载到的内容；本地文件配置另有
   `config`（`yaml` 原文和它的 `updated_at`，即 `profile_contents.updated_at`）；粘贴的节点链接同样以原文保存在这份记录中，恢复后由内核重新读取，未通过的批次不进入节点池；
+  服务商的配置（`kind` 为 `provider`，v2）没有 `url`、`path` 和 `config`，换成 `provider_id` 和 `remote_id`
+  （所属的服务商和订阅在那里的 id），原文登录后经账户重新下载；
+- `providers`（v2）：登录过的服务商，`id`、`origin`、`name`（站点名）、`account`（显示的账户名）、`user_id`、
+  `position`、`created_at`、`updated_at`。`user_id` 是服务商那边的用户 id，恢复后重新登录时靠它分辨是不是同一个
+  账户：是就按 `remote_id` 接上恢复出来的配置，不是就先问是否替换（[accounts.md](accounts.md) 第 2、8 节）；它不比
+  `account` 多透露什么。会话令牌不在快照里，恢复出来的服务商要重新登录；
 - `overrides`：全部覆写，`scope`、`yaml`、`updated_at`；
 - `routing`：`mode`、`profile_id`（当前使用的配置）、`plan_id`（当前使用的方案）、`info_pattern`（信息节点表达式）、
   `updated_at`，以及 `plans`：全部分流方案，每套带 `groups` 和 `rules`，字段与表相同，`egress`、`conditions`、
@@ -98,15 +104,17 @@ D13 定下的方式是**备份与恢复**，不做多设备双向同步：
 
 快照不包含用量、下载缓存（`profile_contents` 里订阅的原文和下载信息）、服务商的账单缓存（`provider_subscriptions`）、
 本机范围的设置、`state` 和 `backup_targets`，也不包含任何令牌（包括服务商的会话令牌）、服务商订阅的链接、WARP 账户
-和组网网络的凭据。恢复出来的网络要重新登录或重新填写密钥（mesh.md 10.2 节）。
+和组网网络的凭据。恢复出来的网络要重新登录或重新填写密钥（mesh.md 10.2 节），恢复出来的服务商要重新登录。
 
-- **删除的记录**：配置、覆写、方案、策略组、规则条目和组网网络删除后只留**墓碑**：主键、`updated_at` 和 `deleted_at`，
-  不带内容，所以删掉的订阅链接不会一直留在备份里。删除的方案不带它的策略组和规则。墓碑在本机保留 90 天
-  （第 2 节），清除之后快照里也就没有了。
+- **删除的记录**：配置、覆写、方案、策略组、规则条目、组网网络和服务商删除（退出登录）后只留**墓碑**：主键、
+  `updated_at` 和 `deleted_at`，不带内容，所以删掉的订阅链接不会一直留在备份里。删除的方案不带它的策略组和规则。
+  墓碑在本机保留 90 天（第 2 节），清除之后快照里也就没有了。
 - **摘要**：去掉 `format`、`version`、`created_at`、`device`、`app_version` 之后，按键排序的紧凑 JSON 的 SHA-256。
   同样的数据不论何时、在哪台设备上导出，摘要都相同；订阅更新、用量变化、本机设置的改动都不改变摘要。
 - **读取**：超过 64 MiB、不是 JSON、`format` 不对或字段类型不对的文件报 `not_a_backup`（或 `too_large`）；`version`
-  比本程序认识的新报 `newer_backup`。所有记录都在写入数据库之前检查过。
+  比本程序认识的新报 `newer_backup`，所以 1.x 读 v2 的快照报 `newer_backup`，而本版本照样读 v1。所有记录都在写入
+  数据库之前检查过；服务商的配置还要有非空的 `provider_id` 和整数的 `remote_id`，带 `url`、`path` 或 `config` 的
+  不是快照（链接只在内存里，D57），v1 里出现 `provider` 种类也不是。
 
 **不加密**（D13）：快照里的订阅链接和本地文件配置的 YAML 原文（其中可能有组网出站的凭据，[mesh.md](mesh.md)
 第 7 节）都是明文，安全性依赖保管文件的人和云端账户（Apple 账户、Google 账户）本身。界面不为此单独提示：导出、开启
@@ -165,13 +173,30 @@ iCloud、登录 Google Drive 都不弹确认框（D30）；[PRIVACY.md](../PRIVA
   把本机记录标记删除，本机没有这条记录时什么也不做。策略组按（`plan_id`，`id`）、规则条目按 `id`，各自比较；
   合并出的规则指向已删除的策略组时，内核把它交给"节点选择"并在报告里说明（routing.md 8.1 节）。本地文件配置
   的原文是单独的一条记录，按它自己的 `updated_at` 比较。`synced` 设置逐项比较，`routing_state` 整行比较。
-  两台设备互相合并对方的快照之后，数据相同。
-- 两种方式都只接受本版本认识的 `synced` 设置和它接受的值；本地设置不动。不再存在的配置的下载缓存一并删除。
+  两台设备互相合并对方的快照之后，数据相同（下面"同一个 origin 的两个服务商"和"一份订阅一个配置"是例外）。
+- 两种方式都只接受本版本认识的 `synced` 设置和它接受的值；本地设置不动。不再存在的配置的下载缓存和账单缓存
+  （`provider_subscriptions`）一并删除。
+- **v1 的快照**不知道服务商账户：两种方式都不动本机的服务商、它们的配置和这些配置的覆写，"替换"也一样；其余照上面
+  恢复。
+- **同一个 origin 的两个服务商**：两台设备各自登录了同一个服务商，各有一条服务商记录（id 不同）和各自的配置，
+  合并后会有两个已登录的服务商在同一个 origin 上，违反"每个 origin 一个账户"（D55）。规则是**本机登录着的留下，
+  快照里的那个连同它的配置和这些配置的覆写不写进来**（不是标记删除，不留墓碑）。会话令牌按服务商的 id 存在本机的
+  凭据库里，留下本机的就不用重新登录；不写墓碑，那台设备合并这里的快照时同样留下它自己的，两边不会互相删掉对方
+  的账户，各留各的，直到一边"替换"或退出登录。快照里正在用的配置被留在外面、
+  而两边是同一个账户（`user_id` 相同）时，改用本机对应同一份订阅（`remote_id` 相同）的配置；不是同一个账户时
+  当前配置就不在了，按第一份带规则的配置接替（见下）。两个都不是本机登录着的（"替换"，或快照本身有两个）时，
+  留下快照里排在前面的。
+- **一份订阅一个配置**：两台设备共用一个服务商，各自为新出现的订阅加了配置时，同一份订阅（同一个服务商、同一个
+  `remote_id`）会有两个配置。按同样的规则，本机的留下，快照的不写进来，正在用的改用本机的那个。
+- **服务商不在了，它的配置也不在**：合并取了另一台设备的退出登录（服务商的墓碑比本机这条记录新），而它的某个
+  配置在本机改得更晚（同步改了名称、加了覆写）时，这个配置会单独留下来。恢复的最后把这样的配置连同覆写标记删除，
+  时间是现在，和退出登录移除配置一样（[accounts.md](accounts.md) 4.4 节）。
 - 写入由 `ProfileLibrary.profiles.restore(write)` 在它的锁里执行，所以订阅的自动更新不会拿旧的列表覆盖恢复的数据。写完后
   它重新读取配置、分流和方案，再逐份检查：订阅重新下载，本地文件配置用快照里的原文，和导入时一样经
   `inspect_source`，带规则的再经 `validate`，"我的方案"节点池里的还要和方案一起拼装校验。失败的配置保留，记为
-  "更新失败"，在订阅页标出；还没下载到原文的订阅不给节点池提供节点。没有内核能读时（macOS 隧道未连接）原文存为
-  未读，连接时再读。当前配置不在了时，按第一份带规则的配置接替。
+  "更新失败"，在订阅页标出；还没下载到原文的订阅不给节点池提供节点。服务商的配置经账户重新下载；恢复出来、本机
+  没有会话的服务商是「需要重新登录」，它的配置留着、没有原文（[accounts.md](accounts.md) 第 8 节）。没有内核能读时
+  （macOS 隧道未连接）原文存为未读，连接时再读。当前配置不在了时，按第一份带规则的配置接替。
   最后，隧道在运行就按恢复后的分流重新加载；重新加载失败时，数据仍是恢复后的，界面说明隧道没有切换。设置存储
   随后 `reload()`，各页重新读取。
 

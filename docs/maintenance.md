@@ -405,7 +405,7 @@ exits.md 第 9 节的待实测项。
 - **数据库表结构**：改表就在 `src/openweir/models/database.py` 的 `MIGRATIONS` 末尾追加一个迁移，`SCHEMA_VERSION`
   随之加一；已经发布的迁移不再修改。每个迁移都要有测试：用上一个版本的表结构和数据建库，打开后数据完整
   （[storage.md](storage.md) 第 2 节）。
-- **存下的格式要让后来的版本能读**：数据库里的设置和记录、备份快照（`openweir-backup`，版本 1）、方案 JSON（版本 1，
+- **存下的格式要让后来的版本能读**：数据库里的设置和记录、备份快照（`openweir-backup`，版本 2）、方案 JSON（版本 1，
   [routing.md](routing.md) §8.5）、Windows 服务 home 里的 `profile.json`、`state.json` 和 `owner.json`。只加有默认值的
   字段；不得不改格式时升版本号，并保留读旧版本的代码。旧版本的应用遇到新格式时：数据库改名放到一边
   （`.bad`）、换一个空库，快照拒绝恢复（`newer_backup`）。
