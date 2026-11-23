@@ -16,7 +16,8 @@ import (
 // requestTakeOver asks the service on conn to stop another user's tunnel and make the user
 // running this the owner (decision D5b, docs/architecture.md §5.4). The UI runs the helper
 // that sends it elevated; the service then restarts for its new owner, so service_restarting
-// is the answer that means it worked.
+// is the answer that means it worked. On Linux the helper runs as root, whom the service never
+// makes the owner: it restarts with none, and the administrator's UI then claims (D66).
 func requestTakeOver(conn io.ReadWriter) error {
 	request, err := proto.Marshal(&controlpb.Request{
 		ProtocolVersion: product.ProtocolVersion,

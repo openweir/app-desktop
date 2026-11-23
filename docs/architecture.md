@@ -974,7 +974,7 @@ NSIS 及自定义安装窗口是 x86 引导组件，由系统仿真运行。更�
   mihomo 的 home 放在其中的 `dev-core`，不碰用户数据目录；"登录时打开"在源码运行时本来就不可用。
 
 - **本机开发不得改动本机网络**：开发机就是日常使用的机器，开发模式必须满足以下各条，并有测试覆盖
-  （`internal/engine/admission_test.go` 的 `TestNoTUN*`，`service/service_unix_test.go` 用真实的开发服务接线验证）：
+  （`internal/engine/admission_test.go` 的 `TestNoTUN*`，`service/service_dev_unix_test.go` 用真实的开发服务接线验证）：
   - 不创建 TUN；用户配置或覆写里的 `tun`、`auto-route`、`auto-redirect`、`tproxy-port`、`redir-port` 一律被清除；
   - 混合端口和其他入站只监听 `127.0.0.1`，强制关闭 `allow-lan`；
   - 不设置系统代理，不修改路由和系统 DNS；

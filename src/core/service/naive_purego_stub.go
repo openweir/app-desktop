@@ -1,4 +1,4 @@
-//go:build windows && (!with_naive || !with_purego)
+//go:build (windows || linux) && (!with_naive || !with_purego)
 
 package main
 

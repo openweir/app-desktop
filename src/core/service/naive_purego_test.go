@@ -1,4 +1,4 @@
-//go:build windows && with_naive && with_purego
+//go:build (windows || linux) && with_naive && with_purego
 
 package main
 
@@ -26,12 +26,12 @@ func TestNaiveRuntimePinnedToInstallDirectory(t *testing.T) {
 	}
 	directory := t.TempDir()
 	err := loadNativeRuntime(directory)
-	if err == nil || !strings.Contains(err.Error(), filepath.Join(directory, "libcronet.dll")) {
+	if err == nil || !strings.Contains(err.Error(), filepath.Join(directory, nativeLibrary())) {
 		t.Fatalf("missing installed library must fail at its absolute path: %v", err)
 	}
 	// This is the binding imported by the fork's Naive adapter. A service loader
 	// accidentally linked to the old binding would leave this loader uninitialized,
-	// allowing it to search PATH instead of retaining the original failure.
+	// allowing it to search PATH or LD_LIBRARY_PATH instead of retaining the original failure.
 	if again := cronet.LoadLibrary(""); again != err {
 		t.Fatalf("service and Naive must share the same pinned loader: first=%v, next=%v", err, again)
 	}

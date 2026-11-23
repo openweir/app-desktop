@@ -10,7 +10,8 @@ import (
 )
 
 // UnixSocketVerifier backs the development socket (docs/architecture.md §11): it accepts
-// any process running as allowedUID. Release builds never listen on a Unix socket.
+// any process running as allowedUID. The Linux release's socket checks its callers with
+// LinuxClientVerifier instead.
 func UnixSocketVerifier(allowedUID uint32) Verifier {
 	return func(conn net.Conn) (net.Conn, Identity, error) {
 		unixConn, ok := conn.(*net.UnixConn)
