@@ -3,7 +3,7 @@ each scroll in their own box, which makes only the rows in sight (DESIGN.md "页
 "焦点与键盘")."""
 
 import pytest
-from PySide6.QtCore import QPointF, Qt
+from PySide6.QtCore import Q_ARG, Q_RETURN_ARG, QMetaObject, QPointF, Qt
 from PySide6.QtQuick import QQuickItem
 from pytestqt.qtbot import QtBot
 
@@ -54,10 +54,19 @@ def row(view: QQuickItem, name: str) -> QQuickItem | None:
 
 def made(view: QQuickItem) -> list[QQuickItem]:
     """The rows the list shows. The nodes' list reuses its rows: one it put back in its pool
-    stays in the tree, hidden, with what it showed last."""
+    stays in the tree with what it showed last, and Qt only culls it, so it still reads as
+    visible; a row counts while the list has it at its index."""
+
+    def shown(item: QQuickItem) -> bool:
+        index = item.property("index")
+        at = QMetaObject.invokeMethod(
+            view, "itemAtIndex", Q_RETURN_ARG("QQuickItem*"), Q_ARG(int, index)
+        )
+        return at is item
+
     return find_all(
         view,
-        lambda i: isinstance(i.property("name"), str) and i.activeFocusOnTab() and i.isVisible(),
+        lambda i: isinstance(i.property("name"), str) and i.activeFocusOnTab() and shown(i),
     )
 
 
