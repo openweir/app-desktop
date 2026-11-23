@@ -33,18 +33,24 @@ import (
 var errRoot = errors.New("the development server must not run as root: it never creates a TUN or changes the network")
 
 func run() error {
-	socket := flag.String("socket", "", "development socket path (required)")
+	socket := flag.String("socket", "", "run the development server on this socket path")
 	home := flag.String("home", "", "mihomo home directory (default: the user config directory)")
 	template := flag.Bool("routing-template", false, "fetch subconv's routing template for subscriptions without usable rules (D54); off, as the end-to-end tests expect")
+	modes := registerModes(flag.CommandLine)
 	flag.Parse()
-	if *socket == "" {
-		return errors.New("-socket is required: off Windows the service only runs as a development server")
+	release, err := modes.selected(*socket != "", flag.Args())
+	switch {
+	case err != nil:
+		return err
+	case release != nil:
+		return release()
+	case *socket == "":
+		return errors.New(noMode)
 	}
 	if err := refuseRoot(os.Geteuid()); err != nil {
 		return err
 	}
 	if *home == "" {
-		var err error
 		if *home, err = developmentHome(); err != nil {
 			return err
 		}
