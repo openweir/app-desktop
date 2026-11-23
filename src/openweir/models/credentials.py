@@ -17,7 +17,7 @@ import sys
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field, fields
-from typing import Protocol
+from typing import Protocol, cast
 
 from keyring.errors import KeyringError
 
@@ -68,7 +68,9 @@ def system_keyring() -> Keyring:
     if sys.platform == "win32":
         from keyring.backends import Windows
 
-        return Windows.WinVaultKeyring()
+        # Typed as returning its DecodingCredential; get_password gives that credential's
+        # value, the password string.
+        return cast(Keyring, Windows.WinVaultKeyring())
     if sys.platform == "linux":
         return secret_service()
     import keyring

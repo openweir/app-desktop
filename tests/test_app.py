@@ -841,6 +841,7 @@ def test_ctrl_q_quits_and_disconnects_first(qtbot: QtBot, loaded: Loaded) -> Non
 
 @pytest.mark.skipif(sys.platform == "win32", reason="Windows always has its service's pipe")
 def test_the_development_socket_wins(tmp_path: Path) -> None:
+    assert sys.platform != "win32"  # for the type checker: Unix sockets
     path = str(tmp_path / "dev.sock")
     host = default_host({DEV_SOCKET_ENV: path}, mark_package(tmp_path))
     assert isinstance(host, ServiceHost)
@@ -925,6 +926,7 @@ def mark_package(directory: Path) -> str:
 
 @pytest.mark.skipif(sys.platform == "win32", reason="the release service's Unix socket")
 def test_a_missing_socket_names_the_unit(tmp_path: Path) -> None:
+    assert sys.platform != "win32"  # for the type checker: Unix sockets
     from openweir.host.transport import unix_opener
 
     path = str(tmp_path / "control.sock")

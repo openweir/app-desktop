@@ -214,6 +214,7 @@ def test_no_session_bus_is_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
     here."""
     if sys.platform != "linux":
         pytest.skip("the Secret Service is Linux's")
+    assert sys.platform == "linux"  # for the type checker, which can't tell skip() ends here
     import secretstorage
     from secretstorage.exceptions import SecretServiceNotAvailableException
 
@@ -259,6 +260,7 @@ def test_secret_service_failures_are_unavailable(
 ) -> None:
     if sys.platform != "linux":
         pytest.skip("the Secret Service is Linux's")
+    assert sys.platform == "linux"  # for the type checker, which can't tell skip() ends here
     from jeepney.low_level import Endianness, Header, HeaderFields, Message, MessageType
     from jeepney.wrappers import DBusErrorResponse
     from keyring.errors import KeyringLocked

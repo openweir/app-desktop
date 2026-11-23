@@ -68,6 +68,7 @@ def test_groups_that_cannot_be_read_make_no_administrator() -> None:
 
 @pytest.mark.skipif(sys.platform == "win32", reason="the user database is Unix's")
 def test_the_users_own_groups() -> None:
+    assert sys.platform != "win32"  # for the type checker: grp is Unix's
     import grp
 
     assert grp.getgrgid(os.getgid()).gr_name in elevation.user_groups()
