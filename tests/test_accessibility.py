@@ -7,6 +7,7 @@ navigation turned on in the system settings.
 import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QAccessible
+from PySide6.QtQml import QQmlEngine, QQmlExpression
 from PySide6.QtQuick import QQuickItem
 from pytestqt.qtbot import QtBot
 
@@ -192,6 +193,31 @@ def test_a_switch_between_views_is_a_tab_list(qtbot: QtBot, loaded: Loaded) -> N
     radios = find_all(mode, lambda i: accessible(i).role == Role.RadioButton)
     assert len(radios) == 2
     assert not any(accessible(r).selected for r in radios)
+    assert loaded.warnings == []
+
+
+@pytest.mark.usefixtures("screen_reader")
+@pytest.mark.parametrize(
+    ("loaded", "version", "joined"),
+    [("zh", "版本 {}", f"OpenAI{COMMA}订阅 A"), ("en", "Version {}", "OpenAI, 订阅 A")],
+    indirect=["loaded"],
+)
+def test_names_built_from_parts_follow_the_language(
+    qtbot: QtBot, loaded: Loaded, version: str, joined: str
+) -> None:
+    """Translators choose the word order of a name built around a value, and the separator
+    between the parts a screen reader reads (DESIGN.md "英文文案")."""
+    about = loaded.view_models.about
+    page = show_page(qtbot, loaded, "settings")
+    value = find(page, lambda i: i.property("text") == about.property("version"))
+    assert value is not None
+    assert accessible(value).name == version.format(about.property("version"))
+
+    context = QQmlEngine.contextForObject(loaded.window)
+    expression = QQmlExpression(
+        context, loaded.window, 'ScreenReader.join(["OpenAI", "", "订阅 A"])'
+    )
+    assert expression.evaluate()[0] == joined
     assert loaded.warnings == []
 
 

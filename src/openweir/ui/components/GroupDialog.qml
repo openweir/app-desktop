@@ -424,7 +424,7 @@ AppDialog {
                         width: ListView.view.width
                         height: Theme.controlSm
                         Accessible.role: Accessible.ListItem
-                        Accessible.name: [name, source, delay].filter(part => part !== "").join("，")
+                        Accessible.name: ScreenReader.join([name, source, delay])
 
                         Rectangle {
                             visible: member.index > 0

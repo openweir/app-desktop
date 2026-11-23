@@ -3861,12 +3861,20 @@ prepend-rules:
         <translation>Not used</translation>
     </message>
     <message>
+        <source>TUN 模式 %1</source>
+        <translation>TUN mode %1</translation>
+    </message>
+    <message>
         <source>两项都关闭时，连接后只开放混合端口</source>
         <translation>With both off, connecting opens the mixed port only</translation>
     </message>
     <message>
         <source>游戏、语音通话等 UDP 流量不经过系统代理，需要 TUN 模式</source>
         <translation>UDP traffic such as games and voice calls bypasses the system proxy; it needs TUN mode</translation>
+    </message>
+    <message>
+        <source>系统代理 %1</source>
+        <translation>System proxy %1</translation>
     </message>
     <message>
         <source>混合端口</source>
@@ -3971,6 +3979,10 @@ prepend-rules:
     <message>
         <source>停用 OpenWeir 的网络扩展</source>
         <translation>Deactivate the OpenWeir network extension</translation>
+    </message>
+    <message>
+        <source>版本 %1</source>
+        <translation>Version %1</translation>
     </message>
     <message>
         <source>崩溃报告</source>

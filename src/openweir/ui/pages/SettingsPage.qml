@@ -119,7 +119,7 @@ ScrollView {
                                 text: page.overview.takeover === "tun" ? qsTr("已启用") : qsTr("不使用")
                                 role: Theme.type.bodySm
                                 color: Theme.textSecondary
-                                Accessible.name: qsTr("TUN 模式") + " " + text
+                                Accessible.name: qsTr("TUN 模式 %1").arg(text)
                             }
                         }
 
@@ -172,7 +172,7 @@ ScrollView {
                                 text: qsTr("不使用")
                                 role: Theme.type.bodySm
                                 color: Theme.textSecondary
-                                Accessible.name: qsTr("系统代理") + " " + text
+                                Accessible.name: qsTr("系统代理 %1").arg(text)
                             }
                         }
 
@@ -812,7 +812,7 @@ ScrollView {
                                 text: page.about.version
                                 role: Theme.type.dataMd
                                 color: Theme.textSecondary
-                                Accessible.name: qsTr("版本") + " " + text
+                                Accessible.name: qsTr("版本 %1").arg(text)
                             }
 
                             LinkButton {
