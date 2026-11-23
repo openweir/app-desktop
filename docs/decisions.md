@@ -1,6 +1,6 @@
 # 决策
 
-本文记录 OpenWeir 的设计决策。代码注释和其他文档按编号引用它们（如"D19"），所以编号不变、不重用；新的决策从 D55
+本文记录 OpenWeir 的设计决策。代码注释和其他文档按编号引用它们（如"D19"），所以编号不变、不重用；新的决策从 D60
 接着编号。每条只写结论，理由和细节在"详见"一栏的文档里。
 
 ## 待决策
@@ -66,3 +66,8 @@
 | D52 | openweir/mihomo 不再有 `main` 分支：`Alpha` 是上游 `Alpha` 合并本项目的改动（以 `git merge upstream/Alpha` 跟进，不变基；`git log upstream/Alpha..Alpha` 列出本项目加的提交），`Meta` 仍是上游的原样镜像。内核只从 `Alpha` 发版，版本号仍是 `openweir-vX.Y.Z`，由 `VERSION` 和 `constant.Version` 一起给出，发版标签保留对应的源代码（D43）；应用的 replace 只固定到这样的发版提交，从 `Alpha` 发的第一个是 `openweir-v1.0.1`。取代 D51 的分支部分：上游的改动和本项目的改动在同一个分支上对照，不用每次变基后强推 | [maintenance.md](maintenance.md) §5.4 |
 | D53 | 混合端口默认 9347（电话键盘上的 "WEIR"），与 OpenWeir 面板的模板、subconv 的默认头部和其他 OpenWeir 客户端一致，取代 Clash 的 7890。基础段（`base.yaml`）写 9347；设置只存用户改过的值，所以没改过端口的安装升级后也改用 9347，改过的照旧。Windows 服务下次连接时把系统代理指向新端口；系统代理里残留的、服务自己写的设置（`127.0.0.1:<端口>` 加服务的例外列表，如旧版本留下的 7890）不当作用户自己的设置保存，已经存下的也不还原，用户关闭系统代理后得到的是不用代理，不是指向已经关闭的端口 | [ui.md](ui.md) §8、[architecture.md](architecture.md) §5.5 |
 | D54 | 每一份订阅都经 [subconv](https://github.com/openweir/subconv) 读取，取代 D50：`compose.Normalize` 用 subconv（v0.5.0）读 mihomo/Clash/Stash YAML、sing-box 与 Xray JSON、分享链接（逐行或 base64）、Surge、Loon、Shadowrocket、Quantumult X、SIP008、`ssd://`，逐项检查：mihomo 会拒绝的节点、策略组、规则和 provider 修复或略去并给出警告，其余照常读入，不再因一项而整份失败。mihomo/Clash 配置保留自己的其他设置（端口、DNS 等），只换掉这五部分；其他格式在前面加基础段。节点池、InspectSource、转为方案和「订阅自带」的 admission 都经过它；InspectSource 带上警告（`SourceWarning`），订阅页在行内用 `warning` 色写「略去 N 个节点」，规则正在使用时还写「略去 N 条规则」。转为方案读 mihomo 配置原写的规则，逐条说明没能转换的原因。没有可用规则的订阅（没有规则、最后的规则没能保留、或略去超过十分之一）在「订阅自带」下用 subconv 的路由模板分流（`Build`，`Rules` 为自动），与 OpenWrt 插件相同：内核导入或更新订阅时（InspectSource）最多每 6 小时从 subconv `rules` 分支的 CDN 主机取一次模板，存在 home 的 `routing-template/`，读订阅时只读这份缓存，不等网络；这样的订阅算作带规则，首次导入就选「订阅自带」，行内写「路由模板使用中」。取不到模板时照旧：只有节点的订阅用「我的方案」的默认方案。节点池只取节点，不用模板。开发服务默认不取模板（`-routing-template` 打开），端到端测试因此不依赖网络 | [routing.md](routing.md) §5.1、§8.1、§8.9 |
+| D55 | 服务商账户是可选的：同一个应用，不登录照常用链接、文件和节点导入；可以同时登录多个服务商（一个 OpenWeir 面板的部署是一个服务商，按用户中心的 origin 区分），每个 origin 一个账户，登录另一个用户时先问是否替换。账户里的每份订阅成为一份 `kind=provider` 的配置，与其他配置并列，分流、节点池、覆写、自动更新、D27 和备份照常，没有模式切换。不做锁定某个服务商的品牌构建，也不预置服务商：用户输入地址，或从用户中心打开 `openweir://provider?url=<origin>`，深链只填好地址、不自动登录 | [accounts.md](accounts.md) §1、§2 |
+| D56 | 登录用 Better Auth 的 bearer 会话（`set-auth-token`，7 天滑动，没有 refresh token）。v1 只在应用内原生登录：邮箱或用户名加密码、邮箱验证码、两步验证（TOTP），没有浏览器登录或设备授权，后端不改；服务商登录时要求人机验证、或只提供社交账号、通行密钥等方式时，说明原因并引导用「从链接导入」添加用户中心里的订阅链接。令牌以 `{"token","user_id"}` 存在系统凭据库的 `provider:<服务商 id>`（D14），不进数据库、备份、诊断和日志；任何请求得到 401 时删除令牌、标为「需要重新登录」，保留配置和上次的原文，隧道照常运行 | [accounts.md](accounts.md) §3、§4 |
+| D57 | 服务商的配置每次更新都先读账单：接入方式为 `app` 或 `both` 时带令牌读 `/proxy/subscriptions/{id}/config`，为 `link` 时下载账单给的链接，不带令牌、不跟随重定向，链接只在内存里，不进数据库、备份和错误信息。到期、停用或不可用时保留上次的原文、不再下载，也从不自动换用别的订阅，只在概览提示。账户请求都在界面进程里以当前用户身份发出，令牌不进服务和系统扩展，交给它们的只有拼好的配置 | [accounts.md](accounts.md) §5 |
+| D58 | 购买、续费、换套餐、充值、支付、改密码和两步验证都在服务商的用户中心（浏览器）里完成。应用只读显示权益、钱包、套餐和订单，唯一能改的是自动续费开关；打开网页后，窗口重新激活时和之后 10 分钟内重新同步，显示同步后的结果 | [accounts.md](accounts.md) §6 |
+| D59 | 备份快照升到 v2：加入服务商（`id`、`origin`、站点名、账户名、`user_id`、`position` 和时间，删除的是墓碑）和 `kind=provider` 的配置（`provider_id`、`remote_id`，没有链接和原文），不含令牌、订阅链接和账单缓存。v1 照样能恢复，旧版本读 v2 报 `newer_backup`。恢复出来的服务商要重新登录，登录同一个 `user_id` 后按 `remote_id` 对上原来的配置 | [accounts.md](accounts.md) §8、[storage.md](storage.md) §3 |
