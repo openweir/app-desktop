@@ -148,6 +148,33 @@ func TestSleepAndWakeRestoreTheSameProfileOnce(t *testing.T) {
 	}
 }
 
+// On Linux logind's delay lock holds the machine back from sleep until the tunnel is down, or
+// for a while at most; waking only schedules the recovery.
+func TestSleepWaitsForTheTunnelToGoDown(t *testing.T) {
+	s, core, _, _ := powered(t, true)
+	s.sleepWait = time.Minute
+	s.Sleep(true)
+	if core.suspends.Load() != 1 || core.Running() {
+		t.Fatal("going to sleep returned before the tunnel was down")
+	}
+	s.Sleep(false)
+	eventually(t, func() bool {
+		state, _ := s.RecoveryStatus()
+		return core.Running() && state == controlpb.RecoveryState_RECOVERY_STATE_NONE
+	})
+	if err := core.gate.Lock(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	suspends := core.suspends.Load()
+	s.sleepWait = 10 * time.Millisecond
+	s.Sleep(true)
+	if core.suspends.Load() != suspends {
+		t.Fatal("the tunnel went down through the held core")
+	}
+	core.gate.Unlock()
+	eventually(t, func() bool { return core.suspends.Load() == suspends+1 && !core.Running() })
+}
+
 func TestWakeDoesNotConnectAnIdleUser(t *testing.T) {
 	s, core, _, _ := powered(t, false)
 	s.PowerChanged(power.Event{Cycle: 1, Sleeping: true})

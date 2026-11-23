@@ -17,6 +17,7 @@ import (
 	"github.com/openweir/app-desktop/src/core/internal/engine"
 	"github.com/openweir/app-desktop/src/core/internal/geodata"
 	"github.com/openweir/app-desktop/src/core/internal/peer"
+	"github.com/openweir/app-desktop/src/core/internal/power"
 	"github.com/openweir/app-desktop/src/core/internal/sysproxy"
 )
 
@@ -100,6 +101,12 @@ type Service struct {
 	// proxyPort is the mixed port the owner's system proxy points at; 0 while it is theirs.
 	// It changes under both proxyMu and mu.
 	proxyPort uint16
+
+	// sleeps numbers the sleep cycles that Sleep hears of, from one goroutine; sleepWait
+	// bounds how long going to sleep waits for the tunnel to be down: less than logind's
+	// default InhibitDelayMaxSec of 5 seconds, after which the machine sleeps anyway.
+	sleeps    *power.Queue
+	sleepWait time.Duration
 }
 
 var _ control.Host = (*Service)(nil)
@@ -123,6 +130,7 @@ func Open(ctx context.Context, root, geodataDir string, platform Platform, log *
 	}()
 	s := &Service{root: root, platform: platform, log: log, ctx: ctx, cancel: cancel,
 		powerDelays: []time.Duration{0, time.Second, 2 * time.Second, 5 * time.Second, 10 * time.Second},
+		sleeps:      power.NewQueue(), sleepWait: 4 * time.Second,
 		sessionJobs: make(map[uint32]sessionJob)}
 	record, ok, err := LoadRecord(root)
 	if err != nil {
