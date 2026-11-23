@@ -7,9 +7,18 @@ fallback choices. The entire ui/fonts directory ships in both standalone package
 from __future__ import annotations
 
 import logging
+import sys
 from pathlib import Path
 
-from PySide6.QtGui import QFont, QFontDatabase, QGuiApplication, QRawFont
+from PySide6.QtCore import Qt
+from PySide6.QtGui import (
+    QFont,
+    QFontDatabase,
+    QGuiApplication,
+    QImage,
+    QPainter,
+    QRawFont,
+)
 
 DIRECTORY = Path(__file__).resolve().parent / "ui" / "fonts"
 BUNDLED = (
@@ -59,7 +68,7 @@ def register_fonts() -> None:
         QFont.removeSubstitutions(family)
         QFont.insertSubstitutions(family, [name for name in fallback if name != family])
     QFontDatabase.setApplicationEmojiFontFamilies(
-        [bundled_family("Noto Color Emoji")] if "Noto Color Emoji" in loaded else []
+        [colour_emoji_family()] if "Noto Color Emoji" in loaded else []
     )
     if "Inter" in loaded:
         font = app.font()
@@ -82,3 +91,42 @@ def bundled_family(family: str) -> str:
         if QRawFont.fromFont(QFont(name)).fontTable("head") in ours:
             return name
     return family
+
+
+def colour_emoji_family() -> str:
+    """The family emoji fall back to: the bundled Noto Color Emoji, unless this Qt cannot paint
+    its colour glyphs and the system has a colour emoji font that it can. Not every Linux build
+    of Qt paints the bundled font's COLRv1 glyphs (on the x86_64 CI runner it drew nothing at
+    all), while a system Noto Color Emoji in CBDT bitmaps still draws. macOS and Windows always
+    paint the bundled font, so only Linux is asked."""
+    bundled = bundled_family("Noto Color Emoji")
+    if not sys.platform.startswith("linux") or paints_in_colour(bundled):
+        return bundled
+    for family in QFontDatabase.families():
+        if family != bundled and "emoji" in family.lower() and paints_in_colour(family):
+            return family
+    return bundled
+
+
+def paints_in_colour(family: str) -> bool:
+    """Whether Qt paints a coloured emoji with ``family``: a rainbow, drawn once off screen."""
+    image = QImage(48, 48, QImage.Format.Format_ARGB32_Premultiplied)
+    image.fill(Qt.GlobalColor.transparent)
+    font = QFont(family)
+    font.setPixelSize(32)
+    painter = QPainter(image)
+    try:
+        painter.setFont(font)
+        painter.drawText(4, 38, "\U0001f308")
+    finally:
+        painter.end()
+    coloured = 0
+    for y in range(image.height()):
+        for x in range(image.width()):
+            colour = image.pixelColor(x, y)
+            channels = (colour.red(), colour.green(), colour.blue())
+            if colour.alpha() > 0 and max(channels) - min(channels) > 40:
+                coloured += 1
+                if coloured > 20:
+                    return True
+    return False

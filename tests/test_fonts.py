@@ -30,7 +30,14 @@ from PySide6.QtTest import QTest
 from pytestqt.qtbot import QtBot
 
 from openweir.app import MAIN_QML
-from openweir.fonts import BUNDLED, DIRECTORY, bundled_family, register_fonts
+from openweir.fonts import (
+    BUNDLED,
+    DIRECTORY,
+    bundled_family,
+    colour_emoji_family,
+    paints_in_colour,
+    register_fonts,
+)
 from openweir.viewmodels.text_editing import TextEditing
 from tests.support.unicode import CLUSTERS, TEXT
 from tests.support.window import find
@@ -119,12 +126,16 @@ def test_text_presentation_is_not_forced_to_emoji() -> None:
     assert all(0 not in run.glyphIndexes() for run in runs)
 
 
-def test_emoji_come_from_the_bundled_font() -> None:
-    """A system font of the same name (Linux's Noto Color Emoji) does not take its place."""
+def test_emoji_come_from_the_bundled_font_where_qt_paints_it() -> None:
+    """A system font of the same name (Linux's Noto Color Emoji) does not take the bundled
+    one's place by chance; only a Qt that cannot paint the bundled one in colour uses another."""
     (family,) = QFontDatabase.applicationEmojiFontFamilies()
-    assert family == bundled_family("Noto Color Emoji")
-    ours = QRawFont(str(DIRECTORY / "noto-color-emoji/NotoColorEmoji-Regular.ttf"), 12)
-    assert QRawFont.fromFont(QFont(family)).fontTable("head") == ours.fontTable("head")
+    assert family == colour_emoji_family()
+    bundled = bundled_family("Noto Color Emoji")
+    if paints_in_colour(bundled):
+        assert family == bundled
+        ours = QRawFont(str(DIRECTORY / "noto-color-emoji/NotoColorEmoji-Regular.ttf"), 12)
+        assert QRawFont.fromFont(QFont(family)).fontTable("head") == ours.fontTable("head")
 
 
 @pytest.mark.parametrize("text", ["🌈", "🇯🇵", "👩🏽‍💻", "✈️", "1️⃣"])
@@ -147,7 +158,11 @@ def test_emoji_renders_in_color(text: str) -> None:
     }
     # What drew it, for a runner whose images differ from the machines this was written on.
     drawn = sorted({run.rawFont().familyName() for run in shaped(text).glyphRuns()})
-    emoji = [family for family in QFontDatabase.families() if "emoji" in family.lower()]
+    emoji = [
+        (family, paints_in_colour(family))
+        for family in QFontDatabase.families()
+        if "emoji" in family.lower()
+    ]
     colorful = sum(a > 0 and max(r, g, b) - min(r, g, b) > 40 for r, g, b, a in colors)
     assert colorful > 20, f"drawn with {drawn}; emoji families: {emoji}; pixels: {len(colors)}"
 
