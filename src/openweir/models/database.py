@@ -41,6 +41,7 @@ SOFT_DELETED = (
     "plan_rules",
     "backup_targets",
     "mesh_networks",
+    "providers",
 )
 
 Migration = Callable[[sqlite3.Connection], None]
@@ -237,7 +238,47 @@ def _schema_3(connection: sqlite3.Connection) -> None:
     )
 
 
-MIGRATIONS: tuple[Migration, ...] = (_schema_1, _schema_2, _schema_3)
+# Version 4, provider accounts (docs/accounts.md §5.1). Times are unix seconds as REAL, like
+# every other table's, so that a backup merges them alike.
+_SCHEMA_4 = """
+-- The providers signed in to here: origin is https://host[:port]; name the site's; account
+-- what the app shows of the user; user_id the provider's id of that user. Code keeps one live
+-- row per origin. The session token is in the system's credential store under
+-- provider:<id>, never here.
+CREATE TABLE providers (
+    id TEXT PRIMARY KEY,
+    origin TEXT NOT NULL,
+    name TEXT NOT NULL,
+    account TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    position INTEGER NOT NULL,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    deleted_at REAL
+) STRICT;
+
+-- A subscription of a provider account is a profile of kind 'provider': it names the provider
+-- and the subscription's id there, and has no url (its link stays in memory). NULL for the
+-- other kinds.
+ALTER TABLE profiles ADD COLUMN provider_id TEXT;
+ALTER TABLE profiles ADD COLUMN remote_id INTEGER;
+
+-- A cache of this machine: a provider profile's subscription as billing last described it,
+-- RemoteSubscription.record() as JSON, which never holds the link. No foreign key, like
+-- profile_contents; a row goes with its profile.
+CREATE TABLE provider_subscriptions (
+    profile_id TEXT PRIMARY KEY,
+    data TEXT NOT NULL,
+    synced_at REAL NOT NULL
+) STRICT;
+"""
+
+
+def _schema_4(connection: sqlite3.Connection) -> None:
+    connection.executescript(_SCHEMA_4)
+
+
+MIGRATIONS: tuple[Migration, ...] = (_schema_1, _schema_2, _schema_3, _schema_4)
 SCHEMA_VERSION = len(MIGRATIONS)
 
 

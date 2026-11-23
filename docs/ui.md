@@ -101,7 +101,7 @@
 
 | 表 | 内容 |
 | --- | --- |
-| `profiles` | 每份配置一行，按 `position` 排序：`id`、`name`、`kind`、`url`、`path`、`auto_update_hours`、`in_pool` |
+| `profiles` | 每份配置一行，按 `position` 排序：`id`、`name`、`kind`、`url`、`path`、`auto_update_hours`、`in_pool`；服务商的订阅（`kind` 为 `provider`）另有 `provider_id`、`remote_id`，`url` 为空 |
 | `profile_contents` | 配置原文 `yaml`，以及下载时一起得到的信息：`fetched_at`（界面上的"更新于"）、用量四项、`proxy_count`、`has_rules`（内核读出的是否带规则，读之前为 NULL），`unread` 和 `read_yaml`（存下时没有内核能读，第 3 节）。这是本机缓存 |
 | `overrides` | `scope` 为 `global` 或某份配置的 `id`；`yaml` 是用户写的原文 |
 | `settings` | 见第 8 节 |
@@ -110,17 +110,19 @@
 | `plans`、`plan_groups`、`plan_rules` | 分流方案（routing.md 第 9 节），第 9 节 |
 | `backup_targets` | 已开启的云端备份目标（`BackupTargets`），每个一行 |
 | `mesh_networks` | 应用内添加的组网网络（mesh.md 10.2 节），不含凭据 |
+| `providers`、`provider_subscriptions` | 登录过的服务商和每份服务商配置上次同步的账单（`ProviderStore`，accounts.md 5.1 节）；后者是本机缓存，不含订阅链接，令牌在系统凭据库 |
 
 - 时间都用 Unix 秒。每行有 `updated_at`，只在内容确实变化时更新。`profiles`、`overrides`、`plans`、`plan_groups`、
-  `plan_rules`、`mesh_networks`、`backup_targets` 删除时只记 `deleted_at`（软删除），留给备份按记录合并；
-  `profile_contents` 是缓存，直接删除。
+  `plan_rules`、`mesh_networks`、`backup_targets`、`providers` 删除时只记 `deleted_at`（软删除），留给备份按记录
+  合并；`profile_contents` 和 `provider_subscriptions` 是缓存，直接删除。
 - `ProfileStore` 的方法（`load`、`save`、`read_config`、`write_config`、`delete_config`、`read_override`、
   `write_override`）各是一个事务：
   - `save(list)` 写入整个列表：新配置插入，有变化的更新，列表里没有的标记删除；当前配置写入
     `routing_state.profile_id`。
   - 调用顺序是先 `write_config` 再 `save`，所以列表不会指向没有原文的配置。`Profile.updated_at`、`usage`、
     `proxy_count` 描述的是下载到的原文，因此和原文一起存在 `profile_contents`；还没有原文的配置，读出来时这三项为空。
-  - `delete_config` 删除原文，并把这份配置的覆写标记删除。清空覆写文本也是标记删除，再次写入时恢复。
+  - `delete_config` 删除原文和服务商配置的账单缓存，并把这份配置的覆写标记删除。清空覆写文本也是标记删除，
+    再次写入时恢复。
   - 原文不存在时报 `config_missing`；数据库读写失败时报 `storage_failed`，界面显示「无法读写本地数据：…」。
   - 如果在写入原文之后、保存列表之前崩溃，留下的原文会在下次打开数据库时清掉。
 - `Profile.in_pool` 对应 `profiles.in_pool`，默认为真：这份订阅的节点进入"我的方案"的节点池（第 9 节）。

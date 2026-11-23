@@ -1,6 +1,7 @@
 """Profiles and overrides in the local database (docs/ui.md §2, docs/storage.md §2).
 
-    profiles           one row per profile, in list order: what the user set
+    profiles           one row per profile, in list order: what the user set; a provider
+                       profile also names its provider and subscription there
     profile_contents   the config as downloaded or imported, with the time, the usage and the
                        proxy count that came with it; a cache of this machine
     overrides          the global override (scope ``global``) and each profile's own
@@ -10,6 +11,8 @@ Each method is one transaction. ``save`` writes the whole list: a profile missin
 or an override cleared, is marked deleted rather than removed; a profile's config is
 removed with ``delete_config``, as it is only a cache. The config is written before the
 list that names it, so the list never names a profile without one.
+
+The providers and what billing last said of their subscriptions are provider/store.py's.
 
 """
 
@@ -56,11 +59,13 @@ def open_database(directory: Path, *, clock: Callable[[], float] = time.time) ->
         purged = purge_tombstones(connection, clock())
         if purged:
             _log.info("purged %d deleted records", purged)
-        # Configs left by a crash between writing one and saving the list.
-        connection.execute(
-            "DELETE FROM profile_contents WHERE profile_id NOT IN "
-            "(SELECT id FROM profiles WHERE deleted_at IS NULL)"
-        )
+        # Configs, and billing caches, left by a crash between writing one and saving the
+        # list, or by a restore that removed their profiles.
+        for cache in ("profile_contents", "provider_subscriptions"):
+            connection.execute(
+                f"DELETE FROM {cache} WHERE profile_id NOT IN "
+                "(SELECT id FROM profiles WHERE deleted_at IS NULL)"
+            )
     return database
 
 
@@ -138,9 +143,13 @@ class ProfileStore:
         return cursor.rowcount > 0
 
     def delete_config(self, profile_id: str) -> None:
-        """Delete a profile's config and its override."""
+        """Delete a profile's config, what billing said of a provider profile, and its
+        override."""
         with _stored(), self.database.transaction() as connection:
             connection.execute("DELETE FROM profile_contents WHERE profile_id = ?", (profile_id,))
+            connection.execute(
+                "DELETE FROM provider_subscriptions WHERE profile_id = ?", (profile_id,)
+            )
             write_override(connection, profile_id, "", self.database.clock())
 
     # -- overrides: ``None`` is the global override, a profile id that profile's own ----------
@@ -175,6 +184,7 @@ def load_profiles(connection: sqlite3.Connection) -> ProfileList:
     rows = connection.execute(
         """
         SELECT p.id, p.name, p.kind, p.url, p.path, p.auto_update_hours, p.in_pool,
+               p.provider_id, p.remote_id,
                c.fetched_at, c.upload, c.download, c.total, c.expire, c.proxy_count,
                c.has_rules, c.unread, c.website, c.support,
                o.scope IS NOT NULL AS has_override
@@ -217,15 +227,39 @@ def _profile(row: sqlite3.Row) -> Profile:
         unread=bool(row["unread"]),
         website=row["website"] or "",
         support=row["support"] or "",
+        provider_id=row["provider_id"],
+        remote_id=row["remote_id"],
     )
 
 
 def save_profiles(connection: sqlite3.Connection, profiles: ProfileList, now: float) -> None:
     """Store the list; what came with a profile's config is stored only with the config. A
     profile read by a core no longer needs the text read before it."""
-    columns = ("id", "name", "kind", "url", "path", "auto_update_hours", "in_pool", "position")
+    columns = (
+        "id",
+        "name",
+        "kind",
+        "url",
+        "path",
+        "auto_update_hours",
+        "in_pool",
+        "provider_id",
+        "remote_id",
+        "position",
+    )
     rows = [
-        (p.id, p.name, p.kind, p.url, p.path, p.auto_update_hours, int(p.in_pool), position)
+        (
+            p.id,
+            p.name,
+            p.kind,
+            p.url,
+            p.path,
+            p.auto_update_hours,
+            int(p.in_pool),
+            p.provider_id,
+            p.remote_id,
+            position,
+        )
         for position, p in enumerate(profiles.profiles)
     ]
     sync_rows(connection, "profiles", columns, rows, now, created_at=True)

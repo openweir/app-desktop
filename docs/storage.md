@@ -7,14 +7,17 @@
 
 ## 1. 范围
 
-- **存储内容**：配置（订阅和本地文件，以及是否加入节点池）、覆写（全局一份，每个配置各一份）、分流方式与分流方案
-  （策略组和规则，见 [routing.md](routing.md)）、应用内添加的组网网络、设置。
+- **存储内容**：配置（订阅、本地文件和服务商账户里的订阅，以及是否加入节点池）、覆写（全局一份，每个配置各一份）、
+  分流方式与分流方案（策略组和规则，见 [routing.md](routing.md)）、应用内添加的组网网络、登录过的服务商
+  （[accounts.md](accounts.md) 5.1 节）、设置。
 - **不在本文范围内**：
   - Windows 服务在 `C:\ProgramData\OpenWeir\` 下保存的运行副本（architecture.md §5.1），它只用于开机恢复；
   - mihomo 自己的 provider 缓存和 `cache.db`；
   - 链式出口的 WARP 账户（系统凭据库）、VPN Gate 服务器列表（`state` 表）和 Tor 数据目录，都只在本机，不进备份
     （[exits.md](exits.md) 第 8 节）；
   - 应用内组网网络的凭据（系统凭据库），不进备份；网络本身进备份（[mesh.md](mesh.md) 10.2 节）。
+  - 服务商账户的会话令牌（系统凭据库的 `provider:<服务商 id>`，D56）和订阅链接（只在内存里，D57），都不进数据库和
+    备份（[accounts.md](accounts.md) 4.1 节）。
 - **读写方**：数据库只由界面进程以当前用户身份读写。服务和系统扩展都不访问它，它们从宿主请求里拿到配置。
 
 ## 2. 本地数据库
@@ -22,16 +25,18 @@
 - **位置**：用户数据目录下的 `openweir.db`。macOS 为 `~/Library/Application Support/OpenWeir/`，Windows 为 `%LOCALAPPDATA%\OpenWeir\`。
 - **实现**：使用标准库 `sqlite3`，开启 WAL 模式。schema 版本记在 `PRAGMA user_version` 里，启动时按版本依次迁移。
 - **写入**：每次写入都在一个事务里完成。界面是单实例，所以同一时间只有一个进程打开数据库。
-- **主键**：配置、方案、规则条目、组网网络和备份目标用 UUID 作主键；覆写、设置和本机状态以 `scope`、`key` 这样的
-  自然键为主键，这样两台设备上的"全局覆写"或同一个设置项是同一条记录；策略组的 `id` 只在所属方案内唯一（地区组的
-  `id` 由地区代码派生，routing.md 第 9 节）。每行都记 `updated_at`；可以删除的记录采用软删除，记 `deleted_at`。
+- **主键**：配置、方案、规则条目、组网网络、服务商和备份目标用 UUID 作主键；覆写、设置和本机状态以 `scope`、
+  `key` 这样的自然键为主键，这样两台设备上的"全局覆写"或同一个设置项是同一条记录；策略组的 `id` 只在所属方案内唯一
+  （地区组的 `id` 由地区代码派生，routing.md 第 9 节）。每行都记 `updated_at`；可以删除的记录采用软删除，记 `deleted_at`。
   备份恢复时靠这几项按记录合并；将来如果改成多设备双向同步，也不需要改表结构。
 - **约束**：表都是 `STRICT`；`in_pool`、`unread`、`hidden`、`enabled` 只能是 0 或 1，`has_rules` 另可为 NULL；
   `plan_groups`、`plan_rules` 以外键指向 `plans`，方案被清除（见下）时一并删除。种类、方式这类取值由代码检查，不写成
-  `CHECK`，以后加一种取值不必重建表。
+  `CHECK`，以后加一种取值不必重建表；同样由代码保证的还有：每个 origin 只有一个未删除的服务商，只有 `provider`
+  种类的配置带 `provider_id` 和 `remote_id`、而且它的 `url` 和 `path` 为空（`Profile` 构造时检查）。
 - **墓碑的保留**：软删除的记录（墓碑）保留 90 天（`database.TOMBSTONE_DAYS`）。每次启动时 `store.open_database`
   在单实例锁之内删掉 `deleted_at` 早于 90 天前的记录，涉及 `profiles`、`overrides`、`plans`、`plan_groups`、
-  `plan_rules`、`mesh_networks` 和 `backup_targets`；被清除的方案连同它的策略组和规则一起删除。这样删掉的订阅链接、
+  `plan_rules`、`mesh_networks`、`providers` 和 `backup_targets`；被清除的方案连同它的策略组和规则一起删除。
+  同时删掉配置已不在（或已删除）的 `profile_contents` 和 `provider_subscriptions`，它们是缓存。这样删掉的订阅链接、
   覆写原文不会一直留在本机，快照里的墓碑也不会越积越多。清除改变快照内容，下一次自动备份会上传新的一份。
   `backup_targets` 不进快照，它的墓碑只为和其他表一致。
 - **清除对合并的影响**：合并靠墓碑判断"本机删除得更晚"。墓碑清除后，本机分不出一条记录是"这里删过"还是"这里
@@ -49,21 +54,25 @@
 
 | 表 | 内容 |
 | --- | --- |
-| `profiles` | `id`、`name`、`kind`（`subscription` / `file`）、`in_pool`（是否加入节点池）、`url`、`path`（本地文件配置的原路径；粘贴的节点链接用 `file` 且路径为空）、`auto_update_hours`（正数为间隔小时；`0` 为关闭；`-n` 为关闭并记住间隔 n，重新开启时沿用，旧版本把不大于 0 的值都当作关闭）、`position`、`created_at`、`updated_at`、`deleted_at` |
+| `profiles` | `id`、`name`、`kind`（`subscription` / `file` / `provider`）、`in_pool`（是否加入节点池）、`url`（服务商的订阅为空）、`path`（本地文件配置的原路径；粘贴的节点链接用 `file` 且路径为空）、`auto_update_hours`（正数为间隔小时；`0` 为关闭；`-n` 为关闭并记住间隔 n，重新开启时沿用，旧版本把不大于 0 的值都当作关闭）、`provider_id` 和 `remote_id`（只有 `provider` 种类有：所属的服务商和订阅在服务商那里的 id；数据库 v4）、`position`、`created_at`、`updated_at`、`deleted_at` |
 | `profile_contents` | `profile_id`、配置 YAML 原文、`fetched_at`、用量（upload / download / total / expire）、`proxy_count`、`has_rules`（内核读出的是否带规则）、`unread` 和 `read_yaml`（存下时没有内核能读，连接时再读；内核拒绝时退回上次读过的原文，ui.md 第 3 节）、`updated_at`。这是本机缓存，订阅下载的内容不进入备份。数据库 v2 另存 ETag、最终响应 URL 的摘要以及官网和帮助链接；换源清除这些字段，替换原文使旧 ETag 失效 |
 | `overrides` | `scope`（`global` 或某个 `profile_id`）、YAML 原文、`updated_at`、`deleted_at` |
 | `routing_state`、`plans`、`plan_groups`、`plan_rules` | 分流方式、当前使用的配置、节点池设置、分流方案及其策略组和规则条目，字段见 routing.md 第 9 节 |
 | `settings` | `key`、`value`（JSON）、`updated_at`。每个设置项的范围（`synced` / `local`）由 `models/settings.py` 里字段的元数据决定（ui.md §8），不存进表里 |
 | `state` | 只属于本机的状态（`key`、`value`（JSON）、`updated_at`）：每个备份目标上次上传的快照摘要（`backup_digest:<目标 id>`）；VPN Gate 出口的服务器列表、在用的服务器和近一小时失效的服务器（`vpngate`，exits.md 5.2 节） |
 | `backup_targets` | 已开启的备份目标：`id`、提供方、显示用的账户名、上次成功备份的时间、上次的错误、`created_at`、`updated_at`、`deleted_at`。不存令牌（见 4 节） |
+| `providers` | 登录过的服务商（数据库 v4，[accounts.md](accounts.md) 5.1 节）：`id`、`origin`、`name`（站点名）、`account`（显示的账户名）、`user_id`（服务商的用户 id）、`position`、`created_at`、`updated_at`、`deleted_at`。退出登录是软删除。令牌不在这里，在系统凭据库 |
+| `provider_subscriptions` | 服务商的每份配置上次同步时的账单（数据库 v4）：`profile_id`、`data`（`RemoteSubscription.record()` 的 JSON，不含订阅链接）、`synced_at`。这是本机缓存，不进备份；配置删除时（`delete_config`）、服务商退出登录时一并删除 |
 | `mesh_networks` | 应用内添加的组网网络：`id`、`kind`（`tailscale` / `zerotier` / `easytier`）、`name`、`via`、`settings`（JSON，不含凭据）、`position`、`created_at`、`updated_at`、`deleted_at`。凭据在系统凭据库（mesh.md 10.2 节） |
 
 当前使用的配置存在 `routing_state` 里，作为"订阅自带"时用的配置（routing.md 第 9 节），不在 `state` 里。
 
 **表结构的修改**：`database.py` 的 `MIGRATIONS` 是一串迁移函数，第 n 个把版本 n−1 升到 n（ui.md §2.3）；版本 1 是
-1.0.0 的表结构。改表结构就在 `MIGRATIONS` 末尾追加一个迁移并配上测试，已有的迁移不再改动，用户已有的数据库都要能
-升上来。存下来的格式同样要让以后的版本读得懂：配置、备份快照（第 3 节，格式变了就把 `version` 加一，旧的照样能
-恢复）和方案 JSON。这条工作规则也写在 [maintenance.md](maintenance.md) 第 5 节。
+1.0.0 的表结构，版本 2 加订阅的 ETag 和官网、帮助链接，版本 3 加 `routing_state.resume_profile`，版本 4 加服务商账户
+（`providers`、`provider_subscriptions` 和 `profiles` 的两列）。旧版本的应用打开版本 4 的数据库时，按 ui.md §2.3
+把它改名放到一边（`.bad`），服务商的记录留在那个文件里。改表结构就在 `MIGRATIONS` 末尾追加一个迁移并配上测试，
+已有的迁移不再改动，用户已有的数据库都要能升上来。存下来的格式同样要让以后的版本读得懂：配置、备份快照（第 3 节，
+格式变了就把 `version` 加一，旧的照样能恢复）和方案 JSON。这条工作规则也写在 [maintenance.md](maintenance.md) 第 5 节。
 
 ## 3. 备份快照
 
@@ -87,8 +96,9 @@ D13 定下的方式是**备份与恢复**，不做多设备双向同步：
 - `mesh`：应用内添加的组网网络，字段与表相同，`settings` 是 JSON 值；
 - `settings`：只包含 `synced` 范围、改过的设置，`key`、`value`、`updated_at`。
 
-快照不包含用量、下载缓存（`profile_contents` 里订阅的原文和下载信息）、本机范围的设置、`state` 和 `backup_targets`，
-也不包含任何令牌、WARP 账户和组网网络的凭据。恢复出来的网络要重新登录或重新填写密钥（mesh.md 10.2 节）。
+快照不包含用量、下载缓存（`profile_contents` 里订阅的原文和下载信息）、服务商的账单缓存（`provider_subscriptions`）、
+本机范围的设置、`state` 和 `backup_targets`，也不包含任何令牌（包括服务商的会话令牌）、服务商订阅的链接、WARP 账户
+和组网网络的凭据。恢复出来的网络要重新登录或重新填写密钥（mesh.md 10.2 节）。
 
 - **删除的记录**：配置、覆写、方案、策略组、规则条目和组网网络删除后只留**墓碑**：主键、`updated_at` 和 `deleted_at`，
   不带内容，所以删掉的订阅链接不会一直留在备份里。删除的方案不带它的策略组和规则。墓碑在本机保留 90 天

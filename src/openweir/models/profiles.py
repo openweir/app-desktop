@@ -1,4 +1,5 @@
-"""Profiles: configs the user imported from a subscription link or a local file."""
+"""Profiles: configs the user imported from a subscription link or a local file, or that a
+provider account brought in (docs/accounts.md §5)."""
 
 from __future__ import annotations
 
@@ -6,6 +7,10 @@ from dataclasses import dataclass, replace
 
 KIND_SUBSCRIPTION = "subscription"
 KIND_FILE = "file"
+# A subscription of a provider account (docs/accounts.md §5.1): it names the provider and the
+# subscription there, and has no link of its own. It updates through the account, and goes
+# when the account signs out.
+KIND_PROVIDER = "provider"
 
 
 class ProfileError(Exception):
@@ -36,11 +41,14 @@ class Usage:
 class Profile:
     id: str
     name: str
-    kind: str  # KIND_SUBSCRIPTION or KIND_FILE (including pasted node links)
-    url: str = ""  # the subscription link
+    kind: str  # KIND_SUBSCRIPTION, KIND_FILE (including pasted node links) or KIND_PROVIDER
+    # The subscription link. Empty for a provider's subscription: its link, if it has one, stays
+    # in memory (D57).
+    url: str = ""
     path: str = ""  # the original local file; empty for pasted node links
-    # Subscriptions only: n > 0 updates every n hours; 0 is off; -n is off, keeping the n hours
-    # it updates at once turned on again. Versions before -n read any value <= 0 as off.
+    # Subscriptions and provider profiles only (can_auto_update): n > 0 updates every n hours;
+    # 0 is off; -n is off, keeping the n hours it updates at once turned on again. Versions
+    # before -n read any value <= 0 as off.
     auto_update_hours: int = 0
     updated_at: float = 0.0  # unix seconds of the last download or import
     usage: Usage | None = None
@@ -55,10 +63,28 @@ class Profile:
     unread: bool = False
     website: str = ""
     support: str = ""
+    # Provider profiles only, None for the others: the ProviderRecord's id, and the
+    # subscription's id in that account (RemoteSubscription.id).
+    provider_id: str | None = None
+    remote_id: int | None = None
+
+    def __post_init__(self) -> None:
+        if self.kind == KIND_PROVIDER:
+            if not self.provider_id or type(self.remote_id) is not int:
+                raise ValueError("a provider profile names its provider and subscription")
+            if self.url or self.path:
+                raise ValueError("a provider profile has no link or file of its own")
+        elif self.provider_id is not None or self.remote_id is not None:
+            raise ValueError("only a provider profile names a provider")
 
     @property
     def is_subscription(self) -> bool:
+        """It downloads from its link; a provider's subscription is no such subscription."""
         return self.kind == KIND_SUBSCRIPTION
+
+    @property
+    def is_provider(self) -> bool:
+        return self.kind == KIND_PROVIDER
 
     @property
     def auto_update_interval(self) -> int:
@@ -72,7 +98,14 @@ class Profile:
 
     @property
     def can_update(self) -> bool:
-        return self.is_subscription or bool(self.path)
+        """It has a source to update from: its link, its provider account or its file. Pasted
+        node links have none."""
+        return self.is_subscription or self.is_provider or bool(self.path)
+
+    @property
+    def can_auto_update(self) -> bool:
+        """It may update by itself at an interval: what it updates from is on the network."""
+        return self.is_subscription or self.is_provider
 
 
 @dataclass(frozen=True)
