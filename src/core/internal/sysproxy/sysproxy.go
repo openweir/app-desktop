@@ -21,6 +21,19 @@ type Settings struct {
 	Server        string `json:"server"`
 	Bypass        string `json:"bypass"`
 	AutoConfigURL string `json:"autoconfig_url"`
+	// Desktop is the Linux desktop's own copy of these settings, which the service writes
+	// back as read; nil on Windows, which ignores it.
+	Desktop *Desktop `json:"desktop,omitempty"`
+}
+
+// Desktop is a Linux user's proxy settings as their desktop keeps them, from every store
+// that is present: GNOME's org.gnome.system.proxy keys and KDE's kioslaverc [Proxy Settings]
+// entries, each value as the desktop's own tool reads and writes it. Giving them back
+// restores exactly what the user had, which the WinINet fields cannot hold
+// (docs/architecture.md "Linux (in progress)", D63). Not read or written yet.
+type Desktop struct {
+	GNOME map[string]string `json:"gnome,omitempty"`
+	KDE   map[string]string `json:"kde,omitempty"`
 }
 
 // Bypass keeps loopback and private addresses off the proxy; "<local>" covers plain host
@@ -39,8 +52,10 @@ func Core(port uint16) Settings {
 }
 
 // Ours reports whether settings are what Core writes, on any port: the service's own, left
-// behind on a port the core no longer opens (7890 before 9347, D53), never a user's.
+// behind on a port the core no longer opens (7890 before 9347, D53), never a user's. The
+// desktop's copy of them does not count.
 func Ours(settings Settings) bool {
+	settings.Desktop = nil
 	host, port, err := net.SplitHostPort(settings.Server)
 	if err != nil || host != "127.0.0.1" {
 		return false

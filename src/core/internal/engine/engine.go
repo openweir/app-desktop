@@ -33,6 +33,7 @@ import (
 	"github.com/openweir/app-desktop/src/core/internal/admission"
 	"github.com/openweir/app-desktop/src/core/internal/controlpb"
 	"github.com/openweir/app-desktop/src/core/internal/routingtemplate"
+	"github.com/openweir/app-desktop/src/core/internal/tunclean"
 )
 
 var (
@@ -66,6 +67,11 @@ type Options struct {
 	// requests; nil is a client of the engine's own.
 	TemplateHosts []rules.Host
 	TemplateHTTP  *http.Client
+	// Pins are the TUN device, route table and rule index that the Linux service holds
+	// owned mode to, so that its cleanup (tunclean) removes exactly what a TUN left behind
+	// (docs/architecture.md "Linux (in progress)", D67). The zero value pins nothing, as
+	// on Windows. Not applied yet.
+	Pins tunclean.Pins
 }
 
 type Engine struct {

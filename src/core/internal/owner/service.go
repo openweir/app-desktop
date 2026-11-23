@@ -38,6 +38,11 @@ type Platform interface {
 	// answered.
 	Restart()
 	NetworkReady() bool
+	// MayClaim refuses a caller who may not own the tunnel from where they are, before a
+	// claim or take-over makes them the owner. Windows lets every caller the pipe verified
+	// claim; Linux is to allow only a user in an active local session (docs/architecture.md
+	// "Linux (in progress)", D66). Not consulted yet.
+	MayClaim(caller peer.Identity) error
 }
 
 // Core is the dispatcher's side of the tunnel. ResumeContext and SuspendContext give up on

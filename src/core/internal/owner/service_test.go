@@ -90,6 +90,8 @@ func (m *machine) Restart() { m.restarts++ }
 
 func (m *machine) NetworkReady() bool { return true }
 
+func (m *machine) MayClaim(peer.Identity) error { return nil }
+
 // fakeCore is the dispatcher's side: Resume and Suspend report back as the dispatcher does.
 type fakeCore struct {
 	host    *Service

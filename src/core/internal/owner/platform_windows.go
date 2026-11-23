@@ -11,6 +11,7 @@ import (
 
 	"golang.org/x/sys/windows"
 
+	"github.com/openweir/app-desktop/src/core/internal/peer"
 	"github.com/openweir/app-desktop/src/core/internal/power"
 	"github.com/openweir/app-desktop/src/core/internal/sysproxy"
 )
@@ -31,6 +32,9 @@ type windowsPlatform struct{ restart func() }
 func (p windowsPlatform) Restart() { p.restart() }
 
 func (windowsPlatform) NetworkReady() bool { return power.NetworkAvailable() }
+
+// MayClaim lets every caller that the pipe admitted claim (§5.3).
+func (windowsPlatform) MayClaim(peer.Identity) error { return nil }
 
 func (windowsPlatform) ReadProxy(session uint32) (sysproxy.Settings, error) {
 	return sysproxy.Read(session)

@@ -10,6 +10,7 @@ require (
 	github.com/Microsoft/go-winio v0.6.4
 	github.com/dlclark/regexp2 v1.12.0
 	github.com/easytier/easytier/easytier-go v0.0.0-20261111015056-2abb1676b475
+	github.com/godbus/dbus/v5 v5.2.4
 	github.com/metacubex/mihomo v1.19.34
 	github.com/metacubex/quic-go v0.61.1-0.20260727080200-2548683b76f4
 	github.com/metacubex/sing v0.5.9
@@ -19,6 +20,7 @@ require (
 	github.com/metacubex/zerotier-go v0.0.0-20260813124750-13fa6f45da5f
 	github.com/openweir/cronet-go v0.0.0-20261120115440-78366bd1e919
 	github.com/openweir/subconv v0.5.0
+	github.com/sagernet/netlink v0.0.0-20240612041022-b9a21c07ac6a
 	go.yaml.in/yaml/v3 v3.0.5
 	golang.org/x/mod v0.41.0
 	golang.org/x/sys v0.49.0
@@ -148,7 +150,6 @@ require (
 	github.com/sagernet/cronet-go/lib/tvos_arm64_simulator v0.0.0-20261023055542-d5437a0df01a // indirect
 	github.com/sagernet/cronet-go/lib/windows_amd64 v0.0.0-20261023055542-d5437a0df01a // indirect
 	github.com/sagernet/cronet-go/lib/windows_arm64 v0.0.0-20261023055542-d5437a0df01a // indirect
-	github.com/sagernet/netlink v0.0.0-20240612041022-b9a21c07ac6a // indirect
 	github.com/samber/lo v1.53.0 // indirect
 	github.com/sina-ghaderi/poly1305 v0.0.0-20220724002748-c5926b03988b // indirect
 	github.com/sina-ghaderi/rabaead v0.0.0-20220730151906-ab6e06b96e8c // indirect
