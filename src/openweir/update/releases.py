@@ -15,16 +15,22 @@ import urllib.error
 import urllib.request
 from collections.abc import Mapping
 from dataclasses import dataclass
+from pathlib import Path
 from typing import IO, Any
 from urllib.parse import urlsplit
 
 from openweir import __version__
 from openweir.platforms import native_machine, normalize_machine
-from openweir.product import DISPLAY_NAME, PRODUCT_ID, REPOSITORY
+from openweir.product import DISPLAY_NAME, LINUX_PACKAGE_FORMAT, PRODUCT_ID, REPOSITORY
 
 LATEST_URL = f"https://api.github.com/repos/{REPOSITORY}/releases/latest"
 USER_AGENT = f"{PRODUCT_ID}/{__version__}"
 CHECKSUMS_NAME = "SHA256SUMS"
+# The Ed25519 signature over SHA256SUMS that vouches for a Linux package (D62).
+SIGNATURE_NAME = f"{CHECKSUMS_NAME}.sig"
+# The Linux package's formats; the package writes its own beside the executable (D61).
+PACKAGE_FORMATS = ("deb", "rpm")
+PACKAGE_FORMAT_NAME = Path(LINUX_PACKAGE_FORMAT).name
 TIMEOUT_S = 30.0
 MAX_RELEASE_BYTES = 1024 * 1024  # the release's JSON
 MAX_INSTALLER_BYTES = 1024 * 1024 * 1024
@@ -65,15 +71,36 @@ def is_newer(version: str, than: str) -> bool:
     return current is None or new > current
 
 
+def installed_package_format(executable: str = sys.executable) -> str | None:
+    """The format of the Linux package this UI came in, deb or rpm, from the marker beside its
+    executable; None run from source, where no marker is, and nothing is to be installed."""
+    marker = Path(executable).resolve().parent / PACKAGE_FORMAT_NAME
+    try:
+        text = marker.read_text("ascii").strip()
+    except OSError, UnicodeDecodeError:
+        return None
+    return text if text in PACKAGE_FORMATS else None
+
+
 def installer_name(
-    version: str, system: str = sys.platform, machine: str | None = None
+    version: str,
+    system: str = sys.platform,
+    machine: str | None = None,
+    package_format: str | None = None,
 ) -> str | None:
-    """The asset this machine installs, or None where no installer is built (D2)."""
+    """The asset this machine installs, or None where no installer is built (D2). On Linux it is
+    the package of the format installed (``package_format``, read from the marker by
+    default)."""
     machine = native_machine(system) if machine is None else normalize_machine(machine)
     if system == "darwin" and machine in ("arm64", "x64"):
         return f"{DISPLAY_NAME}-{version}-macos-universal.dmg"
     if system == "win32" and machine in ("x64", "arm64"):
         return f"{DISPLAY_NAME}-{version}-windows-{machine}-setup.exe"
+    if system == "linux" and machine in ("x64", "arm64"):
+        if package_format is None:
+            package_format = installed_package_format()
+        if package_format in PACKAGE_FORMATS:
+            return f"{DISPLAY_NAME}-{version}-linux-{machine}.{package_format}"
     return None
 
 

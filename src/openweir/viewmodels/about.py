@@ -3,7 +3,9 @@ and installing updates, exporting diagnostics and the third-party licenses
 (docs/release.md).
 
 An update goes check → download → verify → ready, one step at a time; the button in the
-version row does the next one. Opening the installer always asks first (installRequested).
+version row does the next one. Opening the installer always asks first (installRequested). On
+Linux the service's install helper installs the package, and the UI it starts afterwards says
+how that went (update_result).
 """
 
 from __future__ import annotations
@@ -25,6 +27,7 @@ from openweir.i18n import QT_TRANSLATE_NOOP, current_language
 from openweir.models import format as fmt
 from openweir.models.library import ProfileLibrary
 from openweir.models.settings import UPDATE_CHECK_HOURS, Settings, SettingsError, SettingsStore
+from openweir.update import linux
 from openweir.update.releases import UpdateError
 from openweir.update.updater import Check, Downloaded, Updater
 from openweir.viewmodels.common.async_runner import AsyncRunner
@@ -52,6 +55,7 @@ _FAILURES = {
     "download_failed": QT_TRANSLATE_NOOP("AboutViewModel", "下载失败：{detail}"),
     "signature_invalid": QT_TRANSLATE_NOOP("AboutViewModel", "安装包的签名无效：{detail}"),
     "signer_mismatch": QT_TRANSLATE_NOOP("AboutViewModel", "安装包不是由 OpenWeir 的开发者签名的"),
+    "signature_missing": QT_TRANSLATE_NOOP("AboutViewModel", "发布没有附带校验和的签名"),
 }
 # Opening a Windows installer that only the release's checksum vouches for: in a build
 # without a Windows signer, such as 1.0.0.
@@ -59,6 +63,17 @@ UNSIGNED_INSTALLER = QT_TRANSLATE_NOOP(
     "AboutViewModel",
     "安装包未签名，Windows 会提示“未知发布者”。安装器会请求管理员权限，打开后 OpenWeir 会退出。",
 )
+# What the Linux install helper's exit code says, which the UI is started again with (D62,
+# update/linux.py). Only INSTALL_FAILED may have changed anything.
+_RESULTS = {
+    linux.REFUSED: QT_TRANSLATE_NOOP("AboutViewModel", "安装包没有通过校验，更新没有安装"),
+    linux.INSTALL_FAILED: QT_TRANSLATE_NOOP(
+        "AboutViewModel", "系统的包管理器没能装上更新，详见系统日志"
+    ),
+    linux.DISMISSED: QT_TRANSLATE_NOOP("AboutViewModel", "已取消授权，更新没有安装"),
+    linux.NOT_AUTHORIZED: QT_TRANSLATE_NOOP("AboutViewModel", "没有取得管理员授权，更新没有安装"),
+}
+NOT_INSTALLED_CODE = QT_TRANSLATE_NOOP("AboutViewModel", "更新没有安装（退出码 {code}）")
 
 COMPONENT_KINDS = {
     "python": QT_TRANSLATE_NOOP("AboutViewModel", "Python 依赖"),
@@ -91,10 +106,16 @@ CHECKING = "checking"
 LATEST = "latest"
 AVAILABLE = "available"  # newer, with an installer for this machine
 UNAVAILABLE = "unavailable"  # newer, without one
+MANUAL = "manual"  # newer, with this machine's package, which this build cannot check
 DOWNLOADING = "downloading"
 VERIFYING = "verifying"
 READY = "ready"
 FAILED = "failed"
+# How the Linux install helper ended, before this UI started (update_result).
+UPDATED = "updated"
+NOT_INSTALLED = "not_installed"
+# The states an automatic check may leave: none is a download under way or one to open.
+SETTLED = (IDLE, LATEST, AVAILABLE, UNAVAILABLE, MANUAL, FAILED, UPDATED, NOT_INSTALLED)
 
 
 def open_file(path: Path) -> bool:
@@ -103,14 +124,23 @@ def open_file(path: Path) -> bool:
     return QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
 
 
+def open_link(url: str) -> bool:
+    return QDesktopServices.openUrl(QUrl(url))
+
+
+# Starts the install of a Linux package from its SHA256SUMS and SHA256SUMS.sig.
+type PackageInstaller = Callable[[Path, Path, Path], bool]
+
+
 @QmlElement
 @QmlUncreatable("AboutViewModel is created in Python and injected into the view.")  # pyright: ignore[reportCallIssue]
 class AboutViewModel(QObject):
     changed = Signal()
     optionsChanged = Signal()  # the UI language changed
     installRequested = Signal()  # the view asks before the installer is opened
-    # The system opened the installer, and the UI goes (composition.py, D41): True for
-    # Windows' installer, False for a disk image.
+    # The system opened the installer, and the UI goes (composition.py, D41): True where the
+    # service keeps the tunnel through the upgrade (Windows' installer, a Linux package), False
+    # for a disk image.
     installerOpened = Signal(bool)
     _progressed = Signal(int, int)  # from the download's thread
     _verifying = Signal()
@@ -128,13 +158,17 @@ class AboutViewModel(QObject):
         *,
         clock: Callable[[], float] = time.time,
         opener: Callable[[Path], bool] = open_file,
+        install_package: PackageInstaller = linux.start_install,
+        browse: Callable[[str], bool] = open_link,
+        update_result: int | None = None,
         manifest: Path = licenses.MANIFEST,
         notices: Path = licenses.NOTICES,
         crash_directory: Path | None = None,
         parent: QObject | None = None,
     ) -> None:
         """``logs`` returns the core's log lines the logs page holds; it is called on the
-        Qt thread."""
+        Qt thread. ``update_result`` is the Linux install helper's exit code when the UI was
+        started again after it (app.py's --update-result)."""
         super().__init__(parent)
         self._updater = updater
         self._settings = settings
@@ -146,6 +180,8 @@ class AboutViewModel(QObject):
         self._logs = logs
         self._clock = clock
         self._opener = opener
+        self._install_package = install_package
+        self._browse = browse
         self._manifest = manifest
         self._notices = notices
         self._crash_directory = crash_directory
@@ -165,6 +201,9 @@ class AboutViewModel(QObject):
         self._component_model = KeyedListModel(_roles(ComponentRow), self)
 
         self._state = IDLE
+        self._result = update_result
+        if update_result is not None:
+            self._state = UPDATED if update_result == linux.INSTALLED else NOT_INSTALLED
         self._check: Check | None = None
         self._downloaded: Downloaded | None = None
         self._checked_at = 0.0
@@ -234,7 +273,7 @@ class AboutViewModel(QObject):
 
     def _check_automatically(self) -> None:
         # Never in the middle of a download, nor over one the user may still open.
-        if self._state in (IDLE, LATEST, AVAILABLE, UNAVAILABLE, FAILED):
+        if self._state in SETTLED:
             self.checkForUpdates()
 
     @Property(bool, notify=changed)
@@ -288,6 +327,8 @@ class AboutViewModel(QObject):
         if state == UNAVAILABLE:
             text = self.tr("有新版本 {version} · 这个版本没有适合本机的安装包")
             return text.format(version=version)
+        if state == MANUAL:
+            return self.tr("有新版本 {version} · 请从发布页下载安装包").format(version=version)
         if state == DOWNLOADING:
             percent = int(100 * self._received / self._total) if self._total else 0
             return self.tr("正在下载 {percent}%").format(percent=percent)
@@ -297,10 +338,20 @@ class AboutViewModel(QObject):
             return self.tr("{version} 已下载并通过校验").format(version=version)
         if state == FAILED:
             return self._error
+        if state == UPDATED:
+            return self.tr("已更新到 {version}").format(version=self._updater.current)
+        if state == NOT_INSTALLED:
+            text = _RESULTS.get(self._result) if self._result is not None else None
+            if text is None:
+                return self.tr(NOT_INSTALLED_CODE).format(code=self._result)
+            return self.tr(text)
         return ""
 
     @Property(bool, notify=changed)
     def updateFailed(self) -> bool:
+        """Red, unless the user declined the update themselves."""
+        if self._state == NOT_INSTALLED:
+            return self._result != linux.DISMISSED
         return self._state == FAILED
 
     @Property(str, notify=changed)
@@ -315,6 +366,8 @@ class AboutViewModel(QObject):
             return self.tr("取消")
         if state == READY:
             return self.tr("打开安装包…")
+        if state == MANUAL:
+            return self.tr("打开下载页")
         return self.tr("检查更新")
 
     @Property(bool, notify=changed)
@@ -327,7 +380,9 @@ class AboutViewModel(QObject):
         check = self._check
         if check is None or check.release is None or not check.newer:
             return ""
-        return "" if self._state in (IDLE, CHECKING, LATEST) else check.release.page_url
+        # MANUAL's button opens the same page.
+        hidden = (IDLE, CHECKING, LATEST, MANUAL)
+        return "" if self._state in hidden else check.release.page_url
 
     @Property(str, notify=changed)
     def installTitle(self) -> str:
@@ -338,6 +393,11 @@ class AboutViewModel(QObject):
     @Property(str, notify=changed)
     def installMessage(self) -> str:
         installer = self._check.installer if self._check else None
+        if installer and installer.endswith((".deb", ".rpm")):
+            return self.tr(
+                "OpenWeir 会先退出，系统随后请求管理员授权来安装更新；"
+                "安装结束后 OpenWeir 会重新打开。"
+            )
         if not (installer and installer.endswith(".exe")):
             return self.tr(
                 "打开磁盘映像后 OpenWeir 会退出。"
@@ -354,6 +414,10 @@ class AboutViewModel(QObject):
         state = self._state
         if state == AVAILABLE:
             self._download()
+        elif state == MANUAL:
+            check = self._check
+            if check is not None and check.release is not None:
+                self._browse(check.release.page_url)
         elif state == DOWNLOADING:
             self._cancel.set()
         elif state == READY:
@@ -372,8 +436,10 @@ class AboutViewModel(QObject):
             self._checked_at = self._clock()
             if not check.newer:
                 self._set_state(LATEST)
+            elif check.installer:
+                self._set_state(AVAILABLE)
             else:
-                self._set_state(AVAILABLE if check.installer else UNAVAILABLE)
+                self._set_state(MANUAL if check.manual else UNAVAILABLE)
 
         self._runner.submit(asyncio.to_thread(self._updater.check), checked, self._failed)
 
@@ -423,7 +489,8 @@ class AboutViewModel(QObject):
 
     @Slot()
     def confirmInstall(self) -> None:
-        """The user confirmed: check the file once more, then let the system open it."""
+        """The user confirmed: check the file once more, then let the system open it, or on
+        Linux start the service's install helper."""
         downloaded = self._downloaded
         if self._state != READY or downloaded is None:
             return
@@ -431,11 +498,16 @@ class AboutViewModel(QObject):
         self._set_state(VERIFYING)
 
         def ready(path: Path) -> None:
-            if self._opener(path):
+            checksums, signature = downloaded.checksums, downloaded.signature
+            if checksums is not None and signature is not None:
+                opened = self._install_package(path, checksums, signature)
+            else:
+                opened = self._opener(path)
+            if opened:
                 # It can be opened again should leaving not go ahead, as when the disconnect
                 # before quitting fails and the user stays.
                 self._set_state(READY)
-                self.installerOpened.emit(path.suffix == ".exe")
+                self.installerOpened.emit(checksums is not None or path.suffix == ".exe")
             else:
                 self._fail_text(self.tr("无法打开安装包：{name}").format(name=path.name))
 

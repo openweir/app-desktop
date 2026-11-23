@@ -30,12 +30,19 @@ from openweir.update.updater import Check, Downloaded, Updater
 from openweir.viewmodels import about as about_module
 from openweir.viewmodels.about import AboutViewModel
 from openweir.viewmodels.composition import ViewModels, compose
-from tests.support.releases import FakeGitHub, FakeVerifier, fake_github, offline_updater
+from tests.support.releases import (
+    FakeChecksumsVerifier,
+    FakeGitHub,
+    FakeVerifier,
+    fake_github,
+    offline_updater,
+)
 from tests.support.simulated import CORE_VERSION, SimulatedFetcher, SimulatedHost, seed_profiles
 
 NOW = datetime(2026, 10, 30, 9).timestamp()
 DMG = "OpenWeir-1.1.0-macos-universal.dmg"
 EXE = "OpenWeir-1.1.0-windows-x64-setup.exe"
+DEB = "OpenWeir-1.1.0-linux-x64.deb"
 SECRET_OVERRIDE = "prepend-rules:\n  - DOMAIN,override-secret.example.net,DIRECT\n"
 SECRET_RULE = "plan-secret.example.net"
 SECRET_HOST = "provider-secret.example.com"
@@ -50,7 +57,9 @@ def github() -> Iterator[FakeGitHub]:
     with fake_github() as server:
         server.add(DMG, b"disk image " * 50_000)
         server.add(EXE, b"MZ" + b"installer " * 50_000)
-        server.add_checksums(DMG, EXE)
+        server.add(DEB, b"!<arch>\n" + b"package " * 50_000)
+        server.add_checksums(DMG, EXE, DEB)
+        server.add("SHA256SUMS.sig", bytes(64))  # FakeChecksumsVerifier takes it
         yield server
 
 
@@ -108,6 +117,7 @@ def updater_for(
     current: str = "1.0.0",
     system: str = "darwin",
     machine: str = "arm64",
+    package_format: str | None = None,
 ) -> Updater:
     return Updater(
         tmp_path / "data",
@@ -116,6 +126,7 @@ def updater_for(
         current=current,
         system=system,
         machine=machine,
+        package_format=package_format,
     )
 
 
@@ -405,6 +416,161 @@ def test_start_clears_old_downloads(qtbot: QtBot, built: ViewModels, tmp_path: P
     about.start()
     qtbot.waitUntil(lambda: not any(update.directory.iterdir()))
     about.stop()
+
+
+# -- Linux -------------------------------------------------------------------------------------
+
+
+class Installs:
+    """The service's install helper as the UI starts it (update/linux.py)."""
+
+    def __init__(self, result: bool = True) -> None:
+        self.started: list[tuple[Path, Path, Path]] = []
+        self.result = result
+
+    def __call__(self, package: Path, checksums: Path, signature: Path) -> bool:
+        self.started.append((package, checksums, signature))
+        return self.result
+
+
+def linux_updater(github: FakeGitHub, tmp_path: Path) -> Updater:
+    return updater_for(
+        github,
+        tmp_path,
+        FakeChecksumsVerifier(),
+        system="linux",
+        machine="x86_64",
+        package_format="deb",
+    )
+
+
+def test_linux_installs_through_the_services_helper(
+    qtbot: QtBot,
+    built: ViewModels,
+    github: FakeGitHub,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    installs, opened = Installs(), Opened()
+    about = built.about
+    monkeypatch.setattr(about, "_updater", linux_updater(github, tmp_path))
+    monkeypatch.setattr(about, "_install_package", installs)
+    monkeypatch.setattr(about, "_opener", opened)
+    about.runUpdateAction()
+    settle(qtbot, about, "available")
+    about.runUpdateAction()
+    settle(qtbot, about, "ready")
+    assert prop(about, "updateButton") == "打开安装包…"
+    message = prop(about, "installMessage")
+    assert "管理员授权" in message
+    assert "重新打开" in message
+    # The service keeps the tunnel through the upgrade, as with Windows' installer: OpenWeir
+    # leaves without disconnecting.
+    with qtbot.waitSignal(built.desktop.quitRequested):
+        about.confirmInstall()
+    updates = tmp_path / "data" / "updates"
+    assert installs.started == [(updates / DEB, updates / "SHA256SUMS", updates / "SHA256SUMS.sig")]
+    assert opened.paths == []
+    assert asyncio.run(built.host.get_status()).state == "running"
+
+
+def test_linux_says_so_when_the_install_cannot_start(
+    qtbot: QtBot, built: ViewModels, github: FakeGitHub, tmp_path: Path
+) -> None:
+    about = about_for(built, linux_updater(github, tmp_path), install_package=Installs(False))
+    about.checkForUpdates()
+    settle(qtbot, about, "available")
+    about.runUpdateAction()
+    settle(qtbot, about, "ready")
+    with qtbot.assertNotEmitted(about.installerOpened):
+        about.confirmInstall()
+        settle(qtbot, about, "failed")
+    assert prop(about, "updateStatus") == f"无法打开安装包：{DEB}"
+
+
+def test_a_build_without_the_update_key_opens_the_release_page(
+    qtbot: QtBot,
+    built: ViewModels,
+    github: FakeGitHub,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # A Linux build without OPENWEIR_LINUX_UPDATE_KEY has no verifier (D62).
+    monkeypatch.setattr("openweir.update.updater.default_verifier", lambda system: None)
+    update = Updater(
+        tmp_path / "data",
+        ReleaseSource(github.latest_url),
+        current="1.0.0",
+        system="linux",
+        machine="x86_64",
+        package_format="deb",
+    )
+    browsed: list[str] = []
+    about = about_for(built, update, browse=lambda url: browsed.append(url) or True)
+    about.checkForUpdates()
+    settle(qtbot, about, "manual")
+    assert prop(about, "updateStatus") == "有新版本 1.1.0 · 请从发布页下载安装包"
+    assert prop(about, "updateButton") == "打开下载页"
+    assert prop(about, "releaseUrl") == ""  # the button opens the same page
+    about.runUpdateAction()
+    assert browsed == ["https://github.com/openweir/app-desktop/releases/tag/v1.1.0"]
+    assert prop(about, "updateState") == "manual"
+    assert not (tmp_path / "data" / "updates").exists()
+
+
+@pytest.mark.parametrize(
+    ("code", "state", "status", "failed"),
+    [
+        (0, "updated", "已更新到 1.0.0", False),
+        (126, "not_installed", "已取消授权，更新没有安装", False),  # the user declined
+        (127, "not_installed", "没有取得管理员授权，更新没有安装", True),
+        (3, "not_installed", "安装包没有通过校验，更新没有安装", True),
+        (4, "not_installed", "系统的包管理器没能装上更新，详见系统日志", True),
+        (1, "not_installed", "更新没有安装（退出码 1）", True),
+        (137, "not_installed", "更新没有安装（退出码 137）", True),
+    ],
+)
+def test_the_ui_started_after_the_helper_says_how_it_went(
+    qtbot: QtBot,
+    built: ViewModels,
+    github: FakeGitHub,
+    tmp_path: Path,
+    code: int,
+    state: str,
+    status: str,
+    failed: bool,
+) -> None:
+    about = about_for(built, updater_for(github, tmp_path), update_result=code)
+    assert prop(about, "updateState") == state
+    assert prop(about, "updateStatus") == status
+    assert prop(about, "updateFailed") is failed
+    assert prop(about, "updateButton") == "检查更新"
+    # An automatic check goes ahead from here.
+    about._check_automatically()
+    settle(qtbot, about, "available")
+
+
+def test_the_ui_started_after_the_helper_opens_on_the_settings(
+    qtbot: QtBot, tmp_path: Path
+) -> None:
+    def shown(update_result: int | None) -> str:
+        store = ProfileStore(tmp_path / str(update_result))
+        view_models = compose(
+            SimulatedHost(),
+            store,
+            SimulatedFetcher(),
+            lambda: NOW,
+            updater=offline_updater(tmp_path),
+            update_result=update_result,
+        )
+        try:
+            return prop(view_models.shell, "currentPage")
+        finally:
+            view_models.shutdown()
+            store.close()
+
+    assert shown(None) == "overview"
+    assert shown(3) == "settings"
 
 
 # -- automatic checks --------------------------------------------------------------------------

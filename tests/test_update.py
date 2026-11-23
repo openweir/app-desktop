@@ -262,7 +262,7 @@ def test_the_verifier_per_platform_and_signer() -> None:
     signed = WindowsVerifier if product.WINDOWS_SIGNER else ChecksumOnly
     assert isinstance(default_verifier("win32"), signed)
     assert isinstance(default_verifier("win32", ""), ChecksumOnly)
-    assert default_verifier("linux") is None
+    assert default_verifier("linux", linux_key="") is None  # a build without the update key
     assert [v.signed for v in (MacVerifier(), WindowsVerifier(SIGNER), ChecksumOnly())] == [
         True,
         True,
