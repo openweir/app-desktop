@@ -53,7 +53,12 @@ def row(view: QQuickItem, name: str) -> QQuickItem | None:
 
 
 def made(view: QQuickItem) -> list[QQuickItem]:
-    return find_all(view, lambda i: isinstance(i.property("name"), str) and i.activeFocusOnTab())
+    """The rows the list shows. The nodes' list reuses its rows: one it put back in its pool
+    stays in the tree, hidden, with what it showed last."""
+    return find_all(
+        view,
+        lambda i: isinstance(i.property("name"), str) and i.activeFocusOnTab() and i.isVisible(),
+    )
 
 
 def top(item: QQuickItem) -> float:
