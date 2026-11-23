@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import sys
-from collections.abc import Callable, Coroutine
+from collections.abc import Callable, Coroutine, Sequence
 from functools import partial
 from pathlib import Path
 from typing import Any
@@ -45,9 +45,30 @@ from openweir.viewmodels.text_editing import TextEditing as TextEditing
 
 MAIN_QML = Path(__file__).resolve().parent / "ui" / "Main.qml"
 DEV_SOCKET_ENV = "OPENWEIR_DEV_SOCKET"
-# Ask the UI already running to quit and wait for it, as the Windows installer does before
-# it replaces the files (docs/ui.md §8); exits 0 once no UI runs. The tunnel stays as it is.
+# The command line, which the installers and the system use (none of it is for people):
+# - BACKGROUND_ARG (desktop/login.py): started at login; opens in the tray where there is one,
+#   or shows the window. Windows' scheduled task passes it, and Linux's autostart entry is to.
+# - QUIT_ARG: ask the UI already running to quit and wait for it, as the Windows installer does
+#   before it replaces the files (docs/ui.md §8) and the Linux package is to before an upgrade
+#   (D61); exits 0 once no UI runs. The tunnel stays as it is.
+# - UPDATE_RESULT_ARG: --update-result=<code>, the exit code of the Linux update helper that
+#   the UI ran through pkexec, from the shell that starts the UI again after it (D62).
+#   update_result reads it; nothing reports it yet.
 QUIT_ARG = "--quit"
+UPDATE_RESULT_ARG = "--update-result"
+
+
+def update_result(arguments: Sequence[str]) -> int | None:
+    """The exit code that ``--update-result=<code>`` passes; None without one, or for one that
+    is not a number from 0 to 255."""
+    prefix = f"{UPDATE_RESULT_ARG}="
+    for argument in arguments:
+        if argument.startswith(prefix):
+            code = argument.removeprefix(prefix)
+            if code.isascii() and code.isdigit() and int(code) <= 255:
+                return int(code)
+            return None
+    return None
 
 
 class Application(QGuiApplication):

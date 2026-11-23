@@ -12,7 +12,7 @@ from PySide6.QtQuick import QQuickItem
 from PySide6.QtTest import QTest
 from pytestqt.qtbot import QtBot
 
-from openweir.app import MAIN_QML, open_store, switch_language
+from openweir.app import MAIN_QML, open_store, switch_language, update_result
 from openweir.desktop.dock import ACCESSORY, REGULAR
 from openweir.desktop.instance import LOCK_NAME
 from openweir.host.base import TAKEOVER_NONE, TAKEOVER_SETTINGS, TAKEOVER_TUN, HostError, Rule
@@ -842,3 +842,13 @@ def test_vpngate_dialog_loads_without_qml_warnings(qtbot: QtBot, loaded: Loaded)
     qtbot.waitUntil(lambda: exit_.property("severalCountries"))
     loaded.key(qtbot, Qt.Key.Key_Escape)
     assert loaded.warnings == []
+
+
+def test_the_update_result_is_the_helpers_exit_code() -> None:
+    # The Linux update helper's shell starts the UI again with pkexec's exit code (D62).
+    assert update_result(["--update-result=0"]) == 0
+    assert update_result(["--background", "--update-result=126"]) == 126
+    assert update_result([]) is None
+    assert update_result(["--update-result"]) is None
+    for code in ("", "-1", "256", "1_0", " 1", "\uff11"):
+        assert update_result([f"--update-result={code}"]) is None
