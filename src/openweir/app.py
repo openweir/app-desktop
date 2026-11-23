@@ -188,13 +188,16 @@ def default_host(
 
 
 def default_take_over(host: TunnelHost) -> Callable[[], Coroutine[Any, Any, None]] | None:
-    """An administrator's take-over of another user's tunnel (D5b): only with the installed
-    Windows service, whose executable runs as the take-over helper."""
-    if sys.platform != "win32" or not isinstance(host, ServiceHost):
+    """An administrator's take-over of another user's tunnel (D5b, D66): only with the
+    installed service, whose executable runs as the take-over helper, through UAC on Windows
+    and pkexec on Linux; and only for a user the system asks as an administrator."""
+    if sys.platform not in ("win32", "linux") or not isinstance(host, ServiceHost):
+        return None
+    if host.takeover != TAKEOVER_SETTINGS:  # the development service
         return None
     from openweir.desktop import elevation
 
-    if not elevation.is_administrator() or not elevation.service_executable().is_file():
+    if not elevation.is_administrator() or not elevation.helper_available():
         return None
     return partial(host.take_over, elevation.take_over)
 

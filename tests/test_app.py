@@ -19,11 +19,14 @@ from openweir.app import (
     DEV_SOCKET_ENV,
     MAIN_QML,
     default_host,
+    default_take_over,
     missing_socket_opener,
     open_store,
     switch_language,
+    unavailable_opener,
     update_result,
 )
+from openweir.desktop import elevation
 from openweir.desktop.dock import ACCESSORY, REGULAR
 from openweir.desktop.instance import LOCK_NAME
 from openweir.host.base import TAKEOVER_NONE, TAKEOVER_SETTINGS, TAKEOVER_TUN, HostError, Rule
@@ -862,6 +865,30 @@ def test_a_run_from_source_has_no_service_to_talk_to(tmp_path: Path) -> None:
         asyncio.run(host.get_info())
     assert raised.value.code == "service_unavailable"
     assert DEV_SOCKET_ENV in raised.value.message
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="pkexec's take-over is Linux's")
+@pytest.mark.parametrize(
+    ("takeover", "administrator", "installed", "offered"),
+    [
+        (TAKEOVER_SETTINGS, True, True, True),
+        (TAKEOVER_SETTINGS, False, True, False),  # not in sudo, wheel or admin (D66)
+        (TAKEOVER_SETTINGS, True, False, False),  # no helper or no pkexec
+        (TAKEOVER_NONE, True, True, False),  # the development service has one user
+    ],
+)
+def test_who_is_offered_the_take_over(
+    monkeypatch: pytest.MonkeyPatch,
+    takeover: str,
+    administrator: bool,
+    installed: bool,
+    offered: bool,
+) -> None:
+    monkeypatch.setattr(elevation, "is_administrator", lambda: administrator)
+    monkeypatch.setattr(elevation, "helper_available", lambda: installed)
+    host = ServiceHost(unavailable_opener("no service in this test"), takeover=takeover)
+    assert (default_take_over(host) is not None) is offered
+    assert default_take_over(SimulatedHost()) is None  # not the service
 
 
 async def hang_up(_reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:

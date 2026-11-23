@@ -25,6 +25,8 @@ _MESSAGES = {
     "owned_by_other_user": QT_TRANSLATE_NOOP("Feedback", "隧道正由其他用户使用"),
     # The elevated helper that takes over another user's tunnel failed (D5b).
     "take_over_failed": QT_TRANSLATE_NOOP("Feedback", "无法接管隧道"),
+    # Linux: polkit did not authorize the take-over helper, or had no agent to ask (D66).
+    "not_authorized": QT_TRANSLATE_NOOP("Feedback", "没有取得管理员授权"),
     "invalid_config": QT_TRANSLATE_NOOP("Feedback", "配置无效"),
     "not_running": QT_TRANSLATE_NOOP("Feedback", "隧道未运行"),
     "already_running": QT_TRANSLATE_NOOP("Feedback", "隧道已在运行"),
@@ -73,6 +75,10 @@ _MESSAGES = {
     # The database could not be read or written (docs/ui.md §2).
     "storage_failed": QT_TRANSLATE_NOOP("Feedback", "无法读写本地数据"),
 }
+# The Linux service refuses a claim from anywhere but an active local session (D66), as
+# claim_failed, or take_over_failed when it came with a take-over, with this text.
+NOT_LOCAL_SESSION = "only a user in an active session at this machine may own the tunnel"
+_NOT_LOCAL = QT_TRANSLATE_NOOP("Feedback", "只有在这台电脑上本地登录、正在使用的用户才能使用隧道")
 # Codes whose message (a parse error, an HTTP status) helps the user fix the problem.
 _WITH_DETAIL = {
     "invalid_config",
@@ -95,6 +101,8 @@ def _failed(detail: str) -> str:
 def failure_text(error: BaseException) -> str:
     if not isinstance(error, HostError | ProfileError):
         return _failed(str(error))
+    if error.code in ("claim_failed", "take_over_failed") and NOT_LOCAL_SESSION in error.message:
+        return QCoreApplication.translate("Feedback", _NOT_LOCAL)
     message = _MESSAGES.get(error.code)
     if message is None:
         return _failed(error.message)

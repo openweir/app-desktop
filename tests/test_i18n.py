@@ -22,7 +22,7 @@ from openweir.models import format as fmt
 from openweir.models.profiles import ProfileError
 from openweir.models.store import ProfileStore
 from openweir.viewmodels.composition import ViewModels, compose
-from openweir.viewmodels.feedback import failure_text
+from openweir.viewmodels.feedback import NOT_LOCAL_SESSION, failure_text
 from scripts.gen_i18n import stale_binaries, stale_catalogs, unfinished_messages
 from tests.support.simulated import SimulatedFetcher, SimulatedHost, seed_profiles
 
@@ -239,3 +239,24 @@ def test_english_failures() -> None:
     # What did not open is data, named in the UI's words.
     inbound = HostError("inbound_failed", "mixed-port 9347, TUN")
     assert failure_text(inbound) == "Couldn’t open a port or the TUN: mixed-port 9347, TUN"  # noqa: RUF001
+    # The Linux service's refusals (D66), in the UI's words.
+    remote = HostError("claim_failed", f"{NOT_LOCAL_SESSION}: user 1000 is not signed in")
+    local = "Only a user signed in and active at this computer can use the tunnel"
+    assert failure_text(remote) == local
+    denied = HostError("not_authorized", "Error executing command as another user: Not authorized")
+    assert failure_text(denied) == "Administrator authorization wasn’t granted"  # noqa: RUF001
+
+
+def test_linux_service_refusals() -> None:
+    """The Linux service refuses a claim from outside an active local session (D66), as the
+    UI claims or after a take-over; other failures to claim keep their text."""
+    local = "只有在这台电脑上本地登录、正在使用的用户才能使用隧道"
+    for code in ("claim_failed", "take_over_failed"):
+        message = f"{NOT_LOCAL_SESSION}: process 4242 runs in user 1001's session 3"
+        assert failure_text(HostError(code, message)) == local
+    full = HostError("claim_failed", "record the owner: no space left on device")
+    assert failure_text(full) == "服务无法切换到当前用户"
+    helper = HostError("take_over_failed", "the take-over helper exited with status 1")
+    assert failure_text(helper) == "无法接管隧道"
+    refused = HostError("not_authorized", "pkexec: not authorized")
+    assert failure_text(refused) == "没有取得管理员授权"

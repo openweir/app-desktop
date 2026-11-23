@@ -917,6 +917,10 @@
         <translation>Couldn’t take over the tunnel</translation>
     </message>
     <message>
+        <source>没有取得管理员授权</source>
+        <translation>Administrator authorization wasn’t granted</translation>
+    </message>
+    <message>
         <source>配置无效</source>
         <translation>Invalid configuration</translation>
     </message>
@@ -1023,6 +1027,10 @@
     <message>
         <source>无法读写本地数据</source>
         <translation>Can’t read or save local data</translation>
+    </message>
+    <message>
+        <source>只有在这台电脑上本地登录、正在使用的用户才能使用隧道</source>
+        <translation>Only a user signed in and active at this computer can use the tunnel</translation>
     </message>
     <message>
         <source>操作失败：{detail}</source>
