@@ -1,5 +1,7 @@
 """A zip of what a bug report needs (docs/release.md §4): versions, the platform, the host's
 GetInfo and GetStatus, the core's recent warnings and errors and the settings without secrets.
+On Linux, also the distribution and its version, the desktop, the session type and the
+package format, by allow list.
 
 What leaves the machine is chosen by allow lists, never by removing what looks secret: a
 profile contributes counts and flags, not its name, link, path or text; an override only
@@ -21,6 +23,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
+import os
 import platform
 import re
 import sys
@@ -53,6 +56,7 @@ from openweir.models.provider.types import (
     RemoteSubscription,
 )
 from openweir.models.settings import Settings
+from openweir.update.releases import PACKAGE_FORMATS, installed_package_format
 
 # Settings written as they are, and settings only said to be set or not.
 SETTINGS_EXPORTED = frozenset(
@@ -86,6 +90,49 @@ LOG_NOTE = "# Warnings and errors only; every URL is written as scheme://<redact
 # provider's, so any other is written as "other".
 ACCESS_MODES = frozenset({ACCESS_LINK, ACCESS_BOTH, ACCESS_APP})
 STATUSES = frozenset({STATUS_ACTIVE, STATUS_DISABLED, STATUS_EXPIRED})
+
+
+# Linux desktops by the names XDG_CURRENT_DESKTOP gives them: the menu specification's
+# registered environments and others common there. Any other name is written as "other".
+DESKTOPS = frozenset(
+    {
+        "Budgie",
+        "Cinnamon",
+        "COSMIC",
+        "DDE",
+        "Deepin",
+        "EDE",
+        "Endless",
+        "Enlightenment",
+        "GNOME",
+        "GNOME-Classic",
+        "GNOME-Flashback",
+        "Hyprland",
+        "i3",
+        "KDE",
+        "LXDE",
+        "LXQt",
+        "MATE",
+        "niri",
+        "Pantheon",
+        "pop",
+        "Razor",
+        "ROX",
+        "sway",
+        "TDE",
+        "UKUI",
+        "ubuntu",
+        "Unity",
+        "wlroots",
+        "X-Cinnamon",
+        "XFCE",
+    }
+)
+SESSION_TYPES = frozenset({"x11", "wayland", "tty", "mir", "unspecified"})
+OS_RELEASE = (Path("/etc/os-release"), Path("/usr/lib/os-release"))  # the first one there
+# os-release's ID and VERSION_ID hold lower-case letters, digits, ".", "_" and "-"; anything
+# else is no value os-release gives, and is written as "other".
+_OS_RELEASE_VALUE = re.compile(r"[a-z0-9._-]{1,32}")
 
 
 @dataclass(frozen=True)
@@ -160,7 +207,7 @@ async def ask_host(host: TunnelHost) -> tuple[HostInfo | HostError, HostStatus |
 
 
 def about(language: str, now: float) -> dict[str, Any]:
-    return {
+    written: dict[str, Any] = {
         "version": __version__,
         "packaged": PACKAGED,
         "python": platform.python_version(),
@@ -172,6 +219,56 @@ def about(language: str, now: float) -> dict[str, Any]:
         "language": language,
         "exported_at": datetime.fromtimestamp(now, UTC).isoformat(timespec="seconds"),
     }
+    if sys.platform == "linux":
+        written["linux"] = linux_about()
+    return written
+
+
+def linux_about(
+    environ: Mapping[str, str] = os.environ,
+    os_release_paths: Sequence[Path] = OS_RELEASE,
+    package_format: str | None = None,
+) -> dict[str, Any]:
+    """The distribution, the desktop and how OpenWeir came onto it: what differs between
+    Linux machines where a bug shows. ``package_format`` is read from the marker by
+    default."""
+    desktops = environ.get("XDG_CURRENT_DESKTOP", "").split(":")
+    if package_format is None:
+        package_format = installed_package_format()
+    return {
+        "os_release": os_release(os_release_paths),
+        "desktop": [_known(name, DESKTOPS) for name in desktops if name],
+        "session_type": _known(environ.get("XDG_SESSION_TYPE", ""), SESSION_TYPES),
+        "package_format": _known(package_format or "", frozenset(PACKAGE_FORMATS)),
+    }
+
+
+def os_release(paths: Sequence[Path] = OS_RELEASE) -> dict[str, str | None]:
+    """os-release's ID and VERSION_ID, such as ``ubuntu`` and ``24.04``; nothing else of it,
+    such as a PRETTY_NAME or URLs that a vendor wrote."""
+    for path in paths:
+        try:
+            text = path.read_text("utf-8", errors="replace")
+        except OSError:
+            continue
+        values: dict[str, str] = {}
+        for line in text.splitlines():
+            key, separator, value = line.strip().partition("=")
+            if separator and key in ("ID", "VERSION_ID"):
+                if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+                    value = value[1:-1]
+                values[key] = value
+        return {
+            "id": _release_value(values.get("ID", "")),
+            "version_id": _release_value(values.get("VERSION_ID", "")),
+        }
+    return {"id": None, "version_id": None}
+
+
+def _release_value(value: str) -> str | None:
+    if not value:
+        return None
+    return value if _OS_RELEASE_VALUE.fullmatch(value) else "other"
 
 
 def _answer(answer: HostInfo | HostStatus | HostError) -> dict[str, Any]:
