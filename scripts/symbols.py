@@ -47,3 +47,35 @@ def windows(ui: Path, service: Path, build: Path, destination: Path) -> None:
         shutil.copyfile(path, destination / path.name)
         hashes[path.name] = hashlib.sha256(path.read_bytes()).hexdigest()
     (destination / "binaries.json").write_text(json.dumps(hashes, indent=2) + "\n")
+
+
+def build_id(path: Path) -> str | None:
+    """The GNU build ID of an ELF file (readelf -n), which ties a core dump to its binary and to
+    the debug information split off it; None without one."""
+    notes = subprocess.run(
+        ["readelf", "-n", str(path)], check=True, capture_output=True, text=True
+    ).stdout
+    found = re.search(r"Build ID: ([0-9a-f]+)", notes)
+    return found.group(1) if found else None
+
+
+def linux(binaries: list[Path], destination: Path) -> None:
+    """Move each binary's debug information to <destination>/<name>.debug and leave a
+    .gnu_debuglink to it: the package ships the binaries with their symbol tables but without
+    DWARF. Both halves must carry the same build ID, which build-ids.json records."""
+    destination.mkdir(parents=True, exist_ok=True)
+    identifiers = {}
+    for binary in binaries:
+        identifier = build_id(binary)
+        if identifier is None:
+            raise RuntimeError(f"{binary.name} has no build ID")
+        debug = destination / f"{binary.name}.debug"
+        for command in (
+            ["objcopy", "--only-keep-debug", str(binary), str(debug)],
+            ["objcopy", "--strip-debug", f"--add-gnu-debuglink={debug}", str(binary)],
+        ):
+            subprocess.run(command, check=True)
+        if build_id(binary) != identifier or build_id(debug) != identifier:
+            raise RuntimeError(f"symbols do not match {binary.name}")
+        identifiers[binary.name] = identifier
+    (destination / "build-ids.json").write_text(json.dumps(identifiers, indent=2) + "\n")

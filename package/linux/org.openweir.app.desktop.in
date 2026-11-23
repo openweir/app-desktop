@@ -1,0 +1,21 @@
+# scripts/build_linux.py writes /usr/share/applications/org.openweir.app.desktop from this:
+# MimeType gets product.json's urlSchemes, so the links of one-click import (D6, D45) open
+# OpenWeir. These comment lines are left out.
+[Desktop Entry]
+Type=Application
+Version=1.5
+Name=OpenWeir
+GenericName=Proxy Client
+GenericName[zh_CN]=代理客户端
+Comment=mihomo, built into the operating system
+Comment[zh_CN]=让 mihomo 融入操作系统
+Icon=org.openweir.app
+TryExec=/opt/openweir/openweir-ui
+Exec=/opt/openweir/openweir-ui %u
+Terminal=false
+Categories=Network;
+Keywords=proxy;vpn;tun;mihomo;clash;
+Keywords[zh_CN]=代理;隧道;mihomo;clash;
+StartupNotify=true
+SingleMainWindow=true
+MimeType=@MIME_TYPES@

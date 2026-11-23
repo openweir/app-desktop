@@ -1,0 +1,122 @@
+# OpenWeir's .deb and .rpm (docs/decisions.md D61), built by nfpm from scripts/build_linux.py.
+# The script puts a JSON value in place of each upper-case name between at signs, which YAML
+# reads as it is, and runs nfpm from the repository's root, where the relative paths start.
+name: openweir
+arch: @ARCH@
+platform: linux
+# X.Y.Z, as the update helper expects (src/core/service/update_linux.go); dpkg sees X.Y.Z-1.
+version: @VERSION@
+release: "1"
+section: net
+priority: optional
+maintainer: Ember Moth <ember_moth@proton.me>
+vendor: OpenWeir
+homepage: https://github.com/openweir/app-desktop
+license: GPL-3.0-only
+description: |-
+  mihomo, built into the operating system
+  OpenWeir is an open-source proxy client built on mihomo. A system service holds the
+  tunnel (TUN) for the signed-in user; the window imports subscriptions, switches proxies
+  and shows connections.
+
+# The libraries the files need (package/linux/system-libraries.toml), as each format names them.
+# On Linux the UI draws emoji with the system's colour emoji font, which a desktop usually has
+# but a minimal installation may not.
+overrides:
+  deb:
+    depends: @DEB_DEPENDS@
+    recommends:
+      - fonts-noto-color-emoji
+  rpm:
+    depends: @RPM_DEPENDS@
+    recommends:
+      - google-noto-color-emoji-fonts
+
+contents:
+  # /opt/openweir: the UI, the service, Cronet, the GEO data and the licenses. Root owns every
+  # file and directory, and only root may write to them: the service accepts a UI only from
+  # such a tree (docs/architecture.md "Linux (in progress)"). scripts/build_linux.py sets the
+  # modes before nfpm copies them.
+  - src: @TREE@
+    dst: /opt/openweir
+    type: tree
+    file_info:
+      owner: root
+      group: root
+  # Which package installed it, deb or rpm: the updater downloads the same kind.
+  - src: @DEB_MARKER@
+    dst: /opt/openweir/package-format
+    packager: deb
+    file_info:
+      mode: 0644
+      owner: root
+      group: root
+  - src: @RPM_MARKER@
+    dst: /opt/openweir/package-format
+    packager: rpm
+    file_info:
+      mode: 0644
+      owner: root
+      group: root
+  - src: /opt/openweir/openweir-ui
+    dst: /usr/bin/openweir
+    type: symlink
+
+  - src: package/linux/openweir.socket
+    dst: /usr/lib/systemd/system/openweir.socket
+    file_info: &file
+      mode: 0644
+      owner: root
+      group: root
+  - src: package/linux/openweir.service
+    dst: /usr/lib/systemd/system/openweir.service
+    file_info: *file
+  - src: package/linux/org.openweir.app.policy
+    dst: /usr/share/polkit-1/actions/org.openweir.app.policy
+    file_info: *file
+  - src: package/linux/90-openweir.conf
+    dst: /usr/lib/NetworkManager/conf.d/90-openweir.conf
+    file_info: *file
+  - src: @DESKTOP_FILE@
+    dst: /usr/share/applications/org.openweir.app.desktop
+    file_info: *file
+
+  # From scripts/gen_icons.py. Debian's and Fedora's triggers update the icon cache and the
+  # desktop database.
+  - src: package/icons/hicolor/16x16/apps/org.openweir.app.png
+    dst: /usr/share/icons/hicolor/16x16/apps/org.openweir.app.png
+    file_info: *file
+  - src: package/icons/hicolor/22x22/apps/org.openweir.app.png
+    dst: /usr/share/icons/hicolor/22x22/apps/org.openweir.app.png
+    file_info: *file
+  - src: package/icons/hicolor/24x24/apps/org.openweir.app.png
+    dst: /usr/share/icons/hicolor/24x24/apps/org.openweir.app.png
+    file_info: *file
+  - src: package/icons/hicolor/32x32/apps/org.openweir.app.png
+    dst: /usr/share/icons/hicolor/32x32/apps/org.openweir.app.png
+    file_info: *file
+  - src: package/icons/hicolor/48x48/apps/org.openweir.app.png
+    dst: /usr/share/icons/hicolor/48x48/apps/org.openweir.app.png
+    file_info: *file
+  - src: package/icons/hicolor/64x64/apps/org.openweir.app.png
+    dst: /usr/share/icons/hicolor/64x64/apps/org.openweir.app.png
+    file_info: *file
+  - src: package/icons/hicolor/128x128/apps/org.openweir.app.png
+    dst: /usr/share/icons/hicolor/128x128/apps/org.openweir.app.png
+    file_info: *file
+  - src: package/icons/hicolor/256x256/apps/org.openweir.app.png
+    dst: /usr/share/icons/hicolor/256x256/apps/org.openweir.app.png
+    file_info: *file
+  - src: package/icons/hicolor/512x512/apps/org.openweir.app.png
+    dst: /usr/share/icons/hicolor/512x512/apps/org.openweir.app.png
+    file_info: *file
+  - src: package/icons/hicolor/scalable/apps/org.openweir.app.svg
+    dst: /usr/share/icons/hicolor/scalable/apps/org.openweir.app.svg
+    file_info: *file
+
+# package/linux/scripts/, with functions.sh put in.
+scripts:
+  preinstall: @PREINSTALL@
+  postinstall: @POSTINSTALL@
+  preremove: @PREREMOVE@
+  postremove: @POSTREMOVE@

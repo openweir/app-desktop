@@ -4,12 +4,15 @@
     uv run python scripts/gen_licenses.py --check   # fail when they are stale
     uv run python scripts/gen_licenses.py --qt-docs ~/Qt/Docs/Qt-6.12.0  # refresh qt.json
 
-Inputs: the installed Python packages, the Go modules the Windows service and the macOS
-extension link (``go list``, which needs the module cache), ``package/licenses/`` (Qt's
-third-party code, read once from Qt's documentation; the libraries CPython's build bundles;
-Wintun's license; the LGPL text) and the bundled fonts. Outputs, committed like Theme.qml:
+Inputs: the Python packages the UI needs on macOS, Windows and Linux (installed, or for another
+platform's the wheel uv.lock pins, downloaded and checked against its hash), the Go modules the
+Windows and Linux services and the macOS extension link (``go list``, which needs the module
+cache), ``package/licenses/`` (Qt's third-party code, read once from Qt's documentation; the
+libraries CPython's build bundles; native code that wheels bundle; Wintun's license; the LGPL
+text) and the bundled fonts. Outputs, committed like Theme.qml:
 ``src/openweir/licenses/third_party.json`` for the settings page and
-``THIRD_PARTY_NOTICES.txt`` with every text.
+``THIRD_PARTY_NOTICES.txt`` with every text. Every platform's build ships the same two files,
+so they come out the same on whichever platform this runs.
 """
 
 from __future__ import annotations
@@ -17,16 +20,21 @@ from __future__ import annotations
 import argparse
 import hashlib
 import html
+import io
 import json
 import platform
 import re
 import struct
 import subprocess
 import sys
+import tempfile
 import textwrap
-from collections.abc import Iterable, Iterator
+import tomllib
+import urllib.request
+import zipfile
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
-from importlib.metadata import Distribution, distribution
+from importlib.metadata import Distribution, PackageNotFoundError, distribution
 from pathlib import Path
 
 from packaging.requirements import Requirement
@@ -40,6 +48,8 @@ CORE = ROOT / "src" / "core"
 INPUTS = ROOT / "package" / "licenses"
 QT_INPUT = INPUTS / "qt.json"
 CPYTHON_INPUT = INPUTS / "cpython.json"
+WHEELS_INPUT = INPUTS / "wheels.json"
+LOCK = ROOT / "uv.lock"
 WINTUN_LICENSE = INPUTS / "wintun.txt"
 LGPL = INPUTS / "LGPL-3.0-only.txt"
 OUTPUT = ROOT / "src" / "openweir" / "licenses"
@@ -47,7 +57,7 @@ MANIFEST = OUTPUT / "third_party.json"
 NOTICES = OUTPUT / "THIRD_PARTY_NOTICES.txt"
 FONTS = ROOT / "src" / "openweir" / "ui" / "fonts"
 
-# Go builds that ship (docs/architecture.md §3.4): the service and the extension's library.
+# Go builds that ship (docs/architecture.md §3.4): the services and the extension's library.
 GO_TARGETS = (
     (
         {"GOOS": "windows", "GOARCH": "amd64", "CGO_ENABLED": "0"},
@@ -56,6 +66,16 @@ GO_TARGETS = (
     ),
     (
         {"GOOS": "windows", "GOARCH": "arm64", "CGO_ENABLED": "0"},
+        "./service",
+        "with_gvisor,with_naive,with_purego",
+    ),
+    (
+        {"GOOS": "linux", "GOARCH": "amd64", "CGO_ENABLED": "0"},
+        "./service",
+        "with_gvisor,with_naive,with_purego",
+    ),
+    (
+        {"GOOS": "linux", "GOARCH": "arm64", "CGO_ENABLED": "0"},
         "./service",
         "with_gvisor,with_naive,with_purego",
     ),
@@ -81,6 +101,13 @@ WINTUN_VERSION = "0.14.1"
 
 # PySide6 names these, but the UI never imports them, so Nuitka leaves them out.
 NOT_SHIPPED = {"pyside6-webengine", "pyside6-pdf"}
+# The platforms the UI ships on, as environment markers see them: a package that only one of them
+# needs (pywin32-ctypes, secretstorage) is listed for all.
+PLATFORM_MARKERS: dict[str, dict[str, str]] = {
+    "macOS": {"sys_platform": "darwin", "platform_system": "Darwin", "os_name": "posix"},
+    "Windows": {"sys_platform": "win32", "platform_system": "Windows", "os_name": "nt"},
+    "Linux": {"sys_platform": "linux", "platform_system": "Linux", "os_name": "posix"},
+}
 # Licenses the texts or the metadata do not state recognisably.
 LICENSE_OVERRIDES: dict[str, str] = {
     # Its LICENSE files sit in the packages; chacha/ itself says "found in the LICENSE file".
@@ -214,24 +241,66 @@ def _read(path: Path) -> str:
 # -- Python ----------------------------------------------------------------------------------
 
 
-def _requirements(dist: Distribution) -> Iterator[str]:
+def _requirements(dist: Distribution, markers: Mapping[str, str]) -> Iterator[str]:
     for line in dist.requires or ():
         requirement = Requirement(line)
-        if requirement.marker is None or requirement.marker.evaluate({"extra": ""}):
+        if requirement.marker is None or requirement.marker.evaluate({**markers, "extra": ""}):
             yield canonicalize_name(requirement.name)
 
 
-def _runtime_closure(root: str) -> list[Distribution]:
-    seen: dict[str, Distribution] = {}
-    queue = list(_requirements(distribution(root)))
-    while queue:
-        name = queue.pop(0)
-        if name in seen or name in NOT_SHIPPED:
-            continue
-        dist = distribution(name)
-        seen[name] = dist
-        queue.extend(_requirements(dist))
-    return sorted(seen.values(), key=lambda d: canonicalize_name(d.metadata["Name"]))
+def locked_packages(lock: Path = LOCK) -> dict[str, dict]:
+    """uv.lock's packages by their normalized names."""
+    data = tomllib.loads(lock.read_text(encoding="utf-8"))
+    return {canonicalize_name(package["name"]): package for package in data["package"]}
+
+
+def _locked_wheel(name: str, directory: Path) -> Distribution:
+    """The metadata of a package this machine does not install, from the wheel uv.lock pins:
+    a pure one if there is, else the smallest. The license files are the same in each."""
+    wheels = locked_packages()[name].get("wheels") or []
+    if not wheels:
+        raise SystemExit(f"uv.lock has no wheel of {name}")
+    pure = [wheel for wheel in wheels if wheel["url"].endswith("-none-any.whl")]
+    wheel = (pure or sorted(wheels, key=lambda wheel: wheel["size"]))[0]
+    if not wheel["url"].startswith("https://"):
+        raise SystemExit(f"{name}'s wheel is not on https: {wheel['url']}")
+    with urllib.request.urlopen(wheel["url"], timeout=60) as response:
+        data = response.read()
+    algorithm, _, expected = wheel["hash"].partition(":")
+    if hashlib.new(algorithm, data).hexdigest() != expected:
+        raise SystemExit(f"{wheel['url']} does not match uv.lock's {wheel['hash']}")
+    target = directory / name
+    with zipfile.ZipFile(io.BytesIO(data)) as archive:
+        members = [member for member in archive.namelist() if ".dist-info/" in member]
+        archive.extractall(target, members)
+    (info,) = {member.split("/", 1)[0] for member in members}
+    return Distribution.at(target / info)
+
+
+def _runtime_closure(root: str, wheels: Path) -> list[Distribution]:
+    """What ``root`` needs at run time on any of the platforms, installed or not."""
+    found: dict[str, Distribution] = {}
+
+    def load(name: str) -> Distribution:
+        if name not in found:
+            try:
+                found[name] = distribution(name)
+            except PackageNotFoundError:
+                found[name] = _locked_wheel(name, wheels)
+        return found[name]
+
+    shipped: set[str] = set()
+    for markers in PLATFORM_MARKERS.values():
+        seen: set[str] = set()
+        queue = list(_requirements(distribution(root), markers))
+        while queue:
+            name = queue.pop(0)
+            if name in seen or name in NOT_SHIPPED:
+                continue
+            seen.add(name)
+            queue.extend(_requirements(load(name), markers))
+        shipped |= seen
+    return sorted((found[name] for name in shipped), key=lambda d: canonicalize_name(d.name))
 
 
 def _python_texts(dist: Distribution) -> tuple[str, ...]:
@@ -251,9 +320,9 @@ def _python_url(dist: Distribution) -> str:
     return metadata.get("Home-page") or f"https://pypi.org/project/{metadata['Name']}/"
 
 
-def python_entries() -> list[Entry]:
+def python_entries(wheels: Path) -> list[Entry]:
     entries = []
-    for dist in _runtime_closure("openweir"):
+    for dist in _runtime_closure("openweir", wheels):
         metadata = dist.metadata
         texts = _python_texts(dist)
         license_ = metadata.get("License-Expression") or ""
@@ -269,7 +338,7 @@ def python_entries() -> list[Entry]:
         entries.append(
             Entry(metadata["Name"], dist.version, license_, "python", _python_url(dist), texts)
         )
-    return entries + _cpython()
+    return entries + _cpython() + _wheel_natives()
 
 
 def _cpython() -> list[Entry]:
@@ -294,11 +363,38 @@ def _cpython() -> list[Entry]:
     entries = [Entry("CPython", version, "PSF-2.0", "python", "https://www.python.org/", texts)]
     for item in data["libraries"]:
         where = ", ".join(item["modules"])
-        if len(item["platforms"]) == 1:
-            where += f", {item['platforms'][0]}"
+        if set(item["platforms"]) != set(PLATFORM_MARKERS):
+            where += ", " + ", ".join(item["platforms"])
         entries.append(
             Entry(
                 f"{item['name']} (CPython {where})",
+                item["version"],
+                item["license"],
+                "python",
+                item["url"],
+                tuple(item["texts"]),
+            )
+        )
+    return entries
+
+
+def _wheel_natives() -> list[Entry]:
+    """Native libraries that wheels link in or carry without their license in the metadata,
+    from WHEELS_INPUT: OpenSSL in cryptography's, ICU in PySide6's Linux wheels. Each is tied
+    to the version uv.lock pins of its wheel; another means looking again."""
+    locked = locked_packages()
+    entries = []
+    for item in json.loads(WHEELS_INPUT.read_text(encoding="utf-8"))["components"]:
+        wheel = canonicalize_name(item["distribution"])
+        if locked[wheel]["version"] != item["distribution_version"]:
+            raise SystemExit(
+                f"wheels.json describes {wheel} {item['distribution_version']} but uv.lock has "
+                f"{locked[wheel]['version']}; look at what that wheel carries again"
+            )
+        where = f"in {item['distribution']}, {', '.join(item['platforms'])}"
+        entries.append(
+            Entry(
+                f"{item['name']} ({where})",
                 item["version"],
                 item["license"],
                 "python",
@@ -349,12 +445,16 @@ def _linked_modules() -> dict[str, _Module]:
                 continue
             module = modules.setdefault(path, _Module(path, version, Path(root), set()))
             module.packages.add(Path(package))
-    # Purego dynamically loads this DLL; it is shipped but absent from go list -deps.
+    # Purego loads Cronet's shared library at run time, so go list -deps does not name it; the
+    # Windows and Linux services ship it beside them.
     from scripts import cronet
 
-    for arch in ("amd64", "arm64"):
-        native = cronet.library("windows", arch)
-        modules[native.module] = _Module(native.module, native.version, native.root, {native.root})
+    for system in ("windows", "linux"):
+        for arch in ("amd64", "arm64"):
+            native = cronet.library(system, arch)
+            modules[native.module] = _Module(
+                native.module, native.version, native.root, {native.root}
+            )
     return modules
 
 
@@ -674,7 +774,9 @@ def render(entries: list[Entry]) -> tuple[str, str]:
 
 
 def generate() -> tuple[str, str]:
-    entries = python_entries() + go_entries() + qt_entries() + font_entries()
+    with tempfile.TemporaryDirectory() as wheels:
+        python = python_entries(Path(wheels))
+    entries = python + go_entries() + qt_entries() + font_entries()
     return render(entries)
 
 

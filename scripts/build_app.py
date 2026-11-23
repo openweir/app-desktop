@@ -67,7 +67,8 @@ NUITKA_VERSION = "4.2.2"  # pinned in pyproject.toml's build group and locked
 # QtX in the bundle. Kept: QtDBus (QtGui links it), QtOpenGL (the QtQuick binding needs it),
 # QtWidgets (Qt.labs.platform links it), QtSvg (the icons), QtQuickShapesDesignHelpers (Shapes
 # links it), QtQuickDialogs2* (FileDialog), and the macOS and native styles, which the dialogs'
-# Qt Quick fallback would use.
+# Qt Quick fallback would use. Only Linux wheels have the Wayland compositor's and EGLFS's
+# libraries; the UI is a Wayland client, with QtWaylandClient (scripts/build_linux.py).
 UNUSED_QT_LIBRARIES = (
     "3D",
     "Charts",
@@ -115,6 +116,11 @@ UNUSED_QT_LIBRARIES = (
     "WebEngine",
     "WebSockets",
     "WebView",
+    "WaylandCompositor",
+    "WaylandEglCompositorHwIntegration",
+    "EglFSDeviceIntegration",
+    "EglFsKmsSupport",
+    "EglFsKmsGbmSupport",
 )
 # The QML modules of the same families, under PySide6/qml.
 UNUSED_QML_DIRECTORIES = (
@@ -161,6 +167,7 @@ UNUSED_QML_DIRECTORIES = (
     "QtWebEngine",
     "QtWebSockets",
     "QtWebView",
+    "QtWayland/Compositor",
 )
 # The UI shows SVG; PNG is built in.
 UNUSED_IMAGE_FORMATS = ("gif", "icns", "ico", "jpeg", "macheif", "macjp2", "pdf", "tga", "tiff")

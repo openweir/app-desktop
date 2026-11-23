@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<!--
+  What the UI runs as root through pkexec (D62, D66): the service's executable with one of two
+  modes. pkexec picks the action by the program and its first argument, and both ask an
+  administrator every time; neither is offered to sessions that are not active at this machine.
+-->
+<policyconfig>
+  <vendor>OpenWeir</vendor>
+  <vendor_url>https://github.com/openweir/app-desktop</vendor_url>
+  <icon_name>org.openweir.app</icon_name>
+
+  <action id="org.openweir.app.take-over">
+    <description>Take over OpenWeir's tunnel from another user</description>
+    <description xml:lang="zh_CN">从其他用户接管 OpenWeir 的隧道</description>
+    <message>Authentication is required to stop another user's OpenWeir tunnel and take it over</message>
+    <message xml:lang="zh_CN">停止其他用户的 OpenWeir 隧道并接管它需要验证</message>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_admin</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/opt/openweir/openweir-service</annotate>
+    <annotate key="org.freedesktop.policykit.exec.argv1">-take-over</annotate>
+  </action>
+
+  <action id="org.openweir.app.install-update">
+    <description>Install an OpenWeir update</description>
+    <description xml:lang="zh_CN">安装 OpenWeir 更新</description>
+    <message>Authentication is required to install an OpenWeir update</message>
+    <message xml:lang="zh_CN">安装 OpenWeir 更新需要验证</message>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_admin</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/opt/openweir/openweir-service</annotate>
+    <annotate key="org.freedesktop.policykit.exec.argv1">-install-update</annotate>
+  </action>
+</policyconfig>

@@ -2,8 +2,9 @@
 
     uv run python scripts/gen_icons.py
 
-Writes the app icons (src/openweir/ui/brand/*.svg, package/icons/openweir.ico and
-package/icons/openweir.icns) and the six tray SVGs in src/openweir/ui/tray/, all from the
+Writes the app icons (src/openweir/ui/brand/*.svg, package/icons/openweir.ico,
+package/icons/openweir.icns and the Linux packages' hicolor theme icons in package/icons/hicolor/)
+and the six tray SVGs in src/openweir/ui/tray/, all from the
 OpenWeir mark (assets/openweir.svg) and the design repository's brand colours.
 Everything is committed, so a build needs no renderer; run this after changing the
 geometry, and check the result by eye.
@@ -16,10 +17,15 @@ import struct
 import sys
 from pathlib import Path
 
+from openweir.product import LINUX_DESKTOP_ID
+
 ROOT = Path(__file__).resolve().parent.parent
 BRAND = ROOT / "src" / "openweir" / "ui" / "brand"
 TRAY = ROOT / "src" / "openweir" / "ui" / "tray"
 PACKAGE = ROOT / "package" / "icons"
+# The icon theme's directories under /usr/share/icons/hicolor, named after the .desktop file.
+HICOLOR = PACKAGE / "hicolor"
+HICOLOR_SIZES = (16, 22, 24, 32, 48, 64, 128, 256, 512)
 
 # The OpenWeir mark from the assets repository (assets/openweir.svg), on its 100-unit view.
 MARK = (
@@ -118,6 +124,13 @@ def icns(images: dict[int, bytes]) -> bytes:
     return b"icns" + struct.pack(">I", 8 + len(entries)) + entries
 
 
+def hicolor_paths() -> dict[str, Path]:
+    """Each icon the Linux packages install, by its path under the hicolor theme."""
+    relatives = [f"{size}x{size}/apps/{LINUX_DESKTOP_ID}.png" for size in HICOLOR_SIZES]
+    relatives.append(f"scalable/apps/{LINUX_DESKTOP_ID}.svg")
+    return {relative: HICOLOR / relative for relative in relatives}
+
+
 def main() -> None:
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     from PySide6.QtGui import QGuiApplication
@@ -146,6 +159,17 @@ def main() -> None:
             (TRAY / f"tray-{variant}-{state}.svg").write_text(tray_svg(color, opacity))
 
     (PACKAGE / "openweir.icns").write_bytes(icns({size: render(macos, size) for size in ICNS}))
+
+    # Linux: GNOME's grid keeps a sixteenth of the canvas free around the shape, and docks
+    # show the icon as it is drawn.
+    linux = tile_svg(128, 8 / 128)
+    for relative, path in hicolor_paths().items():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if relative.startswith("scalable/"):
+            path.write_text(linux)
+        else:
+            size = int(relative.split("x", 1)[0])
+            path.write_bytes(render(linux, size))
     print("wrote", ", ".join(str(p.relative_to(ROOT)) for p in (BRAND, PACKAGE, TRAY)))
 
 

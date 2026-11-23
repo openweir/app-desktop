@@ -1,0 +1,180 @@
+# The shared libraries that /opt/openweir takes from the distribution instead of carrying them
+# (docs/decisions.md D61). scripts/build_linux.py keeps every soname listed here out of the
+# Nuitka build, reads what each ELF file in the tree needs (readelf -d, NEEDED) and makes the
+# packages depend on the libraries it uses:
+#
+# - the .deb on the Debian package named here ("a | b" lists alternatives: Ubuntu 24.04 renamed
+#   some libraries for 64-bit time_t, and the old names stay as provides on 64-bit machines);
+# - the .rpm on the sonames themselves, <soname>()(64bit), which Fedora, openSUSE and RHEL all
+#   provide whatever they call the package, plus the newest GLIBC_, GLIBCXX_ and CXXABI_
+#   versions the files need, as rpmbuild would.
+#
+# loaded_by_name marks a library the UI loads by its soname at run time (ctypes), which readelf
+# cannot see; the packages always depend on it.
+#
+# A soname that a file needs, that the tree does not carry and that is not listed here stops
+# the build: bundle the library, or add it here once the oldest distributions supported
+# (Ubuntu 22.04 and Debian 12 on x86_64, Ubuntu 24.04 and Debian 13 on arm64) ship it.
+#
+# "requires" is what the package needs besides libraries: systemd runs the service, pkexec
+# the take-over and update helpers.
+
+[requires]
+deb = ["systemd", "pkexec | policykit-1"]
+rpm = ["systemd", "/usr/bin/pkexec"]
+
+# glibc. The .deb also asks for the newest GLIBC_ version the files need.
+[[library]]
+deb = "libc6"
+sonames = [
+    "libc.so.6",
+    "libm.so.6",
+    "libdl.so.2",
+    "libpthread.so.0",
+    "librt.so.1",
+    "libutil.so.1",
+    "ld-linux-x86-64.so.2",
+    "ld-linux-aarch64.so.1",
+]
+versions = "GLIBC_"
+
+[[library]]
+deb = "libstdc++6"
+sonames = ["libstdc++.so.6"]
+
+[[library]]
+deb = "libgcc-s1"
+sonames = ["libgcc_s.so.1"]
+
+[[library]]
+deb = "zlib1g"
+sonames = ["libz.so.1"]
+
+[[library]]
+deb = "libzstd1"
+sonames = ["libzstd.so.1"]
+
+[[library]]
+deb = "libbrotli1"
+sonames = ["libbrotlidec.so.1"]
+
+[[library]]
+deb = "libglib2.0-0t64 | libglib2.0-0"
+sonames = ["libglib-2.0.so.0"]
+
+[[library]]
+deb = "libdbus-1-3"
+sonames = ["libdbus-1.so.3"]
+
+[[library]]
+deb = "libfontconfig1"
+sonames = ["libfontconfig.so.1"]
+
+[[library]]
+deb = "libfreetype6"
+sonames = ["libfreetype.so.6"]
+
+# OpenGL through libglvnd, so that the machine's drivers load.
+[[library]]
+deb = "libegl1"
+sonames = ["libEGL.so.1"]
+
+[[library]]
+deb = "libgl1"
+sonames = ["libGL.so.1"]
+
+[[library]]
+deb = "libxkbcommon0"
+sonames = ["libxkbcommon.so.0"]
+
+[[library]]
+deb = "libxkbcommon-x11-0"
+sonames = ["libxkbcommon-x11.so.0"]
+
+# Qt's xcb platform plugin, for X11 sessions.
+[[library]]
+deb = "libx11-6"
+sonames = ["libX11.so.6"]
+
+[[library]]
+deb = "libx11-xcb1"
+sonames = ["libX11-xcb.so.1"]
+
+[[library]]
+deb = "libice6"
+sonames = ["libICE.so.6"]
+
+[[library]]
+deb = "libsm6"
+sonames = ["libSM.so.6"]
+
+# Qt's xcb plugin needs it, and the UI's X11 window activation loads it with ctypes.
+[[library]]
+deb = "libxcb1"
+sonames = ["libxcb.so.1"]
+loaded_by_name = true
+
+[[library]]
+deb = "libxcb-cursor0"
+sonames = ["libxcb-cursor.so.0"]
+
+[[library]]
+deb = "libxcb-glx0"
+sonames = ["libxcb-glx.so.0"]
+
+[[library]]
+deb = "libxcb-icccm4"
+sonames = ["libxcb-icccm.so.4"]
+
+[[library]]
+deb = "libxcb-image0"
+sonames = ["libxcb-image.so.0"]
+
+[[library]]
+deb = "libxcb-keysyms1"
+sonames = ["libxcb-keysyms.so.1"]
+
+[[library]]
+deb = "libxcb-randr0"
+sonames = ["libxcb-randr.so.0"]
+
+[[library]]
+deb = "libxcb-render0"
+sonames = ["libxcb-render.so.0"]
+
+[[library]]
+deb = "libxcb-render-util0"
+sonames = ["libxcb-render-util.so.0"]
+
+[[library]]
+deb = "libxcb-shape0"
+sonames = ["libxcb-shape.so.0"]
+
+[[library]]
+deb = "libxcb-shm0"
+sonames = ["libxcb-shm.so.0"]
+
+[[library]]
+deb = "libxcb-sync1"
+sonames = ["libxcb-sync.so.1"]
+
+[[library]]
+deb = "libxcb-xfixes0"
+sonames = ["libxcb-xfixes.so.0"]
+
+[[library]]
+deb = "libxcb-xkb1"
+sonames = ["libxcb-xkb.so.1"]
+
+# Qt's wayland platform plugin.
+[[library]]
+deb = "libwayland-client0"
+sonames = ["libwayland-client.so.0"]
+
+[[library]]
+deb = "libwayland-cursor0"
+sonames = ["libwayland-cursor.so.0"]
+
+[[library]]
+deb = "libwayland-egl1"
+sonames = ["libwayland-egl.so.1"]

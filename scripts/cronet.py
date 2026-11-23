@@ -1,4 +1,6 @@
-"""Native Cronet artifacts selected by the same Go module graph as the bindings."""
+"""Native Cronet artifacts selected by the same Go module graph as the bindings: the static
+library the macOS extension links, and the shared library that the Windows and Linux services
+load with purego from beside their executable."""
 
 from __future__ import annotations
 
@@ -26,6 +28,8 @@ def library(system: str, arch: str) -> NativeLibrary:
         ("darwin", "amd64"),
         ("windows", "amd64"),
         ("windows", "arm64"),
+        ("linux", "amd64"),
+        ("linux", "arm64"),
     ):
         raise ValueError(f"unsupported OpenWeir native target: {system}/{arch}")
     module = MODULE + f"{system}_{arch}"
@@ -34,7 +38,7 @@ def library(system: str, arch: str) -> NativeLibrary:
         return json.loads(gomod.go(*arguments))
 
     selected = query("list", "-m", "-json", module)
-    name = "libcronet.a" if system == "darwin" else "libcronet.dll"
+    name = {"darwin": "libcronet.a", "windows": "libcronet.dll", "linux": "libcronet.so"}[system]
     vendored = CORE / "vendor" / module
     if (vendored / name).is_file():
         return NativeLibrary(module, selected["Version"], vendored, vendored / name)
