@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import contextlib
+import dataclasses
 import hashlib
 import http.client
 import re
@@ -180,6 +181,22 @@ def _etag(value: str, url: str) -> EntityTag | None:
     )
 
 
+def read_download(body: bytes, headers: Message) -> Download:
+    """A downloaded config with what its answer's headers say about it, without an entity tag:
+    the usage, file name, update interval in hours, title and links."""
+    hours = headers.get("Profile-Update-Interval", "").strip()
+    interval = int(hours) if re.fullmatch(r"[0-9]{1,10}", hours) else 0
+    return Download(
+        body=body,
+        usage=usage_from_headers(headers),
+        filename=suggested_name(headers.get("Content-Disposition")),
+        title=_title(headers.get("Profile-Title", "")),
+        interval=interval if 0 < interval <= 2_147_483_647 else None,
+        website=web_link(headers.get("Profile-Web-Page-Url", "")),
+        support=web_link(headers.get("Support-Url", "")),
+    )
+
+
 def decode_config(body: bytes) -> str:
     if len(body) > MAX_CONFIG_BYTES:
         raise ProfileError("too_large", f"{len(body)} bytes")
@@ -277,15 +294,6 @@ class UrlFetcher:
             raise ProfileError("download_failed", str(error) or type(error).__name__) from error
         if len(body) > self._max_bytes:
             raise ProfileError("too_large", f"more than {self._max_bytes} bytes")
-        hours = headers.get("Profile-Update-Interval", "").strip()
-        interval = int(hours) if re.fullmatch(r"[0-9]{1,10}", hours) else 0
-        return Download(
-            body=body,
-            usage=usage_from_headers(headers),
-            filename=suggested_name(headers.get("Content-Disposition")),
-            title=_title(headers.get("Profile-Title", "")),
-            interval=interval if 0 < interval <= 2_147_483_647 else None,
-            website=web_link(headers.get("Profile-Web-Page-Url", "")),
-            support=web_link(headers.get("Support-Url", "")),
-            etag=_etag(headers.get("ETag", ""), resource_url),
+        return dataclasses.replace(
+            read_download(body, headers), etag=_etag(headers.get("ETag", ""), resource_url)
         )
