@@ -619,9 +619,9 @@ jobs:
         shell: powershell
         run: ./package/windows/arm64-upgrade-smoke-test.ps1 -X64Installer (Get-Item build/migration/x64/*.exe).FullName -ARM64Installer (Get-Item build/migration/arm64/*.exe).FullName
 
-  # The owned-TUN and fd-mode tests create a real TUN, so they run only here, inside network
-  # namespaces (docs/architecture.md §11). md-tun holds the engine; md-srv, on the
-  # far side of a veth pair, serves the page the test fetches through the TUN and echoes
+  # The owned-TUN, fd-mode, pinned-TUN and crash tests create a real TUN, so they run only
+  # here, inside network namespaces (docs/architecture.md §11). md-tun holds the engine; md-srv,
+  # on the far side of a veth pair, serves the page the test fetches through the TUN and echoes
   # the UDP it sends. The servers listen on 10.201.0.1, off md-tun's link: auto-route leaves
   # on-link destinations to the main table, so a server on 10.200.0.0/24 would bypass the TUN.
   tun:
@@ -711,10 +711,35 @@ jobs:
             OPENWEIR_TUN_OUTBOUND=md-veth0 \
             OPENWEIR_TUN_STACKS="${{ matrix.stacks }}" \
             ip netns exec md-tun "$RUNNER_TEMP/engine-tun.test" -test.run '^TestFDTUN$' -test.v -test.count=1
+      # The Linux service's TUN on the product's device, table and rules (D67), which a profile
+      # cannot move, and the clean-up that systemd runs around the service (tunclean): the crash
+      # test kills, then freezes, a child running that TUN and has Clean bring the namespace
+      # back. md-srv serves the page over IPv6 as well, on md-veth1's own address: a TUN without
+      # an IPv6 address makes IPv6 unreachable under strict-route, whatever the link, and its
+      # rules keep doing so after a crash until something removes them. nodad makes the
+      # addresses usable at once.
+      - name: Pinned TUN and crash clean-up in md-tun
+        run: |
+          sudo ip -n md-tun addr add fd00:200::2/64 dev md-veth0 nodad
+          sudo ip -n md-srv addr add fd00:200::1/64 dev md-veth1 nodad
+          # shellcheck disable=SC2024
+          sudo ip netns exec md-srv python3 -m http.server 8080 --bind fd00:200::1 \
+            --directory "$RUNNER_TEMP/www" > "$RUNNER_TEMP/http6.log" 2>&1 &
+          for _ in $(seq 50); do
+            sudo ip netns exec md-tun curl -fsS --max-time 1 'http://[fd00:200::1]:8080/' && break
+            sleep 0.2
+          done
+          sudo env OPENWEIR_TUN_TEST=1 \
+            OPENWEIR_TUN_TARGET=http://10.201.0.1:8080/ \
+            OPENWEIR_TUN_TARGET6='http://[fd00:200::1]:8080/' \
+            OPENWEIR_TUN_OUTBOUND=md-veth0 \
+            OPENWEIR_TUN_STACKS="${{ matrix.stacks }}" \
+            ip netns exec md-tun "$RUNNER_TEMP/engine-tun.test" -test.run '^(TestPinnedTUN|TestCrashedTUN)$' -test.v -test.count=1
       # systemd-resolved serves the runner, outside the namespaces, yet takes interface
       # indexes from inside them over D-Bus: sing-tun's resolvectl calls for mdtun0 land on
-      # whichever runner interface has the same index. Left there, they cut the runner off
-      # its DNS and the job hangs after its last step, so fail here instead.
+      # whichever runner interface has the same index (tunclean's revert skips itself outside
+      # PID 1's namespace for that reason). Left there, they cut the runner off its DNS and
+      # the job hangs after its last step, so fail here instead.
       - name: Runner DNS untouched
         run: |
           sleep 1
