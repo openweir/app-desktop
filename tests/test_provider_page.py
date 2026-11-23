@@ -278,8 +278,10 @@ def test_a_provider_row_has_the_accounts_menu(
     assert loaded.warnings == []
 
 
+# Slow: the provider answers once the confirmation has closed.
+@pytest.mark.parametrize("slow", [False, True], ids=["answered", "answered-after-closing"])
 def test_signing_out_from_a_row_moves_the_focus_off_the_rows_that_go(
-    qtbot: QtBot, loaded: Loaded, provider: FakeProvider
+    qtbot: QtBot, loaded: Loaded, provider: FakeProvider, slow: bool
 ) -> None:
     view_models = loaded.view_models
     profiles = view_models.profiles
@@ -295,14 +297,20 @@ def test_signing_out_from_a_row_moves_the_focus_off_the_rows_that_go(
     assert "「专业版」、「基础版」会从本机删除。" in profiles.property("signOutText")
     loaded.key(qtbot, Qt.Key.Key_Tab)
     assert loaded.focused_text() == "退出登录"
+    gate = provider.hold("sign_out") if slow else None
     loaded.key(qtbot, Qt.Key.Key_Return)
+    if gate is not None:
+        qtbot.waitUntil(
+            lambda: (
+                not loaded.overlay_items(lambda i: i.isVisible() and i.property("text") == "取消")
+            )
+        )
+        gate.set()
 
     # Both rows go; the focus goes to the row above them, not to the other that goes.
     qtbot.waitUntil(lambda: len(profiles.property("model").rows) == 3)
     qtbot.waitUntil(lambda: loaded.focused().property("accessibleName") == "本地配置 的更多操作")
-    # The ring shows once the window has the focus back from the dialog, a moment later on
-    # Windows.
-    qtbot.waitUntil(lambda: loaded.focused().property("visualFocus"))
+    assert loaded.focused().property("visualFocus")
     assert loaded.warnings == []
 
 

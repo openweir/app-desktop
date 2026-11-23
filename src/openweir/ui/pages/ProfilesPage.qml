@@ -109,7 +109,7 @@ ScrollView {
         if (dialog)
             dialog.returnFocusTo = next
         else if (row.moreButton.activeFocus)
-            next.forceActiveFocus(removeDialog.returnFocusReason)
+            next.forceActiveFocus(Focus.reasonAfter(row.moreButton))
     }
 
     function submitImport() {

@@ -516,8 +516,11 @@ def test_using_a_subscription_of_the_account(
     assert window.warnings == []
 
 
+# Slow: the provider answers once the confirmation has closed, and 退出登录 is off (busy)
+# until then.
+@pytest.mark.parametrize("slow", [False, True], ids=["answered", "answered-after-closing"])
 def test_signing_out_of_the_last_account_goes_to_the_subscriptions_page(
-    qtbot: QtBot, window: Loaded, provider: FakeProvider
+    qtbot: QtBot, window: Loaded, provider: FakeProvider, slow: bool
 ) -> None:
     view_models = window.view_models
     account, shell, profiles = view_models.account, view_models.shell, view_models.profiles
@@ -540,16 +543,23 @@ def test_signing_out_of_the_last_account_goes_to_the_subscriptions_page(
     assert "之后改用「示例订阅 A」的规则" in text
     window.key(qtbot, Qt.Key.Key_Tab)
     assert window.focused_text() == "退出登录"
+    gate = provider.hold("sign_out") if slow else None
     window.key(qtbot, Qt.Key.Key_Return)
+    if gate is not None:
+        qtbot.waitUntil(
+            lambda: (
+                not window.overlay_items(lambda i: i.isVisible() and i.property("text") == "取消")
+            ),
+            timeout=WAIT,
+        )
+        gate.set()
 
     # The page and its tab go; 添加 on the subscriptions page has the focus, with its ring.
     qtbot.waitUntil(lambda: "account" not in listed(view_models), timeout=WAIT)
     assert prop(shell, "currentPage") == "profiles"
     add = window.item(lambda i: kind(i) == "MenuButton" and i.property("text") == "添加")
     qtbot.waitUntil(lambda: window.focused() is add, timeout=WAIT)
-    # The ring shows once the window has the focus back from the dialog, a moment later on
-    # macOS.
-    qtbot.waitUntil(lambda: add.property("visualFocus"), timeout=WAIT)
+    assert add.property("visualFocus")
     qtbot.waitUntil(lambda: len(prop(profiles, "model").rows) == 3, timeout=WAIT)
     assert prop(profiles, "activeName") == "示例订阅 A"
     assert provider.requests_for("sign_out")

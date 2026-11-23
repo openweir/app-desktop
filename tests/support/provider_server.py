@@ -159,6 +159,7 @@ class FakeProvider:
         self.requests: list[Recorded] = []
         self._challenges: dict[str, _Challenge] = {}
         self._answers: dict[str, list[_Answer]] = {}
+        self._holds: dict[str, threading.Event] = {}
         self._lock = threading.Lock()
         if seed:
             self._seed()
@@ -185,6 +186,9 @@ class FakeProvider:
         ).start()
 
     def close(self) -> None:
+        with self._lock:
+            for gate in self._holds.values():
+                gate.set()
         self._server.shutdown()
         self._server.server_close()
 
@@ -402,6 +406,13 @@ class FakeProvider:
         with self._lock:
             self.sessions.clear()
 
+    def hold(self, route: str) -> threading.Event:
+        """Requests to ``route`` are answered once the returned event is set."""
+        gate = threading.Event()
+        with self._lock:
+            self._holds[route] = gate
+        return gate
+
     def requests_for(self, route: str) -> list[Recorded]:
         with self._lock:
             return [r for r in self.requests if r.route == route]
@@ -418,6 +429,9 @@ class FakeProvider:
             self.requests.append(recorded)
             queue = self._answers.get(route)
             override = queue.pop(0) if queue else None
+            gate = self._holds.get(route)
+        if gate is not None:
+            gate.wait(timeout=60)
         if override is not None:
             answer = override
         else:

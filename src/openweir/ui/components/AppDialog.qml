@@ -10,7 +10,7 @@ import QtQuick.Layouts
 //
 // Esc rejects. Enter runs the focused button, or `defaultButton` when focus is elsewhere.
 // Focus starts on `initialFocus`, stays inside while the dialog shows and goes back to
-// `returnFocusTo` once it closes.
+// `returnFocusTo` once it closes, or once it is on again when what it asked for keeps it off.
 Dialog {
     id: dialog
 
@@ -23,6 +23,7 @@ Dialog {
     property alias buttons: buttonRow.data
     property alias leadingButtons: leadingRow.data
     property bool holdsFocus: false  // from opening until it starts to close
+    property Item pendingReturn  // returnFocusTo, off (busy) when the dialog closed
 
     // Opens the dialog; `from` gets focus back afterwards, with its focus ring if it had one.
     function show(from: Item) {
@@ -58,6 +59,7 @@ Dialog {
 
     onAboutToShow: {
         holdsFocus = true
+        pendingReturn = null
         if (initialFocus)
             initialFocus.forceActiveFocus()
     }
@@ -83,6 +85,24 @@ Dialog {
             return
         returnFocusTo.focus = false
         returnFocusTo.forceActiveFocus(returnFocusReason)
+        pendingReturn = returnFocusTo.enabled ? null : returnFocusTo
+    }
+    // A control that is off takes no focus: Qt gives it the focus once it is on again, but
+    // without the reason that shows a focus ring, so focus is set again then.
+    readonly property Connections pendingKeeper: Connections {
+        target: dialog.pendingReturn
+        enabled: target !== null
+
+        function onEnabledChanged() {
+            const item = dialog.pendingReturn
+            if (!item?.enabled)
+                return
+            dialog.pendingReturn = null
+            if (!item.activeFocus)
+                return
+            item.focus = false
+            item.forceActiveFocus(dialog.returnFocusReason)
+        }
     }
 
     contentItem: ColumnLayout {
