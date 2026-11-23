@@ -16,9 +16,14 @@ import pytest
 
 from openweir.models.database import DATABASE_NAME
 from openweir.models.library import Accounts, ProfileLibrary
-from openweir.models.library.accounts import BACKOFF_S, SYNC_INTERVAL_S, WATCH_S
+from openweir.models.library.accounts import (
+    BACKOFF_S,
+    SYNC_INTERVAL_S,
+    WATCH_S,
+    provider_profile_id,
+)
 from openweir.models.library.profiles import ACCOUNT_PROFILE
-from openweir.models.profiles import Profile, ProfileError
+from openweir.models.profiles import KIND_PROVIDER, Profile, ProfileError, ProfileList
 from openweir.models.provider import Session, SignedIn, TwoFactorChallenge, types
 from openweir.models.provider.api import HttpProviderApi
 from openweir.models.provider.store import ProviderStore
@@ -154,6 +159,11 @@ def test_signing_in_brings_the_subscriptions_in_as_profiles(
     assert [(p.name, p.provider_id, p.remote_id, p.url) for p in scene.provider_profiles()] == [
         ("专业版", record.id, 7, ""),
         ("基础版", record.id, 9, ""),
+    ]
+    # Every device that shares the provider's record names them alike.
+    assert [p.id for p in scene.provider_profiles()] == [
+        provider_profile_id(record.id, 7),
+        provider_profile_id(record.id, 9),
     ]
     # Billing only: the dialog's use and the sync after it download configs.
     assert scene.requests("config") == scene.requests("link") == 0
@@ -763,6 +773,66 @@ def test_a_restore_takes_up_the_providers_and_reads_their_configs_again(scene: S
     assert summary.notices == {9: types.PROVIDER_SUBSCRIPTION_EXPIRED}
     assert scene.requests("config") == 2
     assert scene.library.snapshot().update_failed == frozenset()
+
+
+def test_a_restored_provider_needs_signing_in_and_relinks_its_profiles(scene: Scene) -> None:
+    store = ProviderStore(scene.store.database)
+    restored: list[str] = []
+
+    def write() -> None:
+        # As a backup from another device: the provider and its profiles, no session, no
+        # config, no billing.
+        record = store.add(scene.provider.base, "示例服务商", EMAIL, "user-1")
+        restored.append(record.id)
+        profiles = tuple(
+            Profile(
+                id=f"restored-{remote_id}",
+                name=name,
+                kind=KIND_PROVIDER,
+                auto_update_hours=24,
+                provider_id=record.id,
+                remote_id=remote_id,
+            )
+            for remote_id, name in ((7, "专业版"), (9, "基础版"))
+        )
+        scene.store.save(ProfileList(profiles))
+
+    run(lambda: scene.library.profiles.restore(write))
+
+    (pid,) = restored
+    summary = run(lambda: scene.accounts.summary(pid))
+    assert summary.state == ProviderState.SIGN_IN_REQUIRED
+    assert summary.notices == {}
+    # Reading them again asked nothing of the provider, and failed nothing.
+    assert scene.provider.requests == []
+    assert scene.library.snapshot().update_failed == frozenset()
+
+    # Signing in to the same account takes the restored record and its profiles.
+    signed = scene.sign_in()
+    assert signed.provider.id == pid
+    assert scene.token(pid)
+    assert [p.id for p in scene.provider_profiles()] == ["restored-7", "restored-9"]
+    run(lambda: scene.accounts.sync(pid))
+    assert scene.store.read_config("restored-7") == SAMPLE_CONFIG
+    # Another account asks first.
+    conflict = failure(lambda: scene.signing_in("other@example.com"))
+    assert conflict.code == types.PROVIDER_ACCOUNT_CONFLICT
+
+
+def test_a_restore_without_a_provider_deletes_its_session(scene: Scene) -> None:
+    pid = scene.sign_in().provider.id
+    store = ProviderStore(scene.store.database)
+
+    def write() -> None:
+        # As a sign-out merged from another device.
+        scene.store.save(ProfileList())
+        store.delete(pid)
+
+    run(lambda: scene.library.profiles.restore(write))
+
+    assert run(scene.accounts.summaries) == ()
+    assert scene.token(pid) is None
+    assert scene.provider_profiles() == []
 
 
 # -- secrets --------------------------------------------------------------------------------------

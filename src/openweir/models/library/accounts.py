@@ -119,8 +119,16 @@ _HELD = KEEPS_CONFIG - set(_REFUSED)
 _log = logging.getLogger(__name__)
 
 
-def new_profile_id() -> str:
-    return uuid.uuid4().hex
+# Provider profiles' ids are made from the provider's and the subscription's.
+_PROFILE_IDS = uuid.UUID("5f0c2a5e-8f3b-4d0e-9c41-6a7f0e2b9d13")
+
+
+def provider_profile_id(provider_id: str, remote_id: int) -> str:
+    """The id of the profile for a provider's subscription: the same on every device that
+    shares the provider's record (a backup merged into another), so that two devices that
+    each sync a new subscription make one profile, not two. A profile removed and then back
+    in the account takes its old row again, without its old config or override."""
+    return uuid.uuid5(_PROFILE_IDS, f"{provider_id}:{remote_id}").hex
 
 
 @dataclass
@@ -191,9 +199,21 @@ class Accounts:
     async def reload(self) -> None:
         """Take up what a restore wrote (Profiles.restore, under the library's lock): the
         providers and their billing as stored now. A provider that is the same account keeps
-        its session; the profiles' held codes start over, as their configs are read again."""
+        its session; one restored from elsewhere has none, and needs signing in. The sessions
+        of providers the restore left out, or gave another account (a replace, or a sign-out
+        merged from another device), are deleted. The profiles' held codes start over, as
+        their configs are read again."""
+        before = dict(self._records)
         self._take(await asyncio.to_thread(self._read))
         self._held.clear()
+        for provider_id, record in before.items():
+            live = self._records.get(provider_id)
+            if live is not None and live.user_id == record.user_id:
+                continue
+            try:
+                await asyncio.to_thread(self._tokens.delete, provider_id)
+            except CredentialError:
+                _log.warning("could not delete the session of a provider a restore removed")
 
     def _ordered(self) -> list[ProviderRecord]:
         return sorted(self._records.values(), key=lambda r: (r.position, r.created_at, r.id))
@@ -553,13 +573,19 @@ class Accounts:
         core = self._core
         async with core.lock:
             record = self._record(record.id)  # signed out meanwhile: PROVIDER_UNKNOWN
+            taken = {p.id for p in core.list.profiles}
+
+            def new_id(remote_id: int) -> str:
+                made = provider_profile_id(record.id, remote_id)
+                return uuid.uuid4().hex if made in taken else made
+
             result = reconcile(
                 core.list,
                 record.id,
                 subscriptions,
                 self._billing.get(record.id, {}),
                 core.clock(),
-                new_id=new_profile_id,
+                new_id=new_id,
                 auto_update_hours=PROVIDER_UPDATE_HOURS,
             )
             # Names are the pool's group names in a plan, so a rename recomposes it.

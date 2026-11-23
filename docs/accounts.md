@@ -137,6 +137,8 @@ v1 只做原生登录（D56）：
   也不能给它链接（`Profiles.edit` 报 `account_profile`）；自动更新的开关和间隔照常能改。
 - 服务商的配置不能单独删除，只随退出登录一起移除（`Profiles.remove` 报 `account_profile`）；例外是已不在账户中的
   （`provider_subscription_missing`），它的「更多」菜单有「删除」（`Accounts.removable`）。
+- **配置的 id** 由服务商 id 和 `remote_id` 算出（uuid5），共用同一条服务商记录的设备（备份合并过）为同一份新订阅
+  做出同一个配置，合并时不会成为两份。删掉后又回到账户中的订阅用回原来那一行，原文和覆写不会回来。
 - **已不在账户中**：同步时不在列表里的订阅，删掉它在 `provider_subscriptions` 的行，配置和名称留着。所以服务商的配置
   没有这一行，就是上次同步没找到它（账户需要重新登录时不算，那时由状态说明）。
 
@@ -407,7 +409,9 @@ v1 只做原生登录（D56）：
   网络请求在锁外。`ProfileLibrary.accounts` 是它的实现 `Accounts`，另有给 `Profiles` 用的 `paused`、`removable`、
   `notice` 和恢复备份后的 `reload`。
 - 恢复备份（`Profiles.restore`）写完数据后调用 `accounts.reload()`：重新读服务商和账单；`user_id` 没变的服务商留着
-  内存里的令牌。之后服务商的配置也经 `fetch` 重新读取；需要重新登录的保留原文，不算更新失败。
+  内存里的令牌，从别处恢复来的没有令牌，需要重新登录。恢复后不再有的服务商、或换了账户的（替换，或合并进别的设备
+  上的退出登录），删掉它们在凭据库里的令牌。之后服务商的配置也经 `fetch` 重新读取；没有令牌时不发请求，保留原文，
+  不算更新失败。重新登录同一个 `user_id` 时用恢复出来的记录，按 `remote_id` 对上配置。
 - `RemoteSubscription.record()` 和 `from_record()` 是 `provider_subscriptions.data` 的格式，其中从来没有链接。
 
 ## 12. 测试与验收

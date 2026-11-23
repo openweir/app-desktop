@@ -4,8 +4,6 @@ reconciliation a sync applies, the next traffic reset and the default choice."""
 
 from __future__ import annotations
 
-import itertools
-from collections.abc import Callable
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta, timezone
 
@@ -61,9 +59,8 @@ def provider_profile(
     )
 
 
-def ids() -> Callable[[], str]:
-    counter = itertools.count(1)
-    return lambda: f"new-{next(counter)}"
+def new_id(remote_id: int) -> str:
+    return f"new-{remote_id}"
 
 
 def reconcile(
@@ -77,7 +74,7 @@ def reconcile(
         subscriptions,
         stored or {},
         NOW,
-        new_id=ids(),
+        new_id=new_id,
         auto_update_hours=12,
     )
 
@@ -169,7 +166,7 @@ def test_a_first_sync_adds_a_profile_for_each_subscription_at_the_end() -> None:
         ProfileList((local,), active="local"),
         [subscription(7), subscription(9, plan_name="基础版", usable=False)],
     )
-    assert [p.id for p in result.profiles.profiles] == ["local", "new-1", "new-2"]
+    assert [p.id for p in result.profiles.profiles] == ["local", "new-7", "new-9"]
     assert result.profiles.active == "local"
     seven, nine = result.profiles.profiles[1:]
     assert (nine.name, nine.remote_id) == ("基础版", 9)
@@ -181,13 +178,13 @@ def test_a_first_sync_adds_a_profile_for_each_subscription_at_the_end() -> None:
     )
     assert (seven.url, seven.path, seven.auto_update_hours, seven.updated_at) == ("", "", 12, 0)
     assert seven.usage == Usage(1 * GIB, 9 * GIB, 100 * GIB, int(NOW + 30 * DAY))
-    assert result.added == ("new-1", "new-2")
-    assert result.changed == ("new-1", "new-2")
+    assert result.added == ("new-7", "new-9")
+    assert result.changed == ("new-7", "new-9")
     # Both are new; only the usable one is downloaded.
-    assert result.refresh == ("new-1",)
+    assert result.refresh == ("new-7",)
     assert result.stored == {
-        "new-1": subscription(7),
-        "new-2": subscription(9, plan_name="基础版", usable=False),
+        "new-7": subscription(7),
+        "new-9": subscription(9, plan_name="基础版", usable=False),
     }
     assert result.missing == result.renamed == ()
 
@@ -202,7 +199,7 @@ def test_new_profiles_go_after_the_providers_last_one() -> None:
         )
     )
     result = reconcile(profiles, [subscription(7), subscription(9), subscription(12)])
-    assert [p.id for p in result.profiles.profiles] == ["a", "mid", "b", "new-1", "other"]
+    assert [p.id for p in result.profiles.profiles] == ["a", "mid", "b", "new-12", "other"]
 
 
 def test_an_unchanged_subscription_with_a_config_is_left_alone() -> None:

@@ -130,15 +130,16 @@ def reconcile(
     stored: Mapping[int, RemoteSubscription],
     now: float,
     *,
-    new_id: Callable[[], str],
+    new_id: Callable[[int], str],
     auto_update_hours: int,
 ) -> Reconciliation:
     """Bring the provider's profiles in line with ``subscriptions`` (``checked``), given what
     was ``stored`` of them by remote id (docs/accounts.md §5.2):
 
-      - a subscription without a profile gets one, named by ``names``, updating every
-        ``auto_update_hours``; new ones go after the provider's last profile, or at the end of
-        the list when it has none, in the order of their ids;
+      - a subscription without a profile gets one, with the id ``new_id`` gives its remote
+        id, named by ``names``, updating every ``auto_update_hours``; new ones go after the
+        provider's last profile, or at the end of the list when it has none, in the order of
+        their ids;
       - a profile whose subscription is listed takes its current name and billing's usage
         (Profile.usage, as Subscription-Userinfo would give it);
       - a profile whose subscription is not listed is missing: it stays as it is.
@@ -161,7 +162,7 @@ def reconcile(
         profile = own.get(subscription.id)
         if profile is None:
             profile = Profile(
-                id=new_id(),
+                id=new_id(subscription.id),
                 name=titles[subscription.id],
                 kind=KIND_PROVIDER,
                 auto_update_hours=auto_update_hours,
