@@ -164,7 +164,9 @@ class Translations:
         self.language = language
 
     def remove(self) -> None:
-        """Uninstall the translators this object installed."""
+        """Uninstall the translators this object installed and delete them: they are the
+        application's children, so each switch would otherwise keep one more catalog."""
         for translator in self._translators:
             self._app.removeTranslator(translator)
+            translator.deleteLater()
         self._translators = []

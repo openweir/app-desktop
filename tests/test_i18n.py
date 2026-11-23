@@ -7,11 +7,17 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from PySide6.QtCore import QCoreApplication, QLocale, QObject
+from PySide6.QtCore import QCoreApplication, QEvent, QLocale, QObject, QTranslator
 from pytestqt.qtbot import QtBot
 
 from openweir.host.base import HostError
-from openweir.i18n import LANG_ENV, resolve_language, system_ui_languages, ui_locale
+from openweir.i18n import (
+    LANG_ENV,
+    Translations,
+    resolve_language,
+    system_ui_languages,
+    ui_locale,
+)
 from openweir.models import format as fmt
 from openweir.models.profiles import ProfileError
 from openweir.models.store import ProfileStore
@@ -33,6 +39,24 @@ def test_english_is_finished() -> None:
 
 def test_compiled_catalogs_match() -> None:
     assert stale_binaries() == []
+
+
+def test_switching_languages_deletes_the_catalogs_it_leaves(qapp: QCoreApplication) -> None:
+    def catalogs() -> int:
+        QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+        return len(qapp.findChildren(QTranslator))
+
+    before = catalogs()
+    locale = QLocale()
+    translations = Translations(qapp)
+    try:
+        for language in ("en", "zh", "en", "en", "en"):
+            translations.apply(language)
+            assert catalogs() == before + (language == "en")
+    finally:
+        translations.remove()
+        QLocale.setDefault(locale)
+    assert catalogs() == before
 
 
 @pytest.mark.parametrize(
