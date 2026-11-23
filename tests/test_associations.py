@@ -1,6 +1,7 @@
-"""Windows: removing the user's link registrations that open a program no longer there
-(docs/release.md §6, D45). The rules run on a fake registry and a fake file system; only the
-Windows-only test at the end touches the real registry, with a scratch key of its own."""
+"""Removing the user's link registrations that open a program no longer there
+(docs/release.md §6, D45). On Windows the rules run on a fake registry and a fake file system;
+only the Windows-only test at the end touches the real registry, with a scratch key of its
+own. On Linux they run on a mimeapps.list and desktop entries in a scratch directory."""
 
 from __future__ import annotations
 
@@ -8,6 +9,7 @@ import contextlib
 import logging
 import sys
 import uuid
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -15,10 +17,15 @@ import pytest
 from openweir.desktop import associations
 from openweir.desktop.associations import (
     WindowsUserClasses,
+    application_dirs,
     candidates,
     clear_stale,
+    clear_stale_defaults,
     clear_stale_in_background,
+    default_gone,
     is_stale,
+    mimeapps_path,
+    program_gone,
 )
 from openweir.desktop.links import SCHEMES
 
@@ -255,6 +262,7 @@ def test_only_windows_own_platform_looks(
     classes = FakeClasses({"clash": GONE})
     monkeypatch.setattr(associations, "sys", SimpleNamespace(platform=platform))
     monkeypatch.setattr(associations, "WindowsUserClasses", lambda: classes)
+    monkeypatch.setattr(associations, "installed_package_format", lambda: None)
     thread = clear_stale_in_background(qt_platform)
     assert (thread is not None) is runs
     if thread is not None:
@@ -263,6 +271,239 @@ def test_only_windows_own_platform_looks(
         assert classes.asked == list(SCHEMES)
     else:
         assert classes.asked == []
+
+
+# -- Linux -----------------------------------------------------------------------------------
+
+linux_paths = pytest.mark.skipif(sys.platform == "win32", reason="Linux's paths and file modes")
+
+
+class Desktop:
+    """A user's mimeapps.list and the applications directories, in a scratch directory."""
+
+    def __init__(self, root: Path) -> None:
+        self.root = root
+        self.config = root / "config"
+        self.config.mkdir()
+        self.user = root / "data" / "applications"
+        self.system = root / "usr" / "share" / "applications"
+        for directory in (self.user, self.system):
+            directory.mkdir(parents=True)
+        self.bin = root / "bin"
+        self.bin.mkdir()
+        self.mimeapps = self.config / "mimeapps.list"
+
+    @property
+    def dirs(self) -> list[Path]:
+        return [self.user, self.system]
+
+    def program(self, name: str) -> str:
+        path = self.bin / name
+        path.write_text("#!/bin/sh\n")
+        return str(path)
+
+    def entry(
+        self, relative: str, exec_line: str, *, directory: Path | None = None, extra: str = ""
+    ) -> None:
+        path = (directory or self.user) / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            f"[Desktop Entry]\nType=Application\nName=Client\nExec={exec_line}\n{extra}"
+        )
+
+
+@pytest.fixture
+def desktop(tmp_path: Path) -> Desktop:
+    return Desktop(tmp_path)
+
+
+@linux_paths
+def test_a_default_whose_program_is_gone_goes(
+    desktop: Desktop, caplog: pytest.LogCaptureFixture
+) -> None:
+    gone = str(desktop.bin / "clash-party.AppImage")
+    desktop.entry("clash-party.desktop", f"{gone} %u")
+    desktop.entry("clash-verge.desktop", f"{desktop.program('clash-verge')} %u")
+    text = (
+        "# kept as it is\r\n"
+        "[Default Applications]\r\n"
+        "text/html=firefox.desktop\r\n"
+        "x-scheme-handler/clash=clash-party.desktop\r\n"
+        "x-scheme-handler/mihomo=clash-verge.desktop;\r\n"
+        "x-scheme-handler/http=clash-party.desktop\r\n"  # not one of OpenWeir's schemes
+        "\r\n"
+        "[Added Associations]\r\n"
+        "x-scheme-handler/clash=clash-party.desktop;\r\n"
+    )
+    desktop.mimeapps.write_bytes(text.encode())
+    desktop.mimeapps.chmod(0o600)
+    with caplog.at_level(logging.WARNING):
+        assert clear_stale_defaults(desktop.mimeapps, desktop.dirs) == ["clash"]
+    expected = text.replace("x-scheme-handler/clash=clash-party.desktop\r\n", "", 1)
+    assert desktop.mimeapps.read_bytes() == expected.encode()  # nothing else changed
+    assert desktop.mimeapps.stat().st_mode & 0o777 == 0o600
+    assert [path.name for path in desktop.config.iterdir()] == ["mimeapps.list"]
+    assert "clash: links" in caplog.text
+    assert "clash-party.desktop" in caplog.text
+    # The next start finds nothing to do, and writes nothing.
+    before = desktop.mimeapps.stat().st_mtime_ns
+    assert clear_stale_defaults(desktop.mimeapps, desktop.dirs) == []
+    assert desktop.mimeapps.stat().st_mtime_ns == before
+
+
+@linux_paths
+def test_a_default_whose_entry_is_gone_goes(desktop: Desktop) -> None:
+    desktop.mimeapps.write_text("[Default Applications]\nx-scheme-handler/Clash=removed.desktop;\n")
+    assert clear_stale_defaults(desktop.mimeapps, desktop.dirs) == ["clash"]
+    assert desktop.mimeapps.read_text() == "[Default Applications]\n"
+
+
+@linux_paths
+def test_the_first_entry_that_is_there_opens_the_link(desktop: Desktop) -> None:
+    program = desktop.program("clash-verge")
+    desktop.entry("clash-verge.desktop", f"{program} %u", directory=desktop.system)
+    exists = {program}.__contains__
+    assert default_gone("removed.desktop;clash-verge.desktop;", desktop.dirs, exists) is False
+    assert default_gone("removed.desktop;other.desktop", desktop.dirs, exists) is True
+    assert default_gone(" ; ", desktop.dirs, exists) is None
+
+
+@linux_paths
+@pytest.mark.parametrize(
+    ("entry", "gone"),
+    [
+        ("Exec=/opt/gone/client --minimized %u", True),
+        # Unquoted, the program ends at the space, unlike on Windows.
+        ("Exec=/opt/Old Client/client %u", False),
+        ('Exec="/opt/Old Client/client" %u', True),
+        ("Exec=/usr/bin/clash-verge %u", False),
+        ("Exec=clash-verge %u", None),  # found on the PATH, which the session may set otherwise
+        ("Exec=env GDK_BACKEND=x11 /opt/gone/client %u", None),  # through another program
+        ("Exec=/usr/bin/flatpak run io.github.clash %u", False),
+        ("Exec=/usr/bin/clash-verge %u\nDBusActivatable=true", None),
+        ("TryExec=/opt/gone/client\nExec=/usr/bin/clash-verge %u", True),
+        ('Exec="/opt/unclosed %u', None),
+        ("Exec=", None),
+        ("", None),
+        # Only the [Desktop Entry] group counts, without localized keys or comments.
+        ("Exec=/usr/bin/clash-verge %u\n[Desktop Action new]\nExec=/opt/gone/client", False),
+    ],
+)
+def test_which_program_an_entry_opens(entry: str, gone: bool | None) -> None:
+    files = {"/usr/bin/clash-verge", "/usr/bin/flatpak", "/opt/Old"}
+    assert program_gone(f"[Desktop Entry]\nType=Application\n{entry}\n", files.__contains__) is gone
+
+
+@linux_paths
+def test_a_default_it_cannot_judge_stays(
+    desktop: Desktop, caplog: pytest.LogCaptureFixture
+) -> None:
+    desktop.entry("flclash.desktop", "flclash %u")
+    text = "[Default Applications]\nx-scheme-handler/clashmeta=flclash.desktop\n"
+    desktop.mimeapps.write_text(text)
+    with caplog.at_level(logging.WARNING):
+        assert clear_stale_defaults(desktop.mimeapps, desktop.dirs) == []
+    assert desktop.mimeapps.read_text() == text
+    assert "cannot tell" in caplog.text
+
+
+@linux_paths
+def test_an_entry_in_a_subdirectory_is_there(desktop: Desktop) -> None:
+    # The desktop file ID kde-clash.desktop names applications/kde/clash.desktop too.
+    desktop.entry("kde/clash.desktop", f"{desktop.program('clash')} %u", directory=desktop.system)
+    text = "[Default Applications]\nx-scheme-handler/clash=kde-clash.desktop\n"
+    desktop.mimeapps.write_text(text)
+    assert clear_stale_defaults(desktop.mimeapps, desktop.dirs) == []
+    assert desktop.mimeapps.read_text() == text
+
+
+@linux_paths
+def test_a_linked_file_is_left_alone(desktop: Desktop, caplog: pytest.LogCaptureFixture) -> None:
+    dotfiles = desktop.root / "dotfiles-mimeapps.list"
+    text = "[Default Applications]\nx-scheme-handler/clash=removed.desktop\n"
+    dotfiles.write_text(text)
+    desktop.mimeapps.symlink_to(dotfiles)
+    with caplog.at_level(logging.WARNING):
+        assert clear_stale_defaults(desktop.mimeapps, desktop.dirs) == []
+    assert desktop.mimeapps.is_symlink()
+    assert dotfiles.read_text() == text
+
+
+@linux_paths
+def test_no_file_and_an_unreadable_file_are_nothing_to_do(desktop: Desktop) -> None:
+    assert clear_stale_defaults(desktop.mimeapps, desktop.dirs) == []
+    assert not desktop.mimeapps.exists()
+    desktop.mimeapps.write_bytes(b"[Default Applications]\nx-scheme-handler/clash=\xff.desktop\n")
+    assert clear_stale_defaults(desktop.mimeapps, desktop.dirs) == []
+
+
+@linux_paths
+def test_a_file_it_cannot_write_stays(desktop: Desktop, monkeypatch: pytest.MonkeyPatch) -> None:
+    text = "[Default Applications]\nx-scheme-handler/clash=removed.desktop\n"
+    desktop.mimeapps.write_text(text)
+
+    def refuse(*_args: object, **_kwargs: object) -> None:
+        raise PermissionError(13, "Permission denied")
+
+    monkeypatch.setattr(associations.os, "replace", refuse)
+    assert clear_stale_defaults(desktop.mimeapps, desktop.dirs) == []
+    assert desktop.mimeapps.read_text() == text
+    assert [path.name for path in desktop.config.iterdir()] == ["mimeapps.list"]
+
+
+@linux_paths
+def test_where_the_files_are(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    assert mimeapps_path({}) == tmp_path / ".config" / "mimeapps.list"
+    assert mimeapps_path({"XDG_CONFIG_HOME": "/cfg"}) == Path("/cfg/mimeapps.list")
+    assert mimeapps_path({"XDG_CONFIG_HOME": "relative"}) == tmp_path / ".config" / "mimeapps.list"
+    dirs = application_dirs({"XDG_DATA_DIRS": "/usr/share/gnome:relative:/usr/share"})
+    assert dirs[:3] == [
+        tmp_path / ".local/share/applications",
+        Path("/usr/share/gnome/applications"),
+        Path("/usr/share/applications"),
+    ]
+    assert Path("/var/lib/flatpak/exports/share/applications") in dirs
+    default = application_dirs({"XDG_DATA_HOME": "/data"})
+    assert default[:3] == [
+        Path("/data/applications"),
+        Path("/usr/local/share/applications"),
+        Path("/usr/share/applications"),
+    ]
+
+
+@linux_paths
+@pytest.mark.parametrize(
+    ("qt_platform", "package", "runs"),
+    [
+        ("xcb", "deb", True),
+        ("wayland", "rpm", True),
+        ("wayland-egl", "deb", True),
+        ("xcb", None, False),  # run from source: no registration of its own to make way for
+        ("offscreen", "deb", False),  # the tests' platform
+    ],
+)
+def test_on_linux_only_the_installed_package_looks(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    qt_platform: str,
+    package: str | None,
+    runs: bool,
+) -> None:
+    calls: list[tuple[Path, list[Path]]] = []
+    monkeypatch.setattr(associations, "sys", SimpleNamespace(platform="linux"))
+    monkeypatch.setattr(associations, "installed_package_format", lambda: package)
+    monkeypatch.setattr(
+        associations, "clear_stale_defaults", lambda path, dirs: calls.append((path, dirs))
+    )
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    thread = clear_stale_in_background(qt_platform)
+    assert (thread is not None) is runs
+    if thread is not None:
+        thread.join(timeout=10)
+        assert [path for path, _dirs in calls] == [tmp_path / "mimeapps.list"]
+    else:
+        assert calls == []
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="the real registry is Windows'")
