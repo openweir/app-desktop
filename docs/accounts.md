@@ -133,9 +133,12 @@ v1 只做原生登录（D56）：
   - `provider_subscriptions`：`profile_id`（主键）、`data`（`RemoteSubscription.record()` 的 JSON，不含链接）、
     `synced_at`。这是缓存，不进备份。
 - `Profile` 加种类 `KIND_PROVIDER = "provider"` 和 `provider_id`、`remote_id` 两项；`url` 为空，订阅链接只在内存里。
-- **名称**取 `planName`（null 时用 `planId`），同一账户里重名时加「 · #<id>」。每次同步按界面语言更新，用户不能改名。
-- 服务商的配置不能单独删除，只随退出登录一起移除；例外是已不在账户中的（`provider_subscription_missing`），它的
-  「更多」菜单有「删除」。
+- **名称**取 `planName`（null 时用 `planId`），同一账户里重名时加「 · #<id>」。每次同步按界面语言更新，用户不能改名，
+  也不能给它链接（`Profiles.edit` 报 `account_profile`）；自动更新的开关和间隔照常能改。
+- 服务商的配置不能单独删除，只随退出登录一起移除（`Profiles.remove` 报 `account_profile`）；例外是已不在账户中的
+  （`provider_subscription_missing`），它的「更多」菜单有「删除」（`Accounts.removable`）。
+- **已不在账户中**：同步时不在列表里的订阅，删掉它在 `provider_subscriptions` 的行，配置和名称留着。所以服务商的配置
+  没有这一行，就是上次同步没找到它（账户需要重新登录时不算，那时由状态说明）。
 
 ### 5.2 同步
 
@@ -147,26 +150,33 @@ v1 只做原生登录（D56）：
 3. 在锁里：新出现的加为配置（排在这个服务商已有的配置之后，没有时排在末尾），已有的更新名称，不在列表里的标为
    「已不在账户中」；账单的用量（`upload`、`download`、`total`、`expireAt`）写进 `Profile.usage`，与订阅下载的
    `Subscription-Userinfo` 同义；存下每份的 `RemoteSubscription`；
-4. 在锁外，对可用（`usable`）且还没有原文的，以及（`planId`、`status`、`usable`、`updatedAt`）变了的，调用
-   `profiles.update()`，走 5.4 节取配置。
+4. 在锁外，对可用（`usable`）且还没有原文、或（`planId`、`status`、`usable`、`updatedAt`、`subscriptionAccess`）
+   变了的，调用 `profiles.update()`，走 5.4 节取配置。接入方式也比较，是因为它变了取配置的路也变了（比如链接关掉后
+   改走应用）。变了的配置同时解除 5.4 节的「保留原文」；变成不可用的不下载，由 5.5 节的状态说明。纯逻辑在
+   `models/provider/sync.py`（`checked`、`names`、`reconcile`）。
 
 `complete`（登录完成）做前三步，不下载配置：对话框只等账单，选中的那份由 `use` 下载，其余的由随后的 `sync` 下载。
 链接（`url`、`urls`）只留在内存里的同步结果中。
 
 ### 5.3 时机
 
+`sync_all()` 不自己定时：订阅页每 60 秒检查一次自动更新（`ProfilesViewModel.checkUpdates` → `profiles.update_due()`），
+`update_due()` 先调用 `sync_all()`，再更新到了间隔的配置，与自动更新共用一个计时器。`sync_all()` 按时钟判断每个服务商
+该不该同步：
+
 | 时机 | 做什么 |
 | --- | --- |
-| 启动后 5 秒 | `sync_all()` |
-| 运行中每 30 分钟 | `sync_all()` |
-| 显示账户页或订阅页，且距上次同步超过 60 秒 | `sync_all()` |
+| 启动后的第一次检查 | 本次运行还没同步过的服务商同步（检查在订阅页 `start()` 时做；要推迟到 5 秒后，由订阅页推迟第一次检查） |
+| 运行中，距上次同步 30 分钟 | `update_due()` 里的 `sync_all()` |
+| 显示账户页或订阅页 | `sync_all(max_age=60)`：距上次同步超过 60 秒的同步 |
 | 登录完成，对话框关闭后 | `sync(id)` |
-| 打开用户中心的网页之后 | 窗口重新激活时，以及之后 10 分钟内每 60 秒，`sync(id)` |
-| 切换界面语言 | `sync_all()`，名称跟着语言变 |
+| 打开用户中心的网页之后 | 打开时调用 `watch(id)`：之后 10 分钟里，距上次同步满 60 秒的 `sync_all()` 都同步它，所以窗口重新激活时调用 `sync_all()`，其余由每 60 秒的检查完成 |
+| 切换界面语言 | `sync_all(max_age=0)`，名称跟着语言变 |
 | 账户页「更多」里的「刷新」 | `sync(id)` |
 
 - **退避**：`sync_all()` 跳过最近失败的服务商：第一次失败后等 5 分钟，连续失败后等 30 分钟；429 带 `Retry-After`
-  时至少等那么久。`sync(id)` 由用户或登录触发，不等退避，只是在 `Retry-After` 期间直接报 `provider_rate_limited`。
+  时至少等那么久。需要重新登录或账户已停用的不同步。`sync(id)` 由用户或登录触发，不等退避，只是在
+  `Retry-After` 期间直接报 `provider_rate_limited`，不发请求。
 - 配置按自己的自动更新间隔更新（默认取回答的 `Profile-Update-Interval`，服务商写 24 小时），另加同步发现变化时的更新。
 - 服务商把渲染好的配置缓存 10 分钟，所以界面不承诺续费或换套餐后"立即"生效。
 
@@ -186,8 +196,15 @@ v1 只做原生登录（D56）：
 | 可用，`link` | 下载 `url`，连不上时依次试 `urls`；不带令牌、不跟随重定向，链接不落盘 | 没有链接时 `provider_link_unavailable`（没有订阅链接） |
 
 - 回答和订阅下载一样读 `Subscription-Userinfo`、`Profile-Update-Interval` 和 `Content-Disposition`；没有 ETag。
-- `KEEPS_CONFIG` 里的码保留上次的原文：行内写这个码的文字，不写「更新失败」；自动更新不按 30 分钟重试，而是等同步
-  看到这份订阅变了再试。隧道正用着它时照常运行。
+  回答没有 `Subscription-Userinfo` 时，用量留着同步写的账单用量。同步新加的配置先按 12 小时更新，第一次下载后改用
+  回答的 `Profile-Update-Interval`（服务商写 24），与导入链接时相同。
+- 读到的账单（不含链接）也存进 `provider_subscriptions`，与同步写的相同。
+- `KEEPS_CONFIG` 里的码保留上次的原文：不算更新失败（不进 `ProfileList.update_failed`），行内写这个码的文字，不写
+  「更新失败」；自动更新不按 30 分钟重试，而是等同步看到这份订阅变了再试。隧道正用着它时照常运行。哪份配置因为
+  什么保留原文，在 `AccountSummary.notices`（按 `remote_id`）：订阅一级的码（到期、不可用、停用、不在账户中、没有
+  链接）；需要重新登录和账户已停用是整个服务商的，看 `AccountSummary.state`。
+- 自动更新（`Profiles._due`）在这些时候等着（`Accounts.paused`）：服务商不是 `signed_in`；这份配置正保留原文；
+  存下的账单说它不能下载（到期、停用、不可用），或没有它的账单。
 - 正在用的服务商配置不可用、同一账户里另有可用的时，概览提示「改用「X」」，由用户决定，从不自动换（D57）。
 
 ### 5.5 状态
@@ -206,8 +223,11 @@ v1 只做原生登录（D56）：
 | `unusable`：不可用而账单没说原因 | 暂不可用 | `warning` |
 
 - `trial` 为真时前面加「试用 · 」。
-- **下次重置**由 `periodStart` 和 `resetMode` 算出，与用户中心的算法相同：`purchase_day` 是每月 `periodStart` 的那一天，
-  `month_start` 是每月 1 日，`none` 不重置。
+- **下次重置**（`sync.next_reset`）由 `startAt`、`periodStart` 和 `resetMode` 算出：`purchase_day` 与用户中心
+  （user-web 的 `nextReset`）和 api-edge 的日任务相同，从购买时起按整月算（1 月 31 日、2 月 28 日、3 月 31 日），取
+  `periodStart` 之后的第一个；`month_start` 是 `periodStart` 之后的下一个 1 日零点，api-edge 按服务商的时区算，账单
+  不给时区，所以用本机的；`none` 不重置。
+- 默认选哪份（登录对话框第 5 步、账户页「当前订阅」）：`sync.most_left`，能下载的里剩余流量最多的，其次到期最晚的。
 
 ## 6. 钱包、套餐与购买
 
@@ -384,7 +404,10 @@ v1 只做原生登录（D56）：
 | `viewmodels/profiles.py`、`ui/pages/ProfilesPage.qml`、`viewmodels/overview.py`、`viewmodels/feedback.py` | 订阅页、概览、错误文字 |
 
 - `AccountsService` 的方法都是协程，在 asyncio 线程上调用，与 `ProfileLibrary` 相同；改动配置时经过配置库和它的锁，
-  网络请求在锁外。
+  网络请求在锁外。`ProfileLibrary.accounts` 是它的实现 `Accounts`，另有给 `Profiles` 用的 `paused`、`removable`、
+  `notice` 和恢复备份后的 `reload`。
+- 恢复备份（`Profiles.restore`）写完数据后调用 `accounts.reload()`：重新读服务商和账单；`user_id` 没变的服务商留着
+  内存里的令牌。之后服务商的配置也经 `fetch` 重新读取；需要重新登录的保留原文，不算更新失败。
 - `RemoteSubscription.record()` 和 `from_record()` 是 `provider_subscriptions.data` 的格式，其中从来没有链接。
 
 ## 12. 测试与验收
