@@ -13,7 +13,9 @@ from openweir.models.routing import MODE_PLAN, MODE_PROFILE
 from tests.support.simulated import SAMPLE_CONFIG
 from tests.test_routing_library import NODES_ONLY, Scene, run
 
-BROKEN_RULES = "proxies: []\nrules:\n  - MATCH,nowhere\n"
+# A provider's message instead of a subscription, which the core refuses. A profile that
+# names a proxy it lacks is no longer one: subconv leaves the rule out.
+REFUSED = "Your subscription has expired\n"
 
 
 def mac_scene(directory: Path) -> Scene:
@@ -51,7 +53,7 @@ def test_an_import_without_a_core_is_stored_unread_and_read_at_connect(tmp_path:
 
 def test_a_profile_in_use_the_core_refuses_takes_the_tunnel_down(tmp_path: Path) -> None:
     scene = mac_scene(tmp_path)
-    scene.fetcher.body = BROKEN_RULES.encode()
+    scene.fetcher.body = REFUSED.encode()
     run(lambda: scene.library.profiles.import_url("https://sub.example.com/broken", "Broken"))
 
     with pytest.raises(HostError) as raised:
@@ -69,7 +71,7 @@ def test_another_refused_profile_is_marked_and_left_out(tmp_path: Path) -> None:
     scene = mac_scene(tmp_path)
     scene.fetcher.body = NODES_ONLY.encode()
     run(lambda: scene.library.profiles.import_url("https://nodes.example.com/a", "Nodes"))
-    scene.fetcher.body = BROKEN_RULES.encode()
+    scene.fetcher.body = REFUSED.encode()
     run(lambda: scene.library.profiles.import_url("https://sub.example.com/broken", "Broken"))
 
     run(scene.library.tunnel.start)
@@ -155,11 +157,11 @@ def test_an_update_the_core_refuses_at_connect_falls_back(tmp_path: Path) -> Non
     ).profiles
 
     scene = relaunched_without_a_core(tmp_path)
-    scene.fetcher.body = BROKEN_RULES.encode()
+    scene.fetcher.body = REFUSED.encode()
     (unread,) = run(lambda: scene.library.profiles.update(rules.id)).profiles.profiles
     assert unread.unread
     assert unread.has_rules is None
-    scene.fetcher.body = (BROKEN_RULES + "# again\n").encode()
+    scene.fetcher.body = (REFUSED + "# again\n").encode()
     run(lambda: scene.library.profiles.update(rules.id))  # another one waiting keeps the read text
 
     run(scene.library.tunnel.start)

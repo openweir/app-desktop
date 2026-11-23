@@ -466,6 +466,15 @@ VERDICTS = {
     "empty": TunnelConfig("{}\n"),
     "groups name proxies an override removed": TunnelConfig(SAMPLE_CONFIG, ("proxies: []\n",)),
     "a rule names no proxy": TunnelConfig("rules: ['MATCH,NOWHERE']\n"),
+    "a group names no proxy": TunnelConfig(
+        "proxy-groups: [{name: G, type: select, proxies: [NOWHERE]}]\nrules: ['MATCH,G']\n"
+    ),
+    "a provider's message": TunnelConfig("Your subscription has expired\nRenew it\n"),
+    "settings only": TunnelConfig("mode: rule\n"),
+    "broken YAML": TunnelConfig("rules: [\n"),
+    "an override's rule names no proxy": TunnelConfig(
+        "proxies: []\n", ("rules: ['MATCH,nowhere']\n",)
+    ),
     "an override adds a rule": TunnelConfig(DIRECT_PROFILE, ("prepend-rules: ['MATCH,REJECT']\n",)),
 }
 

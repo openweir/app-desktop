@@ -48,7 +48,9 @@ LOCAL_CONFIG = (
     "rules:\n  - MATCH,DIRECT\n"
 )
 # Rules that name a group the config lacks: the host refuses it.
-BROKEN_CONFIG = SAMPLE_CONFIG + "\n# broken\n" + "rules:\n  - MATCH,不存在的组\n"
+# A provider's message instead of a subscription, which the core refuses. (A rule naming a
+# group the profile lacks is no longer refused: subconv leaves the rule out.)
+BROKEN_CONFIG = "Your subscription has expired\n"
 
 
 def prop(view_model: QObject, name: str) -> Any:

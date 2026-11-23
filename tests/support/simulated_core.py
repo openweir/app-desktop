@@ -108,9 +108,7 @@ def check_config(config: TunnelConfig) -> dict[str, Any]:
     if config.composition is not None:
         document, _ = compose(config.composition)
     else:
-        document = _load(config.config_yaml, "")
-    if not isinstance(document, dict):
-        raise HostError("invalid_config", "the config is not a YAML mapping")
+        document = _read_like_subconv(config.config_yaml)
     for number, text in enumerate(config.overrides, 1):
         label = f"override {number}: "
         override = _load(text, label)
@@ -126,6 +124,61 @@ def check_config(config: TunnelConfig) -> dict[str, Any]:
 
 
 BUILT_IN_PROXIES = {"DIRECT", "REJECT", "REJECT-DROP", "PASS", "COMPATIBLE", "GLOBAL"}
+# What makes a mapping a profile to subconv (src/core/internal/compose/normalize.go).
+ROUTING_PARTS = ("proxies", "proxy-providers", "proxy-groups", "rules", "rule-providers")
+
+
+def _read_like_subconv(text: str) -> dict[str, Any]:
+    """The core reads a subscription's own config through subconv (D54): share links become
+    a profile of their proxies, and a profile's groups and rules that name no proxy are left
+    out with a warning instead of failing the config. Overrides come after this and are not
+    repaired, as in the core."""
+    if not text.strip():
+        raise HostError("invalid_config", "the configuration is empty")
+    proxies, document, _ = _subscription(text, "")
+    document = dict(document) if document else {"proxies": proxies}
+    groups = [g for g in document.get("proxy-groups") or [] if isinstance(g, dict)]
+    while True:
+        known = (
+            BUILT_IN_PROXIES
+            | set(_names(document.get("proxies")))
+            | {str(g.get("name")) for g in groups}
+        )
+        kept = []
+        for group in groups:
+            members = [m for m in group.get("proxies") or [] if str(m) in known]
+            if members or group.get("use") or group.get("include-all"):
+                kept.append({**group, "proxies": members} if "proxies" in group else group)
+        if kept == groups:
+            break
+        groups = kept
+    if "proxy-groups" in document:
+        document["proxy-groups"] = groups
+    known = BUILT_IN_PROXIES | set(_names(document.get("proxies"))) | set(_names(groups))
+    rules = []
+    for rule in document.get("rules") or []:
+        parts = [part.strip() for part in str(rule).split(",")]
+        position = 1 if parts[0] == "MATCH" else 2
+        target = parts[position] if len(parts) > position else ""
+        if parts[0] in NESTED_RULES or target in known:
+            rules.append(rule)
+    if "rules" in document:
+        document["rules"] = rules
+    return document
+
+
+def _unreadable(text: str) -> str:
+    """Why the core says a body is no subscription (compose.readError): a short text, such as
+    a provider's message or broken YAML, is quoted by its first line, cut at 120 runes."""
+    text = text.strip()
+    if not text:
+        return "the subscription is empty"
+    if len(text) > 4096 or re.fullmatch(r"[A-Za-z0-9+/=_\-\r\n]{32,}", text):
+        return UNREADABLE
+    line = text.split("\n", 1)[0].strip()
+    return "a message, not a subscription: " + (line if len(line) <= 120 else line[:117] + "...")
+
+
 # Rules whose payload holds other rules; the simulation does not look inside them.
 NESTED_RULES = {"AND", "OR", "NOT", "SUB-RULE"}
 
@@ -233,17 +286,23 @@ def _subscription(
 ) -> tuple[list[dict[str, Any]], dict[str, Any], list[SourceWarning]]:
     """The named proxies of a subscription, a later one of a taken name numbered as subconv
     numbers it, the profile itself and what reading it left out or changed."""
-    document = _load(text, label)
+    try:
+        document = yaml.safe_load(text)
+    except yaml.YAMLError:
+        document = None
     warnings: list[SourceWarning] = []
-    if isinstance(document, dict):
+    if isinstance(document, dict) and any(key in document for key in ROUTING_PARTS):
         proxies = document.get("proxies") or []
         if not isinstance(proxies, list):
             raise HostError("invalid_config", label + "proxies must be a list")
+    elif isinstance(document, dict) and not document:
+        raise HostError("invalid_config", label + UNREADABLE)
     else:
-        document = {}
-        proxies, warnings = _share_links(text)
+        # Settings without anything to route are as much a message as plain text.
+        proxies, warnings = _share_links(text) if not isinstance(document, dict) else ([], [])
         if not proxies:
-            raise HostError("invalid_config", label + UNREADABLE)
+            raise HostError("invalid_config", label + _unreadable(text))
+        document = {}
     named: dict[str, dict[str, Any]] = {}
     for proxy in proxies:
         if isinstance(proxy, dict) and isinstance(proxy.get("name"), str) and proxy["name"]:
