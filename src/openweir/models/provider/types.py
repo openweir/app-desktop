@@ -591,7 +591,7 @@ class ProviderApi(Protocol):
                          which send subscription.USER_AGENT (D48)
         Accept-Language  zh-CN or en-US from the UI language (i18n.current_language), so names
                          and descriptions come in it
-        Accept           application/json
+        Accept           application/json, except config and link downloads
 
     POSTs to /api/auth/* also send ``Origin: <origin>`` (Better Auth checks it). No request
     follows a redirect: a 3xx is PROVIDER_BAD_RESPONSE. ``Authorization: Bearer <token>`` only
