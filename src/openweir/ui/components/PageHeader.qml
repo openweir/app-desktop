@@ -27,6 +27,8 @@ Item {
 
     implicitWidth: column.implicitWidth + column.anchors.rightMargin
     implicitHeight: column.implicitHeight
+    // The undo hint is a status that screen readers read out as it shows.
+    onUndoTextChanged: ScreenReader.announce(undoHint, undoText)
 
     // The band, from the window's top edge and across the page's margins.
     TitleBandArea {
@@ -67,6 +69,8 @@ Item {
             }
 
             RowLayout {
+                id: undoHint
+
                 Layout.fillWidth: true
                 Layout.alignment: Qt.AlignVCenter
                 visible: header.undoText !== ""

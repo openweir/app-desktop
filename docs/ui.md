@@ -38,6 +38,9 @@
   - 获得焦点的行记为列表的 `currentIndex`：`ListView` 不回收也不复用当前行，焦点所在的行滚出视野后仍在原处，
     方向键从它接着走；否则复用会把焦点带到别的行上。
   - 列表只能按矩形裁剪，所以容器的边框画在行的上面，圆角外侧再用页面背景色盖住。
+- **读屏播报**（DESIGN.md「读屏」）：焦点没动、读屏该知道的内容变了时，用 Qt 6.8 起的 `Accessible.announce`
+  告诉它，一律经 `ScreenReader.announce(item, 文字)`。它另外发出 `announced`，测试用 `Loaded.announcements()`
+  听：离屏平台没有读屏，系统实际怎么读只能在各平台上看。
 - asyncio 事件循环运行在后台线程，结果通过排队信号回到 Qt 线程。
 - **控制客户端**：负责构造 Request、校验 Response 的版本和 ID，并按间隔调用 `PollEvents` 拉取订阅。
   传输有两种实现：

@@ -161,6 +161,33 @@ def test_custom_controls_tell_their_role_and_state(qtbot: QtBot, loaded: Loaded)
 
 
 @pytest.mark.usefixtures("screen_reader")
+def test_the_undo_hint_is_read_out_as_it_shows(qtbot: QtBot, loaded: Loaded) -> None:
+    """The hint takes the status text's place without taking the focus, so it is announced
+    (DESIGN.md "撤销提示")."""
+    routing = loaded.view_models.routing
+    show_page(qtbot, loaded, "routing")
+    with qtbot.waitSignal(routing.routingChanged):
+        routing.setMode("plan")
+    rows = routing.plan_rules().property("rows")
+    qtbot.waitUntil(lambda: len(rows.rows) == 6)
+    heard = loaded.announcements()
+    rule = rows.rows[0]
+    routing.plan_rules().removeRule(rule.id)
+    qtbot.waitUntil(lambda: heard == [f"已删除「{rule.name}」"])
+    header = loaded.item(lambda i: kind(i) == "PageHeader")
+    hint = find(header, lambda i: accessible(i).name == f"已删除「{rule.name}」")
+    assert hint is not None
+    assert accessible(hint).role == Role.StaticText
+
+    # Undoing puts the rule back; the status text that returns is not announced.
+    routing.undo()
+    qtbot.waitUntil(lambda: len(rows.rows) == 6 and routing.property("undoText") == "")
+    qtbot.wait(50)
+    assert heard == [f"已删除「{rule.name}」"]
+    assert loaded.warnings == []
+
+
+@pytest.mark.usefixtures("screen_reader")
 def test_rows_and_menus_are_read_out(qtbot: QtBot, loaded: Loaded) -> None:
     content = show_page(qtbot, loaded, "profiles")
     rows = find_all(content, lambda i: kind(i) == "ProfileRow")
