@@ -127,8 +127,13 @@ def settle(qtbot: QtBot, about: AboutViewModel, *states: str) -> None:
 
 
 @pytest.mark.parametrize(
-    ("system", "machine", "installer", "hint"),
-    [("darwin", "arm64", DMG, "磁盘映像"), ("win32", "AMD64", EXE, "管理员权限")],
+    ("system", "machine", "installer", "hint", "tunnel"),
+    [
+        # A disk image: OpenWeir quits as 退出 OpenWeir does, disconnecting first (D41).
+        ("darwin", "arm64", DMG, "磁盘映像", "stopped"),
+        # Windows' installer: the service keeps the tunnel through the upgrade.
+        ("win32", "AMD64", EXE, "管理员权限", "running"),
+    ],
 )
 def test_update_from_check_to_install(
     qtbot: QtBot,
@@ -140,6 +145,7 @@ def test_update_from_check_to_install(
     machine: str,
     installer: str,
     hint: str,
+    tunnel: str,
 ) -> None:
     opened = Opened()
     about = built.about
@@ -179,7 +185,36 @@ def test_update_from_check_to_install(
         assert not prop(about, "updateButtonEnabled")
         about.confirmInstall()
     assert opened.paths == [tmp_path / "data" / "updates" / installer]
+    assert asyncio.run(built.host.get_status()).state == tunnel
+
+
+def test_the_disk_image_opens_again_when_quitting_does_not_go_ahead(
+    qtbot: QtBot,
+    built: ViewModels,
+    github: FakeGitHub,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The disconnect before quitting fails and the user stays in OpenWeir."""
+    about, desktop = built.about, built.desktop
+    monkeypatch.setattr(about, "_updater", updater_for(github, tmp_path))
+    monkeypatch.setattr(about, "_opener", Opened())
+
+    async def refused() -> None:
+        raise HostError("core_unresponsive", "the core did not answer")
+
+    monkeypatch.setattr(built.host, "stop", refused)
+    about.runUpdateAction()
+    settle(qtbot, about, "available")
+    about.runUpdateAction()
+    settle(qtbot, about, "ready")
+    with qtbot.waitSignal(desktop.quitFailed):
+        about.confirmInstall()
+    desktop.cancelQuit()
     assert asyncio.run(built.host.get_status()).state == "running"
+    assert prop(about, "updateState") == "ready"
+    assert prop(about, "updateButton") == "打开安装包…"
+    assert prop(about, "updateButtonEnabled")
 
 
 @pytest.mark.parametrize("signed", [True, False])

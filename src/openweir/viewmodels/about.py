@@ -109,7 +109,9 @@ class AboutViewModel(QObject):
     changed = Signal()
     optionsChanged = Signal()  # the UI language changed
     installRequested = Signal()  # the view asks before the installer is opened
-    installerOpened = Signal()
+    # The system opened the installer, and the UI goes (composition.py, D41): True for
+    # Windows' installer, False for a disk image.
+    installerOpened = Signal(bool)
     _progressed = Signal(int, int)  # from the download's thread
     _verifying = Signal()
     # The store tells its listeners on the thread that wrote; the timers live on this one.
@@ -430,7 +432,10 @@ class AboutViewModel(QObject):
 
         def ready(path: Path) -> None:
             if self._opener(path):
-                self.installerOpened.emit()
+                # It can be opened again should leaving not go ahead, as when the disconnect
+                # before quitting fails and the user stays.
+                self._set_state(READY)
+                self.installerOpened.emit(path.suffix == ".exe")
             else:
                 self._fail_text(self.tr("无法打开安装包：{name}").format(name=path.name))
 

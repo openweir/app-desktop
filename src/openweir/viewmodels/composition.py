@@ -208,7 +208,19 @@ def compose(
         logs.held,
         crash_directory=store.directory / "crashes",
     )
-    about.installerOpened.connect(desktop.leave)
+
+    def installer_opened(windows_installer: bool) -> None:
+        """Go once the system has opened the update (D41, docs/release.md §3). Windows'
+        installer would close the UI with --quit anyway, and the service keeps the tunnel
+        through the upgrade (was_running). Nothing does that for a disk image: the old system
+        extension's tunnel would run on with no UI while the app is replaced, so OpenWeir quits
+        as 退出 OpenWeir does, disconnecting first."""
+        if windows_installer:
+            desktop.leave()
+        else:
+            desktop.quit()
+
+    about.installerOpened.connect(installer_opened)
     backup = BackupViewModel(
         Backups(store.database),
         library,

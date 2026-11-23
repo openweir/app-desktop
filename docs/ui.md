@@ -642,9 +642,12 @@ UI 只保存和传递覆写原文，解析与合并在内核里做；模拟宿�
     退出 Apple Event 带
     `kAEQuitReason`；其他平台上 `Quit` 事件只来自系统（Windows 的 `WM_ENDSESSION`），托盘的退出不经过它。
     离开事件循环用 `exit`，不用 `quit`：macOS 上 `quit` 会经 `terminate:` 再变成一个 `Quit` 事件。
-  - 应用内更新的下载和校验在界面进程里，退出时随之取消，不拖住退出。Windows 安装器用 `--quit` 关闭界面，不断开，
-    升级后服务按 `was_running` 恢复隧道（architecture.md 第 9 节）；macOS 的磁盘映像由用户自己退出 OpenWeir（照常
-    断开），替换后手动连接。
+  - 应用内更新的下载和校验在界面进程里，退出时随之取消，不拖住退出。系统打开安装包后界面就退出（release.md
+    第 3 节第 5 步），两个平台不同：Windows 上直接离开、不断开，和安装器的 `--quit` 一样，升级后服务按 `was_running`
+    恢复隧道（architecture.md 第 9 节）；macOS 打开磁盘映像后调用 `DesktopViewModel.quit`，像「退出 OpenWeir」一样先
+    断开再退出，断开失败时同样询问，替换后由用户打开新版本、手动连接。macOS 没有替用户保管隧道的服务：不断开的话，
+    旧版本系统扩展里的隧道会在没有界面的情况下继续运行，正是 D41 要避免的；新版本的界面还得和旧扩展通信，直到
+    下次连接时激活新扩展。
   - 界面崩溃或被结束时没有机会断开，隧道仍由服务或系统扩展维持（architecture.md §1）。
 - **单实例**：第一个界面在用户数据目录持有 `ui.lock`（`QLockFile`，进程不在了的锁视为过期），并以
   `openweir-<用户名、数据目录和 ui.key 的哈希>` 为名监听 `QLocalServer`（只允许同一用户连接）。`ui.key` 是
