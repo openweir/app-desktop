@@ -10,7 +10,8 @@ name: Release
 # environment: its reviewers approve each run before the jobs get the signing secrets, the Azure
 # sign-in and the Google OAuth client. A last job puts all three installers and SHA256SUMS into
 # a draft GitHub Release v<version> at this commit (docs/release.md §1), which a person
-# publishes; publishing creates the tag, which is the source (D43).
+# publishes; publishing creates the tag, which is the source (D43). The Linux packages go out only
+# in previews (prerelease.yml), unsigned, until the release signs them (docs/release.md §8).
 on:
   workflow_call:
     inputs:

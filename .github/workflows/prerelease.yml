@@ -1,14 +1,15 @@
 # Previews as GitHub pre-releases (docs/release.md "预览版"): the last job of CI (ci.yml) calls
 # this on a push to develop once every check has passed, so it runs this commit's copy and
-# publishes the installers this CI run built. Its
-# unsigned macOS disk image and Windows installers go out as v<version>-preview.<N> (N counts
-# from 1 per version), so testers download them from the release page instead of Actions artifacts. main
-# holds what is to be released, and its v* tags make the signed releases (release.yml). Pre-releases
-# are never offered as updates (src/openweir/update/releases.py reads releases/latest only), and
-# only the newest is kept, so a preview carries all three installers: a develop push that builds
-# one builds them all (scripts/ci_changes.py), and a run without each of them publishes nothing
-# and leaves the previous preview in place. A CI run that built no installer (documentation
-# only) publishes nothing either.
+# publishes the installers this CI run built. Its unsigned macOS disk image, Windows installers
+# and Linux .deb and .rpm packages (x64 and arm64) go out as v<version>-preview.<N> (N counts
+# from 1 per version), so testers download them from the release page instead of Actions
+# artifacts. main holds what is to be released, and its v* tags make the signed releases
+# (release.yml), which carry no Linux packages until they are signed too. Pre-releases are never
+# offered as updates (src/openweir/update/releases.py reads releases/latest only), and only the
+# newest is kept, so a preview carries every platform: a develop push that builds one platform's
+# installers builds them all (scripts/ci_changes.py), and a run without each of them publishes
+# nothing and leaves the previous preview in place. A CI run that built no installer
+# (documentation only) publishes nothing either.
 name: Preview
 
 on:
@@ -35,11 +36,12 @@ jobs:
       HEAD_SHA: ${{ github.sha }}
     steps:
       # CI keeps the installers for a week (ci.yml), long enough for a rerun of this job. When
-      # nothing matches, nothing is downloaded and dist is not created.
+      # nothing matches, nothing is downloaded and dist is not created. The Linux packages come
+      # with a .sha256 each, from the machine that built them.
       - name: Installers from the CI run
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131  # v7.0.0
         with:
-          pattern: "{macos-universal,windows-installer}-*"
+          pattern: "{macos-universal,windows-installer,linux-package}-*"
           merge-multiple: true
           path: dist
 
@@ -67,15 +69,30 @@ jobs:
           fi
           mkdir -p dist
           cd dist
+          # The Linux packages arrive as their builders hashed them, or the job fails.
+          for sums in *.sha256; do
+            if ! sha256sum --check --strict --quiet "$sums"; then
+              echo "::error::${sums%.sha256} does not match the checksum its build wrote"
+              exit 1
+            fi
+            rm -- "$sums"
+          done
           dmgs=(*.dmg)
           x64=(OpenWeir-*-windows-x64-setup.exe)
           arm64=(OpenWeir-*-windows-arm64-setup.exe)
-          if [ $((${#dmgs[@]} + ${#x64[@]} + ${#arm64[@]})) -eq 0 ]; then
+          debs_x64=(OpenWeir-*-linux-x64.deb)
+          debs_arm64=(OpenWeir-*-linux-arm64.deb)
+          rpms_x64=(OpenWeir-*-linux-x64.rpm)
+          rpms_arm64=(OpenWeir-*-linux-arm64.rpm)
+          counts=(${#dmgs[@]} ${#x64[@]} ${#arm64[@]} ${#debs_x64[@]} ${#debs_arm64[@]} ${#rpms_x64[@]} ${#rpms_arm64[@]})
+          total=0
+          for count in "${counts[@]}"; do total=$((total + count)); done
+          if [ "$total" -eq 0 ]; then
             skip "This CI run built no installer; nothing to publish."
           fi
           # The new preview replaces the previous one, so it carries every platform or is not made.
-          if [ ${#dmgs[@]} -ne 1 ] || [ ${#x64[@]} -ne 1 ] || [ ${#arm64[@]} -ne 1 ]; then
-            echo "::warning::Found ${#dmgs[@]} disk image(s), ${#x64[@]} x64 and ${#arm64[@]} ARM64 installer(s), not one of each; the previous preview stays"
+          if [ "${counts[*]}" != "1 1 1 1 1 1 1" ]; then
+            echo "::warning::Found ${#dmgs[@]} disk image(s), ${#x64[@]} x64 and ${#arm64[@]} ARM64 Windows installer(s), ${#debs_x64[@]} x64 and ${#debs_arm64[@]} arm64 .deb, ${#rpms_x64[@]} x64 and ${#rpms_arm64[@]} arm64 .rpm, not one of each; the previous preview stays"
             skip "Not one of each installer; no preview, and the previous one stays."
           fi
           # Previews of a version count from 1: the next number after this version's newest preview.
@@ -85,6 +102,10 @@ jobs:
           mv "${dmgs[0]}" "OpenWeir-$preview-macos-universal-unsigned.dmg"
           mv "${x64[0]}" "OpenWeir-$preview-windows-x64-unsigned-setup.exe"
           mv "${arm64[0]}" "OpenWeir-$preview-windows-arm64-unsigned-setup.exe"
+          mv "${debs_x64[0]}" "OpenWeir-$preview-linux-x64-unsigned.deb"
+          mv "${debs_arm64[0]}" "OpenWeir-$preview-linux-arm64-unsigned.deb"
+          mv "${rpms_x64[0]}" "OpenWeir-$preview-linux-x64-unsigned.rpm"
+          mv "${rpms_arm64[0]}" "OpenWeir-$preview-linux-arm64-unsigned.rpm"
           files=(OpenWeir-*)
           sha256sum "${files[@]}" > SHA256SUMS
           ls -l
@@ -103,6 +124,7 @@ jobs:
 
           - **Previews are unsigned**; only stable releases published from main are signed and notarized. On Windows, SmartScreen warns about an unknown publisher: choose **More info → Run anyway**.
           - **On macOS you can look around but not connect**: the system extension needs a Developer ID signature and notarization before it can be activated.
+          - **Linux** (x64: Ubuntu 22.04, Debian 12, Fedora 41 or later; arm64: Ubuntu 24.04, Debian 13, Fedora 41 or later): \`sudo apt install ./OpenWeir-$VERSION-linux-x64-unsigned.deb\` or \`sudo dnf install ./OpenWeir-$VERSION-linux-x64-unsigned.rpm\` (\`arm64\` likewise). The packages carry no signature, so check them against \`SHA256SUMS\` first. A preview of the same version as the one installed needs \`sudo apt install --reinstall ./…\` or \`sudo dnf reinstall ./…\`. Without the GNOME AppIndicator extension there is no tray icon, and closing the window quits OpenWeir.
           - In-app updates never offer previews; switch to the stable release once it is out.
           - Verify the downloads with \`SHA256SUMS\`.
 
@@ -112,6 +134,7 @@ jobs:
 
           - **预览版不签名**，只有 main 上发布的正式版才签名和公证。Windows 安装时 SmartScreen 会提示未知发布者，选择「更多信息 → 仍要运行」。
           - **macOS 只能查看界面，不能连接**：系统扩展需要 Developer ID 签名和公证才能激活。
+          - **Linux**（x64：Ubuntu 22.04、Debian 12、Fedora 41 及更新；arm64：Ubuntu 24.04、Debian 13、Fedora 41 及更新）：\`sudo apt install ./OpenWeir-$VERSION-linux-x64-unsigned.deb\` 或 \`sudo dnf install ./OpenWeir-$VERSION-linux-x64-unsigned.rpm\`（arm64 同理）。安装包没有签名，安装前先用 \`SHA256SUMS\` 核对。已装的是同一版本号的预览版时，用 \`sudo apt install --reinstall ./…\` 或 \`sudo dnf reinstall ./…\`。GNOME 没有 AppIndicator 扩展时没有托盘图标，关闭窗口即退出 OpenWeir。
           - 预览版不会通过应用内更新推送；正式版发布后请改用正式版。
           - 用 \`SHA256SUMS\` 核对下载的文件。
           EOF
