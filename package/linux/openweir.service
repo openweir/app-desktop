@@ -1,0 +1,54 @@
+# OpenWeir's service (docs/architecture.md "Linux (in progress)", D60): the Go service as root,
+# started by openweir.socket and at boot, holding the tunnel for the user who owns it.
+[Unit]
+Description=OpenWeir service
+Documentation=https://github.com/openweir/app-desktop
+# -system serves exactly the one socket systemd passes.
+Requires=openweir.socket
+# Stopped before the network and systemd-resolved at shutdown, so that -cleanup still finds
+# what a TUN left in them.
+After=openweir.socket network.target systemd-resolved.service
+
+[Service]
+Type=notify
+# Routing rules, the route table and resolved's settings that a crashed TUN left (D67).
+# sing-tun clears its rule range itself when it starts, so a failure here does not keep the
+# service from starting; it is in the journal.
+ExecStartPre=-/opt/openweir/openweir-service -cleanup
+ExecStart=/opt/openweir/openweir-service -system
+ExecStopPost=/opt/openweir/openweir-service -cleanup
+# A new owner ends the process cleanly (mihomo's home is fixed for its life); systemd starts it
+# again for them.
+Restart=always
+RestartSec=2
+TimeoutStopSec=25
+# /var/lib/openweir: the service's root, which users may pass through to their own homes under
+# users/<uid>; /var/cache/openweir: the update helper's copies.
+StateDirectory=openweir
+StateDirectoryMode=0711
+CacheDirectory=openweir
+UMask=0077
+# CAP_SYS_PTRACE reads other users' /proc/<pid>/exe, for the peer check and mihomo's process
+# rules; the DAC and owner capabilities give each user's home to its user.
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW CAP_NET_BIND_SERVICE CAP_SYS_PTRACE CAP_CHOWN CAP_FOWNER CAP_DAC_OVERRIDE
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+DevicePolicy=closed
+DeviceAllow=/dev/net/tun rw
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+RestrictRealtime=yes
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+# Not set, on purpose: ProtectProc=invisible (the peer check reads other users' processes),
+# MemoryDenyWriteExecute (Cronet, loaded through purego) and ProtectKernelTunables (until a TUN
+# test shows that sing-tun writes no sysctl).
+
+[Install]
+WantedBy=multi-user.target
+Also=openweir.socket
