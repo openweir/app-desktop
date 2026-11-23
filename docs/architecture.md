@@ -12,16 +12,19 @@ OpenWeir（决策 D1）；
 
 ## 1. 定位与原则
 
-- 面向 Windows 与 macOS 的 mihomo 图形客户端，界面使用 PySide6，并以 Nuitka standalone 模式打包。
+- 面向 Windows、macOS 与 Linux 的 mihomo 图形客户端，界面使用 PySide6，并以 Nuitka standalone 模式打包。
 - **内核以 Go 库形式内嵌，不作为 CLI 子进程运行。** Windows 上内核位于自有的 LocalSystem 服务内，
-  macOS 上位于 NetworkExtension 系统扩展内。两端共用本仓库自己实现的 Go 内核层 engine，直接依赖 mihomo；
+  macOS 上位于 NetworkExtension 系统扩展内，Linux 上位于以 root 运行的 systemd 服务内（"Linux"一节）。各端共用本仓库
+  自己实现的 Go 内核层 engine，直接依赖 mihomo；
   [libclash](https://github.com/Herta-Network/libclash) 只作参考，不作为依赖（见第 3 节）。
 - **UI 始终以普通用户权限运行。** Windows 在安装器处请求 UAC；管理员接管其他用户的隧道时，界面经 UAC 启动的是服务
-  自己的接管辅助进程，界面本身不提权（5.4 节）。macOS 只在首次激活系统扩展时需要用户批准。
-- **隧道不依赖界面进程。** Windows 服务按属主持久化配置，并在开机后恢复；macOS 的 NE 本身就独立于 App 运行。关闭窗口
+  自己的接管辅助进程，界面本身不提权（5.4 节）；Linux 上同样经 pkexec 启动服务的辅助进程。macOS 只在首次激活系统扩展时
+  需要用户批准。
+- **隧道不依赖界面进程。** Windows 和 Linux 的服务按属主持久化配置，并在开机后恢复；macOS 的 NE 本身就独立于 App 运行。关闭窗口
   留在托盘、界面崩溃或被结束时隧道照常运行；用户退出 OpenWeir 时先断开隧道再退出（D41，ui.md 第 8 节）。
-- **控制面是自定义的方法调用协议，不使用 HTTP。** Windows 上走命名管道；macOS 上走 Network Extension
-  自带的 IPC（provider message），不监听任何 socket。两端都不开放 TCP 端口，mihomo 自带的 HTTP
+- **控制面是自定义的方法调用协议，不使用 HTTP。** Windows 上走命名管道，Linux 上走 systemd 监听的 Unix 套接字
+  `/run/openweir/control.sock`；macOS 上走 Network Extension 自带的 IPC（provider message），不监听任何 socket。
+  各端都不开放 TCP 端口，mihomo 自带的 HTTP
   控制器（Clash API）在任何情况下都不启动。
 
 ### 为什么不以子进程运行 mihomo
@@ -66,6 +69,7 @@ secret 注入。而且接口面由 mihomo 决定：上游升级时新增的接�
 | engine | Go | 随宿主 | 直接内嵌 mihomo：配置准入、生命周期、查询 |
 | 控制分发器 | Go | 随宿主 | 解码 Request、调用方法、编码 Response、维护订阅缓冲；Windows 服务与 macOS 扩展共用 |
 | Windows 服务 | Go | LocalSystem | 管道、帧编解码与身份校验、属主、持久化与恢复、系统代理 |
+| Linux 服务 | Go | root（systemd，带沙箱） | 与 Windows 服务同一套代码：套接字、对端校验、属主、恢复、GNOME/KDE 的系统代理、TUN 的清理 |
 | NE 管理库 | Swift（C ABI） | 用户 | 系统扩展激活、隧道配置与启停、转发控制消息 |
 | NE 系统扩展 | Swift + Go | root（系统扩展） | 隧道网络设置、utun fd、运行内核、把 app message 交给分发器 |
 
@@ -207,8 +211,8 @@ secret 注入。而且接口面由 mihomo 决定：上游升级时新增的接�
 
 ### 3.3 以 SYSTEM 身份运行时的安全要求
 
-Windows 服务以 SYSTEM 身份运行内核，下面每一项都必须满足，并且各有回归测试（`internal/engine/security_test.go`
-里的 `TestSecurity1` 到 `TestSecurity6`）。这些要求源自 libclash 里在移动端由应用沙箱兜底、在桌面上不再成立的地方。
+Windows 服务以 SYSTEM 身份、Linux 服务以 root 身份运行内核，下面每一项都必须满足，并且各有回归测试
+（`internal/engine/security_test.go` 里的 `TestSecurity1` 到 `TestSecurity7`）。这些要求源自 libclash 里在移动端由应用沙箱兜底、在桌面上不再成立的地方。
 
 | # | 要求 | 原因 | 实现与测试 |
 | --- | --- | --- | --- |
@@ -218,6 +222,7 @@ Windows 服务以 SYSTEM 身份运行内核，下面每一项都必须满足，�
 | 4 | provider 路径用 `filepath` 规范化并检查 `filepath.IsLocal`；不设置 `SKIP_SAFE_PATH_CHECK` / `SAFE_PATHS` | 只按 `/` 切分时，Windows 上的 `..\` 可以跳出 `providers/`；`IsSafePath` 作为兜底 | mihomo 在启动时读取这两个变量，`New` 按行为自检（home 外的路径必须被拒），不通过就拒绝运行；测试用子进程带上变量验证 |
 | 5 | 持久化节点选择（`profile.store-selected`） | 开机恢复后要回到用户上次选的节点 | 强制为 true；测试选择节点后重启内核，确认仍是该节点 |
 | 6 | 组网出站只用作出站（[mesh.md](mesh.md) 第 4 节）：`easytier` 的 `enable-exit-node` 强制 false、`no-listener` 强制 true，`proxy-networks`、`mapped-listeners`、`listeners` 清空 | 这些选项让组网里的其他设备把本机当出口、进入本机所在的子网，向它们公布监听地址，或在所有网卡上接受它们的连接；以 SYSTEM 身份运行时会把用户的网络暴露出去 | 改写顶层 `proxies` 和 provider 的 `payload`；远程 provider 和带 `override-expr` 的 provider 在 `override-expr` 末尾追加同样效果的表达式，mihomo 对下载来的每个出站最后执行它们。测试覆盖配置、覆写、内联和远程 provider，并用 mihomo 的表达式求值器核对；同时确认三种组网出站的 `state-dir` 越出 home 时被拒绝（Tailscale 只在 `with_gvisor` 构建里有，CI 另外带这个标签跑） |
+| 7 | Linux 上自管模式的 TUN 固定在产品的位置（D67）：`device` 强制为 `openweir0`，`iproute2-table-index`、`iproute2-rule-index` 强制为 9347；删除 `include-uid`、`exclude-uid`（及 `-range`）、`include-android-user`、`include-package`、`exclude-package`、`include-interface`、`exclude-interface`、`route-address-set`、`route-exclude-address-set` 和 auto-redirect 的标记与回落规则，`redir-port`、`tproxy-port` 置 0 | TUN 对整台机器生效（D66）：以 root 运行时，按 UID、包、接口挑选流量的列表会把别的用户的流量带进属主的隧道或漏在外面；`redir-port`、`tproxy-port` 只收防火墙规则送来的流量，服务不写这样的规则，以 root 开出属主选的端口没有意义；固定的位置让崩溃后的清理（`internal/tunclean`）知道删什么，也碰不到别的隧道 | `internal/admission/pins.go` 在覆写之后改写，解析后由 `admission.Verify` 再核对一次；`TestSecurity7LinuxTUNStaysPinned`，真实 TUN 上由 `tun` job 的 `TestPinnedTUN` 验证（第 11 节） |
 
 拼装时，第 6 项关闭的每个选项在报告里给出 `mesh_restricted` 警告。EasyTier 不监听时能否打洞还要实测
 （[mesh.md](mesh.md) 第 8 节）。
@@ -772,37 +777,168 @@ macOS 不监听任何 socket，控制消息全部走 Network Extension 自带的
 - 做法与 hypervpn 一致，见它的 `NetworkExtensionManager.swift`（`providerExchange`）和
   `PacketTunnelProvider.swift`（`handleAppMessage`）。
 
-## Linux（进行中）
+## Linux
 
-Linux 版正在开发，还没有发布。已定的决策是 D60–D67；完整的设计等实现落地后写成本文单独的一节，这里先记下
-已经定下的结构和约定，代码里标着"Linux (in progress)"的地方都指这里。
+Linux 版（决策 D60–D67）是一个以 root 运行的 systemd 系统服务，加上以普通用户身份运行的界面，装在 `/opt/openweir`，
+以 `.deb` 和 `.rpm` 发布（现在只有不签名的预览版，release.md 1.2 节）。服务跑的是 Windows 服务那套 Go 代码（属主、
+控制分发器、帧协议），控制协议不变，平台相关的部分在各包的 `*_linux.go` 里。路径、单元名、TUN 设备和路由表号都在
+`product.json` 的 `linux` 段，Go 经 `product_gen.go`（`product.Linux*`）、界面经 `openweir.product`（`LINUX_*`）读取。
 
-- **特权部分**（D60）：`openweir-service` 作为 root 运行的 systemd 系统服务 `openweir.service`，由
-  `openweir.socket` 按需激活，开机时也启动，单元带沙箱选项。它跑的是 Windows 服务那套 Go 代码（属主、分发器、
-  帧协议），控制协议不变。套接字是 `/run/openweir/control.sock`，服务经 `SO_PEERCRED` 和 `/proc/<pid>/exe`
-  校验对端，只接受 `/opt/openweir/openweir`。服务的根目录是 `/var/lib/openweir`，属主的 home 在其下的
-  `users/<uid>`。
-- **服务的运行方式**：`-system`（在 systemd 下运行；加 `-foreground` 时自己监听套接字）、`-cleanup`（单元的
-  `ExecStartPre` 和 `ExecStopPost`）、`-take-over` 和 `-install-update`（界面经 pkexec 运行）。`-socket` 仍是
-  开发服务（第 11 节），不变。
-- **TUN**（D67）：设备 `openweir0`，路由表 9347，策略路由规则从 9347 到 9357。服务把每份配置的 TUN 固定在这里，
-  `-cleanup`（`internal/tunclean`）在服务启动前和停止后删掉崩溃留下的规则、路由表和 systemd-resolved 设置，
-  不会碰到别的隧道。
-- **属主**（D66）：只有 logind 里活动的本地会话能认领；会话、睡眠和唤醒来自 logind（`internal/logind`）。
-  管理员经 pkexec 接管时，辅助进程以 root 连接，root 不成为属主：服务让出属主，再由管理员的界面认领。
-- **安装包与界面**：`.deb` 和 `.rpm` 装到 `/opt/openweir`，包格式记在 `/opt/openweir/package-format`（D61）；
-  更新经 pkexec 安装 Ed25519 签名过的包（D62）；系统代理只在 GNOME 和 KDE 上可用（D63）。界面用系统的窗口
-  装饰（D64），没有托盘时关闭窗口就退出（D65）。界面的命令行参数 `--background`、`--quit`、
-  `--update-result=<code>` 见 `src/openweir/app.py`。
-- **标识**：路径、单元名、TUN 设备和路由表号都在 `product.json` 的 `linux` 段；Go 经 `product_gen.go`
-  （`product.Linux*`）、界面经 `openweir.product`（`LINUX_*`）读取。
+### 服务与单元
+
+- **运行方式**（`service/service_linux.go`，D60）：
+  - `-system`：在 systemd 下运行，要求 euid 0。从 `LISTEN_FDS` 取 systemd 传来的套接字（必须正好一个；加
+    `-foreground` 时自己监听 `/run/openweir/control.sock`，调试用），状态根目录取 `$STATE_DIRECTORY`
+    （`/var/lib/openweir`），就绪后经 `NOTIFY_SOCKET` 报告 `READY=1`，然后在日志里写一行
+    `service started version=… core=…`。日志写到 stderr，进 journal。属主换人时干净退出（mihomo 的 home 在进程的
+    一生里不变），由 `Restart=always` 为新属主重新启动。
+  - `-cleanup`：TUN 留下的东西的清理（见下面的"TUN"），要求 root，由单元的 `ExecStartPre`（带 `-` 前缀，失败不阻止
+    启动：sing-tun 启动时自己也会清掉它的规则范围）和 `ExecStopPost` 运行。
+  - `-take-over`：管理员经 pkexec 运行的接管辅助进程（D66），只认 pkexec 设的 `PKEXEC_UID`，一分钟内结束。
+  - `-install-update <包> <SHA256SUMS> <SHA256SUMS.sig>`：经 pkexec 运行的安装辅助进程（D62，见"更新"）。
+  - `-socket <路径>`：开发服务（第 11 节），拒绝以 root 运行，与 macOS 上相同。
+- **单元**（`package/linux/`）：`openweir.socket` 监听 `/run/openweir/control.sock`，套接字 0666、目录 0755：每个本地
+  用户都能连接，访问控制是服务自己的对端校验。`openweir.service` 是 `Type=notify`，`Requires=openweir.socket`，排在
+  `network.target` 和 `systemd-resolved.service` 之后（关机时它先停，`-cleanup` 还找得到要清的东西），`Restart=always`、
+  `RestartSec=2`、`TimeoutStopSec=25`；`WantedBy=multi-user.target` 加 `Also=openweir.socket`，所以开机就启动，按属主
+  恢复隧道，与 Windows 服务相同（5.2 节）。
+- **沙箱**：`StateDirectory=openweir`（0711）、`CacheDirectory=openweir`（更新辅助进程的副本）、`UMask=0077`、
+  `NoNewPrivileges`、`ProtectSystem=strict`、`ProtectHome`、`PrivateTmp`、`DevicePolicy=closed` 只开 `/dev/net/tun`、
+  `ProtectKernelModules`、`ProtectKernelLogs`、`ProtectControlGroups`、`RestrictNamespaces`、`LockPersonality`、
+  `RestrictRealtime`、`SystemCallArchitectures=native`，地址族只有 `AF_UNIX`、`AF_INET`、`AF_INET6`、`AF_NETLINK`。
+  能力只留 `CAP_NET_ADMIN`、`CAP_NET_RAW`、`CAP_NET_BIND_SERVICE`、`CAP_SYS_PTRACE`（读别的用户的 `/proc/<pid>/exe`：
+  对端校验和 mihomo 的进程规则要用）、`CAP_CHOWN`、`CAP_FOWNER`、`CAP_DAC_OVERRIDE`（把每个用户的 home 交给他读）。
+  有意不设的：`ProtectProc=invisible`（对端校验要读别的用户的进程）、`MemoryDenyWriteExecute`（经 purego 加载的
+  Cronet）、`ProtectKernelTunables`（还没有测试证明 sing-tun 不写 sysctl）。
+- **Cronet**：服务以 `CGO_ENABLED=0` 构建，标签与 Windows 相同（`with_gvisor,with_naive,with_purego`），Naive 出站经
+  purego 只加载服务旁边的 `libcronet.so`，不看 `LD_LIBRARY_PATH`（`service/naive_purego.go`）。
+
+### 对端校验
+
+`peer.LinuxClientVerifier`（`internal/peer/peer_linux.go`）是这个人人都能连接的套接字的访问控制：
+
+- **进程**来自内核：Linux 6.5 起是 `SO_PEERPIDFD` 给的 pidfd；更早的内核用 `SO_PEERCRED` 报告的 pid 做 `pidfd_open`，
+  并要求这个进程不是在校验开始之后才启动的（比较 `/proc/<pid>/stat` 的启动时间）。校验完进程必须还在，否则这个 pid
+  可能已经换了主人；连接一直握着 pidfd 直到关闭，就像 Windows 服务握着客户端的进程（5.3 节）。
+- **可执行文件**：`/proc/<pid>/exe` 必须是 `/opt/openweir/openweir-ui`（任何非 root 用户运行）或
+  `/opt/openweir/openweir-service`（只认 root：pkexec 运行的辅助进程，唯一带 `Administrator` 的调用者），而且就是此刻
+  在那里的那个文件（设备号和 inode 相同）；这个文件和它上面的每一级目录都必须归 root、组和其他人不可写，这样别的
+  用户既放不进来，也换不掉。`/opt` 是指向别处的链接的系统（如 ostree）因此被拒绝。root 不能以界面的身份连接，也就
+  从不以界面的身份认领隧道。
+- **身份**：`UserID` 和 `SessionID` 都是调用者的 uid（服务按 logind 的用户而不是会话，见下），`ProcessID` 是它的进程。
+  `GetInfo` 对通过校验的调用者都开放。开发服务只比较 uid（第 11 节）。
+
+### 属主、会话与认领
+
+- `internal/owner/platform_linux.go` 是属主（5.4 节）在 Linux 上的 `Platform`，`internal/logind` 经系统总线读
+  systemd-logind（`github.com/godbus/dbus/v5`）。用户是十进制 uid；"会话"是 logind 里登录着的用户，以 uid 编号：
+  有未关闭的会话就算登录着，只有 linger 不算；`SessionLogonTime` 是 logind 的 `User.Timestamp`，用户全部注销再登录
+  时才变。logind 的 `UserNew`、`UserRemoved`、`SessionRemoved` 交给 `SessionChanged`，`PrepareForSleep` 交给
+  `Sleep`：服务握着 delay 抑制锁，直到隧道停好。网络是否就绪看 `power.NetworkAvailable()`。
+- **认领**（D66，`MayClaim`）：调用者的进程必须在它自己的、活动的本地会话里（logind 的 `Active`、`Remote=false`、
+  class `user`）。桌面经用户的 systemd 启动的程序往往不在任何会话里（GNOME、KDE 都这样），这时像 polkit 一样看这个
+  用户的显示会话，也就是他登录的那个图形会话；在别人会话里的进程被拒。拒绝时是 `claim_failed`（接管时
+  `take_over_failed`），原话是只有在这台机器前活动会话里的用户能使用隧道。TUN 对整台机器生效，v1 不按用户分流
+  （不用 include-uid）。
+- **接管**（D66）：管理员的界面经 `pkexec /opt/openweir/openweir-service -take-over` 运行辅助进程，polkit 动作
+  `org.openweir.app.take-over` 要求 `auth_admin`，只对本机的活动会话。辅助进程以 root 连接；root 不成为属主：服务
+  停止另一位用户的隧道、写回他的系统代理（现在或他下次登录时）、删除 `owner.json` 后重启
+  （`internal/owner/evict.go`），再由管理员的界面认领。界面只对 sudo、wheel、admin 组的成员、而且 pkexec 和服务都在时
+  显示「接管」（ui.md 第 8 节）；pkexec 的 126（取消验证）和 127（未授权）什么都不改变。
+- **目录**（`internal/owner/securedir_linux.go`）：只有 root 写。根目录 `/var/lib/openweir` 和其中的 `users/` 是 0711，
+  别的用户能穿过、不能列出；属主的 home `users/<uid>` 是 0750 加 POSIX ACL（访问 ACL 和默认 ACL），只让属主读和进入，
+  服务和 mihomo 在里面建的东西继承下去；文件系统不支持 ACL 时 home 只有 root 能读，记一条警告。链接、不是目录的和
+  不归 root 的目录一律拒绝。服务的崩溃日志在属主 home 的 `crashes/`（0750、0640，没有属主时在根目录下），界面的
+  崩溃报告读得到自己的那一份（D37）。
+
+### TUN 与崩溃后的清理（D67）
+
+- 自管模式的 TUN 由服务里的 engine 建立（sing-tun 的 auto-route、strict-route）。宿主交给 engine 的 `Pins`（设备
+  `openweir0`、路由表 9347、规则起点 9347）由准入在覆写之后写进每份配置，解析后再核对（3.3 节第 7 项）。DNS 交给
+  sing-tun：有 systemd-resolved 时按链接设置（`resolvectl`，关闭时 revert），从不改 `/etc/resolv.conf`。
+- strict-route 的规则在服务崩溃后还在，sing-tun 要到下次启动才删：在那之前，TUN 没有地址的地址族的每个包都被
+  `unreachable` 规则拦下，挂住的服务更是拿走所有流量，机器等于断网。所以 `-cleanup`（`internal/tunclean`）在服务启动
+  前和停止后（包括崩溃和 `kill -9`）运行：先删除 IPv4、IPv6 优先级 9347–9357 的规则（有了它们，路由表就不在任何查找
+  里了），再清空路由表 9347；设备 `openweir0` 还在（有进程握着它）时先 `resolvectl revert`，再删除它；同名但不是 TUN
+  的设备是别人的，不动。没有东西可删时什么都不做。在 PID 1 以外的网络命名空间里不调用 resolvectl：resolved 按网卡
+  编号接收设置，会落到宿主上同号的网卡（CI 的 TUN 测试就在命名空间里跑）。
+- NetworkManager：包里的 `/usr/lib/NetworkManager/conf.d/90-openweir.conf` 写 `unmanaged-devices+=interface-name:openweir*`，
+  让它不管这个设备；用 `+=` 追加，不盖掉别的配置（如 Ubuntu 的 `10-globally-managed-devices.conf`）设的值。
+
+### 系统代理（D63）
+
+`internal/sysproxy/sysproxy_linux.go`：服务以属主的身份改他桌面自己的设置。`systemd-run --user
+--machine=<用户>@.host --wait --pipe --quiet --collect` 在他的用户管理器里运行桌面的工具（systemd 248 起），那里有他的
+会话总线和设置守护进程。GNOME 写 GSettings 的 `org.gnome.system.proxy`（GTK、Firefox、Chromium 也读它）；KDE 用
+`kwriteconfig6`（没有就用 5）写 `kioslaverc` 的 `[Proxy Settings]`，再经 D-Bus 通知 KIO 重读；两样都在就都写。读出的
+原值存进 `sysproxy.Settings.Desktop`，还原时原样写回，所以崩溃后和下次登录时能像 Windows 一样写回（5.5 节）。命令行
+里的 `$` 写成 `$$`，因为 systemd-run 会展开它。不设环境变量。别的桌面（既没有 gsettings 也没有 kwriteconfig）上服务
+返回 `system_proxy_unavailable`（不重试），设置页的系统代理一行不可用，写「仅 GNOME 和 KDE 支持系统代理」；Linux 的
+新安装默认只开 TUN（D46）。
+
+### 界面
+
+- **选宿主**（`app.default_host`）：设了 `OPENWEIR_DEV_SOCKET` 时连开发服务（`TAKEOVER_NONE`）；打包版（可执行文件旁边
+  有 `package-format`）连 `/run/openweir/control.sock` 的 `ServiceHost`（`TAKEOVER_SETTINGS`），套接字不在时的说明
+  点名 `openweir.socket`；从源码运行又没设开发套接字时，服务不可用。
+- 用户数据在 `$XDG_DATA_HOME/OpenWeir`（默认 `~/.local/share/OpenWeir`），凭据在 Secret Service（storage.md 第 1 节）。
+- 桌面行为见 ui.md 第 8 节：系统的窗口装饰（D64）；有 StatusNotifier 宿主时才有托盘，没有时关闭窗口即退出（D65）；
+  后来的界面把启动令牌转交给已在运行的界面；登录项是 `~/.config/autostart` 里的条目；SIGTERM、SIGINT 像系统的退出
+  一样不断开就离开，Ctrl+Q 是用户的退出，先断开（D41）；启动时清理 `mimeapps.list` 里失效的 scheme 默认程序
+  （release.md 第 6 节，D45）。
+- 命令行参数（`src/openweir/app.py`）：`--background`（登录时启动）、`--quit`（请已在运行的界面退出，安装包升级前用）、
+  `--update-result=<code>`（更新辅助进程的退出码，「版本」一行说明结果）。
+
+### 安装包（D61）
+
+- **布局**（`package/linux/README.md`）：`/opt/openweir/` 里是 Nuitka standalone 的界面 `openweir-ui`（包的数据在旁边的
+  `openweir/` 目录里，所以可执行文件不叫 `openweir`）、`openweir-service`、`libcronet.so`、`geodata/`、`LICENSE`、
+  `openweir/licenses/`，以及写着 `deb` 或 `rpm` 的 `package-format`（更新时下载同一种包）。`/usr/bin/openweir` 指向
+  `/opt/openweir/openweir-ui`；两个单元在 `/usr/lib/systemd/system/`；polkit 的 `org.openweir.app.take-over` 和
+  `org.openweir.app.install-update` 都是 `auth_admin`，按 `exec.path` 和 `exec.argv1` 区分；`org.openweir.app.desktop` 的
+  `MimeType` 取自 `product.json` 的 `urlSchemes`；hicolor 图标由 `scripts/gen_icons.py` 生成；还有 NetworkManager 的
+  配置。root 拥有一切，`/opt/openweir` 里只有 root 可写：服务只接受这样的目录里的界面。
+- **依赖**：`scripts/build_linux.py` 读树里每个 ELF 文件的 `readelf -d`（NEEDED）。树里带的库之外，只能是
+  `package/linux/system-libraries.toml` 列出的系统库（glibc、libstdc++、zlib、GLib、D-Bus、fontconfig、FreeType、
+  libglvnd 的 EGL 和 GL、xkbcommon、X11 与 xcb 一族、Wayland 的客户端库），否则构建失败。列出的库不进构建；只被
+  它们需要、树里没人用的库（如 libdbus 带来的 libsystemd）构建时删掉。`.deb` 依赖 Debian 的包名（`a | b` 照顾
+  Ubuntu 24.04 为 64 位 time_t 改的名字；libc6 带最低的 glibc 版本），`.rpm` 依赖 soname 本身（`libfoo.so.1()(64bit)`
+  和最高的 `GLIBC_`、`GLIBCXX_`、`CXXABI_` 版本），Fedora、openSUSE、RHEL 不管把库放在哪个包里都提供它们；两种包还
+  依赖 systemd 和 pkexec。界面用 ctypes 按 soname 加载的 `libxcb.so.1`（X11 的窗口激活）readelf 看不到，在列表里标
+  `loaded_by_name`，总是依赖。彩色 emoji 字体只推荐、不强制（`fonts-noto-color-emoji`、`google-noto-color-emoji-fonts`）：
+  Linux 上界面用系统的字体画 emoji，桌面一般都有，精简安装可能没有。
+- **架构与 glibc**：只为构建机的架构构建（Python 的扩展模块不交叉编译）。x64 在 `ubuntu:22.04` 里构建（glibc 2.35），
+  arm64 在 Ubuntu 24.04 上（glibc 2.39，PySide6 aarch64 轮子的下限）；构建检查每个 ELF 的 `e_machine`，需要的
+  `GLIBC_`、`GLIBCXX_`、`CXXABI_` 版本不超过构建镜像的，树里的链接不出树。支持的最老发行版：x64 是 Ubuntu 22.04、
+  Debian 12，arm64 是 Ubuntu 24.04、Debian 13；`.rpm` 在 Fedora 41 上测试。新加系统库之前先确认这些发行版都有它。
+- **维护脚本**：安装时 daemon-reload，启用并启动套接字和服务；升级前请运行中的界面退出（以各自的用户
+  `runuser -u <用户> -- /opt/openweir/openweir-ui --quit`，最多等 15 秒，剩下的发 SIGTERM；两样都不断开），文件就位后
+  `try-restart`，服务为属主恢复隧道；删除时停止并禁用两个单元；清除（只有 deb 有）删除 `/var/lib/openweir` 和
+  `/var/cache/openweir`，用户自己的数据目录不动。`systemctl` 的启停只在 systemd 运行时做，容器和 chroot 里只启用。
+- **崩溃符号**：`openweir-ui` 和 `openweir-service` 的 DWARF 由 `objcopy --only-keep-debug` 分到 `symbols/`，二进制里留
+  `.gnu_debuglink`，`build-ids.json` 记下 GNU build ID（服务由 `-B gobuildid` 从 Go 的 build ID 得到它）。
+
+### 更新（D62）
+
+- 安装包名 `OpenWeir-<版本>-linux-<x64|arm64>.<deb|rpm>`，界面按 `package-format` 选同一种。发布用 Ed25519 给
+  `SHA256SUMS` 签名（`SHA256SUMS.sig`）；公钥在构建时由环境变量 `OPENWEIR_LINUX_UPDATE_KEY` 写进 `product.json` 的
+  `signing.linuxUpdateKey`，并以 `-X` 链接进服务（`product.LinuxUpdateKey`）。
+- 界面先用公钥验 `SHA256SUMS.sig`，验过才信 `SHA256SUMS`，再下载并核对安装包（release.md 第 3 节）。「打开安装包…」
+  启动一个脱离的 shell：`pkexec /opt/openweir/openweir-service -install-update <包> <SHA256SUMS> <.sig>`，等旧界面退出，
+  再以 `--update-result=<退出码>` 启动界面。辅助进程（`service/update_linux.go`）要求 euid 0 和 `PKEXEC_UID`，把三个文件
+  以 `O_NOFOLLOW` 复制进 `/var/cache/openweir` 下新建的 0700 目录，用链接进来的公钥再验一次签名和哈希，核对包名
+  `openweir`、架构和更新的版本，再用 `apt-get install`、`dnf install`（没有 dnf 时 `zypper install`）安装。退出码：0 装好、
+  3 文件没通过校验、4 包管理器失败、126 取消了验证、127 未授权或没有验证代理。
+- **没有公钥的构建**（预览版现在都是）不提供安装：有新版本时「版本」一行写「请从发布页下载安装包」，按钮是
+  「打开下载页」。正式版的 Linux 安装包和签名还没做（release.md 1.3 节）。
 
 ## 7. Python UI
 
 - 分层参考 hypervpn：视图（QML）→ ViewModel → models → 宿主客户端。asyncio 事件循环运行在后台线程，结果
   通过排队信号回到 Qt 线程。
-- 控制客户端只依赖 protobuf：Windows 上是命名管道的一条长连接，macOS 上通过 ctypes 调用管理库。
-- 宿主抽象 `TunnelHost` 有 `ServiceHost`（Windows 服务；开发模式下走本地 socket）和 `MacExtensionHost`（macOS
+- 控制客户端只依赖 protobuf：Windows 上是命名管道的一条长连接，Linux 上是 `/run/openweir/control.sock` 的一条长连接，
+  macOS 上通过 ctypes 调用管理库。
+- 宿主抽象 `TunnelHost` 有 `ServiceHost`（Windows 和 Linux 的服务；开发模式下走本地 socket）和 `MacExtensionHost`（macOS
   打包的 app，经管理库发 provider message，`src/openweir/host/extension.py`）两个实现；测试和预览用模拟宿主。
 - Tor 出口未实现。设计是把 arti 做成 pyo3 扩展模块 `openweir_tor`，运行在界面进程里，不进服务和系统扩展
   （D23，[exits.md](exits.md) 第 4 节）。
@@ -813,10 +949,10 @@ Linux 版正在开发，还没有发布。已定的决策是 D60–D67；完整�
 
 | 威胁 | 措施 |
 | --- | --- |
-| 其他本地进程冒充 UI | Windows：连接建立时比较映像与安装的 `OpenWeir.exe` 的文件 ID 并锁住映像，要求用户会话，读取 SID 与会话，签名的发布构建再校验签名者（5.3 节）；macOS：只有本应用能取得 NE session |
-| 抢注服务管道名 | 使用 `ProtectedPrefix\Administrators` 前缀 |
+| 其他本地进程冒充 UI | Windows：连接建立时比较映像与安装的 `OpenWeir.exe` 的文件 ID 并锁住映像，要求用户会话，读取 SID 与会话，签名的发布构建再校验签名者（5.3 节）；Linux：从内核取对端进程的 pidfd 并握住，`/proc/<pid>/exe` 必须是 `/opt/openweir/openweir-ui` 本身，它和上面每一级目录都归 root、他人不可写（"Linux"一节"对端校验"）；macOS：只有本应用能取得 NE session |
+| 抢注服务管道名 | 使用 `ProtectedPrefix\Administrators` 前缀；Linux 的套接字由 systemd 建在 root 的 `/run/openweir/` 里 |
 | 其他用户抢注界面的单实例管道名或 socket，截取后来的界面转交的一键导入链接（其中常有订阅的 token） | 名字含数据目录里只有本用户能读的随机 `ui.key`；后来的界面和 `--quit` 写之前核对对端以本用户身份运行：Windows 比较管道服务端进程的令牌用户 SID，macOS、Linux 比较 socket 对端的 uid（[ui.md](ui.md) 第 8 节"单实例"） |
-| 配置让 SYSTEM 读写任意文件 | 每个 SID 独立的 mihomo home 目录 + `IsSafePath`（不带 `cmfa`，不设 `SKIP_SAFE_PATH_CHECK` / `SAFE_PATHS`），并修正 `ResolveAsRoot` |
+| 配置让 SYSTEM 读写任意文件 | 每个 SID（Linux 上每个 uid）独立的 mihomo home 目录 + `IsSafePath`（不带 `cmfa`，不设 `SKIP_SAFE_PATH_CHECK` / `SAFE_PATHS`），并修正 `ResolveAsRoot` |
 | 用户借链接让 SYSTEM 写到别处 | home 只有 SYSTEM 能写，属主不能在里面放链接；服务不用链接或别人建的目录（5.1 节） |
 | 属主的配置与凭据落在磁盘上 | `profile.json` 和 mihomo 的缓存只有 SYSTEM 和属主能读 |
 | 配置开放 mihomo 控制器 | engine 清空全部控制器字段，HTTP 控制器从不启动；embed mode 作为第二道防线 |
@@ -824,15 +960,16 @@ Linux 版正在开发，还没有发布。已定的决策是 D60–D67；完整�
 | 畸形或超大的消息 | Windows 先校验帧头再分配缓冲区，macOS 在解码前检查长度；未知方法和枚举直接拒绝；属主以外的调用者的请求超过 4 KiB 时不读入内存（4.2 节） |
 | 其他用户耗尽 SYSTEM 服务的资源或写满磁盘 | 连接同时最多 64 条、每个用户 8 条；被拒连接的日志每类每分钟一行（5.3 节） |
 | 订阅拖住内核或泄漏 | 事件缓存在有界缓冲区，满了丢弃最旧的；超过 30 秒未拉取的订阅自动失效 |
-| 其他用户接管隧道 | 属主 SID 校验；另一个用户的隧道运行时不能认领，只有经 UAC 提权的管理员能接管（5.4 节）；一个服务进程只打开一个属主的 home |
+| 其他用户接管隧道 | 属主 SID 校验；另一个用户的隧道运行时不能认领，只有经 UAC 提权的管理员能接管（5.4 节）；一个服务进程只打开一个属主的 home。Linux 上只有 logind 里活动的本地会话能认领，接管经 pkexec 以 `auth_admin` 确认（D66） |
 | 同一用户的其他进程借界面接管隧道 | 接管要求客户端 token 启用 Administrators 组，只有经 UAC 确认的提权进程有；界面不提权，服务的可执行文件不提权运行时通不过客户端校验 |
-| 其他用户的流量走属主的隧道 | 属主注销时停止隧道；同一次登录内恢复，新登录由启用的登录项连接（D5） |
+| 其他用户的流量走属主的隧道 | 属主注销时停止隧道；同一次登录内恢复，新登录由启用的登录项连接（D5）。Linux 的 TUN 对整台机器生效，所以只让坐在这台机器前的用户打开，配置也挑不了谁的流量（D66、3.3 节第 7 项） |
+| 崩溃的 TUN 留下的规则让机器断网 | Linux：systemd 在服务启动前和停止后运行 `-cleanup`，按固定的设备、路由表和规则范围删除（D67，"Linux"一节） |
 | 系统代理留在失效的端口上 | 停止、注销、服务停止，以及崩溃后没能恢复隧道时写回属主原来的设置；写不了就存着，等他下次登录 |
 | 局域网暴露 | `allow-lan` 和监听 `0.0.0.0` 的 listeners 默认关闭，由用户显式开启 |
 | Google 登录时，同一台机器上的其他程序抢先请求回环端口上的监听 | 只接受带本次随机 `state` 的请求；授权码要配合只在界面进程内存里的 PKCE `code_verifier` 才能换到令牌；令牌存系统凭据库（[storage.md](storage.md) 第 4 节） |
 | Tor 出口的回环端口被同一台机器的其他用户使用 | 只监听回环地址，要求每次界面启动随机生成的账号密码（Tor 出口未实现） |
 | Tor 中继发来的数据攻击解析代码 | arti 运行在普通用户权限的界面进程里，不进 SYSTEM 服务和系统扩展（Tor 出口未实现） |
-| UI 与内核侧版本不一致 | 消息体（Windows 上还有帧头）携带协议版本，不一致时拒绝；Windows 安装器同时更新 UI 与服务，macOS 的 UI 与扩展在同一个包里 |
+| UI 与内核侧版本不一致 | 消息体（Windows、Linux 上还有帧头）携带协议版本，不一致时拒绝；Windows 安装器和 Linux 安装包同时更新 UI 与服务，macOS 的 UI 与扩展在同一个包里 |
 
 ## 9. 安装、升级与卸载
 
@@ -888,6 +1025,14 @@ Linux 版正在开发，还没有发布。已定的决策是 D60–D67；完整�
     Qt 的消息也在里面）写到 `%RUNNER_TEMP%\openweir-ui`；界面启动即退出时，脚本当场把它的崩溃目录复制过去，再把日志
     打印出来，因为后面的 `/PURGE` 会删掉用户数据。测试失败时工作流把这个目录作为 artifact 上传。真机上的 UAC、开机恢复和隧道见
     [maintenance.md](maintenance.md) 2.1 节。
+- **Linux**：`sudo apt install ./OpenWeir-….deb` 或 `sudo dnf install ./OpenWeir-….rpm`；维护脚本启用并启动服务，升级前请
+  界面退出、之后重启服务，删除时停止服务，清除时删掉服务的状态（"Linux"一节"安装包"）。
+  - 验证：CI 的 `linux-package` job 构建两种架构的安装包，`linux-install` job 用 `package/linux/smoke-test.sh` 在 Ubuntu
+    24.04 虚拟机上安装（单元、套接字、服务与日志、目录的属主和模式、`package-format`、polkit 动作、`.desktop` 文件、`ldd`）、
+    在测试网段上造出崩溃的 TUN 留下的 IPv4 和 IPv6 规则、路由表和设备后 `kill -9` 服务并确认清理恢复原样、确认 offscreen
+    界面在 `--quit` 和升级到下一个版本时退出且服务重启、删除时保留状态而清除时删掉；再在 `ubuntu:22.04`、`debian:12`、
+    `debian:13` 容器里装 `.deb`，在 `fedora:41` 容器里装 `.rpm`。真正的 TUN、系统代理、接管和 IPv6 出口 runner 上做不到，
+    在真机上验收（maintenance.md 的 Linux 清单）。
 - **macOS**：拖入"应用程序"文件夹完成安装，首次连接时激活系统扩展。设置页「系统扩展」提供停用入口（D35）：
   确认后断开所有 OpenWeir 隧道、调用 `deactivationRequest`，系统确认完成后删除本应用的 VPN 配置，保留订阅、设置和凭据。
   待用户处理、未完成、取消和失败分别显示，可重试；下次显式连接会重新激活扩展。应用不会自行删除自己的安装目录。
@@ -912,11 +1057,13 @@ Windows 安装器为两个 OpenWeir 可执行文件设置独立的 WER mini dump
 | 产物 | 构建方式 |
 | --- | --- |
 | Windows 服务 | `go build -trimpath`，windows/amd64 或 windows/arm64，不用 cgo，使用 `with_gvisor,with_naive,with_purego`，注入版本并保留 DWARF |
+| Linux 服务 | 同上，linux/amd64 或 linux/arm64，`-B gobuildid`，有更新公钥时以 `-X` 链接进去；DWARF 分到 `symbols/` |
 | macOS xcframework | 本仓库 Go 模块的 c-archive 构建，包含 engine 与控制分发器，导出供 `handleAppMessage` 调用的 C 函数 |
 | 协议绑定 | 由 `control.proto` 生成 Go 与 Python 代码 |
 | UI | Nuitka standalone（Windows 上是 `--mode=standalone` 的 `OpenWeir.exe`，用 MSVC；macOS 上是 `--mode=app`） |
 | Windows 安装包 | MSVC x86 编译自定义安装器 UI 插件，NSIS 3 封装它与 x64 或 ARM64 原生应用；`scripts/build_windows.py --arch` 选择目标 |
 | macOS 包 | `scripts/build_app.py` 组装并签名 `OpenWeir.app`；发布工作流公证后做成 `.dmg` |
+| Linux 安装包 | `scripts/build_linux.py`：Nuitka standalone 的 `openweir-ui`、服务、Cronet 和 GEO 数据组成 `/opt/openweir` 的目录树，检查后由 nfpm（固定版本，`go run`）做成 `.deb` 和 `.rpm`（"Linux"一节） |
 | 崩溃符号 | Nuitka `--unstripped`；macOS dSYM 校验 UUID；Windows PDB 与精确 Go 服务二进制独立存档，发布 artifact 保留 90 天 |
 
 - **Windows 构建**（`scripts/build_windows.py`，在 Windows 上运行，`uv run --group build`，Nuitka 4.2.2 锁在 `uv.lock` 里）：拉取 GEO 数据
@@ -932,8 +1079,13 @@ Windows 安装器为两个 OpenWeir 可执行文件设置独立的 WER mini dump
   再签安装界面插件 `OpenWeirSetupUI.dll`，然后经 makensis 的 `!uninstfinalize`、`!finalize` 签卸载器和安装器。
   Wintun 不是单独的文件：它嵌在服务里，随服务一起签名。每签一个文件，`sign.ps1` 都核对 Windows 信任这个签名、证书是
   `OpenWeir` 的且带证书配置文件的 EKU、签名带时间戳；任何一步失败，makensis 和整个构建都失败。
+- **Linux 构建**（`scripts/build_linux.py`，在本机架构的 Linux 上运行，`uv run --group build`）：拉取 GEO 数据、构建服务、
+  Nuitka 构建界面（不带 macOS、Windows 也不带的那些，加上 GTK 3 的平台主题、FFmpeg 和 Qt 的 OpenSSL 后端；要带 xcb、
+  Wayland 和 Wayland 装饰插件），组装到 `build/linux-<x64|arm64>/openweir/`，统一模式、删掉只被系统库需要的库、检查
+  目录树和依赖，再由 nfpm 打包；`--skip-packages` 停在目录树，`--packages-only` 只打包，`--format` 选一种。CI 的
+  `linux-package` job 构建、`linux-install` job 安装验证（第 9 节）；构建失败时脚本把原因写成 GitHub 的错误注释。
 - 需要的证书：Apple Developer ID；Windows 用 Azure Artifact Signing 的 Public Trust 证书配置文件（D42），证书由服务
-  每天签发，不经手私钥。
+  每天签发，不经手私钥。Linux 将来要一对 Ed25519 密钥给 `SHA256SUMS` 签名（D62），还没有建（release.md 1.3 节）。
 - **发布工作流** `.github/workflows/release.yml`：`main` 的推送 CI 全部通过后由 CI 调用（`workflow_call`），在 `release`
   Environment 里经审批后运行；
   macOS 上建临时钥匙串、签名、`notarytool` 公证、staple，产出 `OpenWeir-<版本>-macos-universal.dmg` 和它的 `.sha256`；
@@ -944,7 +1096,8 @@ Windows 安装器为两个 OpenWeir 可执行文件设置独立的 WER mini dump
   按固定版本和 SHA-256 从 nuget.org 取得，都用 x64 版：dlib 只有 x86、x64 版，ARM64 runner 在 Windows 11 的 x64 仿真下
   运行它们，另装 x64 的 .NET 10 到 `C:\Program Files\dotnet\x64`；被签的文件是什么架构都可以。三个安装包存为 workflow artifact；对标签，最后一个
   job 再经一次审批，核对三个安装包，写 `SHA256SUMS`，把这四个文件放进一个**草稿** GitHub Release，由人试过安装包、
-  写好说明后发布（release.md 第 1.1 节）。不上传源代码包，源代码是本仓库的标签（D43）。
+  写好说明后发布（release.md 第 1.1 节）。不上传源代码包，源代码是本仓库的标签（D43）。Linux 安装包现在只进
+  预览版（`prerelease.yml`，不签名），正式版要等签名做好（release.md 1.3 节）。
 - 签名的范围：签名和构建在同一个 job 里，构建时运行的依赖（Nuitka、PyPI 包、Go 模块）与签名在同一台 runner 上，
   也能取到这个 job 的 OIDC 令牌，和 macOS 的签名证书在同一个 job 里一样。能换到的只是这个证书配置文件的签名权限，
   只在这次运行里。`metadata.json` 的 `CorrelationId`（`openweir-<运行 ID>-<尝试次数>-<架构>`）把发布工作流的签名请求
@@ -962,10 +1115,10 @@ NSIS 及自定义安装窗口是 x86 引导组件，由系统仿真运行。更�
 
 ## 11. 开发与测试
 
-- **在 Mac 上调试 Windows 服务的逻辑**：服务二进制在非 Windows 平台可以作为前台进程运行，以普通用户身份
-  启动；以 root 身份启动时直接拒绝运行。此时帧协议跑在一个本地 socket 上，客户端校验降级为 uid 检查，engine 使用无 TUN
-  模式，分发器标记为开发宿主（`Development`）。这样 `ServiceHost` 和全部方法都能在 Mac 上联调。这只是开发模式，
-  不进入任何发布包；macOS 正式版走 provider message，不使用 socket。
+- **在 Mac 或 Linux 上调试服务的逻辑**：服务二进制在 macOS 和 Linux 上可以作为前台进程运行开发服务（`-socket`），以普通
+  用户身份启动；以 root 身份启动时直接拒绝运行。此时帧协议跑在一个本地 socket 上，客户端校验降级为 uid 检查，engine 使用无 TUN
+  模式，分发器标记为开发宿主（`Development`）。这样 `ServiceHost` 和全部方法都能在 Mac 或 Linux 上联调。这只是开发
+  模式：macOS 正式版走 provider message，不使用 socket；Linux 的发布版是 `-system`，由 systemd 传来套接字。
 
   ```bash
   go -C src/core run ./service -socket /tmp/openweir-dev.sock
@@ -994,6 +1147,12 @@ NSIS 及自定义安装窗口是 x86 引导组件，由系统仿真运行。更�
     测试用自管模式启动 TUN，经 TUN 访问 `md-srv`，并用 mihomo 的流量统计确认流量确实经过内核；再验证
     TUN 配置不变时 Reload 不重建网卡，关闭 TUN 或 Stop 后链路、策略路由和各路由表都恢复原样。
     矩阵覆盖 `system`、`mips` 栈，以及带 `with_gvisor` 的 `gvisor`、`mixed` 栈。
+    Linux 服务的 TUN 也在这里测（D67）：`TestPinnedTUN`（`tun_pins_linux_test.go`）用产品的设备、路由表和规则起点跑自管
+    模式，配置和覆写都想挪走它们、想挑谁的流量进 TUN，TUN 仍必须是 `openweir0`、走表 9347、只在 9347–9357 写规则，停止后
+    什么都不留；`TestCrashedTUN`（`tun_crash_linux_test.go`）让子进程带着 strict-route 的 TUN 运行，先 `kill -9` 它，再换一个
+    冻住不动的，两次都由 `tunclean.Clean` 把命名空间恢复原样（包括连通性），旁边别人的规则和路由不动。为此 `md-srv` 在
+    `md-veth1` 自己的 IPv6 地址上也提供页面，`OPENWEIR_TUN_TARGET6` 指向它：TUN 没有 IPv6 地址时，strict-route 让 IPv6 不可达，
+    崩溃后规则还在时一直如此，清理之后必须重新连得上。`tun` job 最后核对 runner 自己的 DNS 设置没有被改动。
     同一个 job 还跑 fd 模式的测试（`tun_fd_linux_test.go`）：测试扮演扩展，自己建 TUN、配上 `FDNetwork` 的地址和
     到服务的路由，把描述符交给 fd 模式的 engine，检查流量经过内核、TUN 的 DNS 地址由 mihomo 应答、TUN 设置
     不变时 Reload 沿用副本，并数 `/dev/net/tun` 的描述符：运行时两个，Stop 和 Close 后只剩宿主的一个。
@@ -1026,7 +1185,7 @@ NSIS 及自定义安装窗口是 x86 引导组件，由系统仿真运行。更�
   条目 id、重载改方案。分流用例需要 GEO 数据，用 `scripts/fetch_geodata.py` 拉取并缓存。默认跳过，设置
   `OPENWEIR_E2E=1` 才运行；`OPENWEIR_E2E_SERVICE` 可以指向已
   构建的服务，否则测试自己 `go build`；`OPENWEIR_E2E_SCREENSHOTS` 指向一个目录时保存各页截图。CI 的
-  `e2e` job 在 macOS runner 上先构建服务再运行。全程只用回环地址，不需要 TUN。
+  `e2e` job 在 macOS runner 和 Ubuntu 24.04 上先构建服务再运行。全程只用回环地址，不需要 TUN。
 - **测试覆盖**：
   - engine：配置流水线的回归测试，对应 3.3 节各项；开发模式护栏；启停与重载；50 次启停的泄漏检查；
     只有 engine 引用 mihomo 运行时的导入检查（`imports_test.go`）。这些测试经 mihomo 解析、核对解析结果；
@@ -1046,10 +1205,15 @@ NSIS 及自定义安装窗口是 x86 引导组件，由系统仿真运行。更�
     对一组输入的回答（`internal/compose/vectors_test.go` 核对，带 `-update` 时改写），`tests/test_simulated.py`
     核对模拟宿主答得一样；配置检查的错误码和措辞由端到端测试与开发服务核对。内核运行时报告的 WARP 设备、
     VPN Gate 列表和组网状态在模拟宿主里是编出来的样例，测试需要哪种状态就自己设定。
+- **Linux CI**：`python` job 在 Ubuntu 24.04 的 x64 和 arm64 上跑 pyright 和全部测试（离屏，先装 Qt 要的系统库），`e2e`
+  在 Ubuntu 24.04 上跑；`go` job 在 Linux 上另跑 Cronet 原生库的 fork 测试（`LD_LIBRARY_PATH` 指向 `linux_<arch>` 模块里的
+  `libcronet.so`）和两个发布服务的交叉构建；对端校验的测试在测试进程里重新执行自己去连接（`OPENWEIR_TEST_PEER_DIAL`），
+  系统代理的测试要 `/bin/sh`，ACL 的测试在不支持 ACL 的文件系统上跳过。安装包由 `linux-package`、`linux-install` 两个
+  job 构建和验证（第 9 节），失败的构建和每项失败的安装检查都写成错误注释，不登录也看得到。
 - **竞态检查**：`go test -race` 会报出 mihomo 自身在 `log.SetLevel` 上的竞态（见 3.2 节），所以 CI 不带
   `-race`；分发器的订阅代码可以单独用 `-race` 检查。
-- **真机验收**：CI 覆盖不到的部分（真实 TUN 流量、系统代理的模拟写入、真机上的安装与升级、系统扩展激活）见
-  [maintenance.md](maintenance.md) 第 2 节。
+- **真机验收**：CI 覆盖不到的部分（真实 TUN 流量、系统代理的模拟写入、真机上的安装与升级、系统扩展激活，Linux 上
+  GNOME 和 KDE 的系统代理、pkexec 接管、桌面会话里的托盘和窗口）见 [maintenance.md](maintenance.md) 第 2 节。
 
 ## 12. 待定事项
 

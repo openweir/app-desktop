@@ -8,7 +8,7 @@ OpenWeir 是网络代理客户端。OpenWeir 本身没有账户，不收集使�
 
 | 场景 | 发往 | 内容 |
 | --- | --- | --- |
-| 下载和更新订阅 | 订阅链接所在的服务器 | 一次普通的 HTTP 请求：订阅链接（常含令牌）、你的 IP、User-Agent `OpenWeir/<版本> (Windows 或 macOS) clash.meta`。由界面以当前用户身份发出，跟随系统代理设置；订阅默认每 12 小时自动更新一次，可以按订阅关闭 |
+| 下载和更新订阅 | 订阅链接所在的服务器 | 一次普通的 HTTP 请求：订阅链接（常含令牌）、你的 IP、User-Agent `OpenWeir/<版本> (Windows、macOS 或 Linux) clash.meta`。由界面以当前用户身份发出，跟随系统代理设置；订阅默认每 12 小时自动更新一次，可以按订阅关闭 |
 | 连接代理 | 配置里的节点和服务器 | 内核按配置连接节点；配置里的 proxy provider 和规则集由内核按配置下载；策略组的延迟测试访问配置里的测速地址 |
 | 路由模板 | subconv 的 CDN 主机（`cdn.jsdmirror.com`、`fastly.jsdelivr.net`、`testingcf.jsdelivr.net`、`gcore.jsdelivr.net`、`cdn.jsdelivr.net`）和 GitHub（`raw.githubusercontent.com`） | 导入或更新订阅时，内核最多每 6 小时下载一次公开的路由模板和它的清单：你的 IP、Go 默认的 User-Agent，不带订阅内容。订阅没有可用的规则、按模板分流时，模板里的规则集由内核按配置从同一主机下载 |
 | GEO 数据更新 | 配置指定的下载站点，默认是 GitHub（MetaCubeX/meta-rules-dat） | 启用自动更新时，按配置周期更新正在使用的数据库，默认周期为 24 小时。请求从界面进程发出，遵循系统代理设置；完全退出界面后暂停，下次打开补查 |
@@ -46,15 +46,16 @@ GitHub、jsDelivr 与它的镜像、Cloudflare、VPN Gate、组网服务、Apple
 ## 本机保存的数据
 
 - **订阅、覆写、分流方案和设置**：在用户数据目录的 `openweir.db` 里，Windows 是 `%LOCALAPPDATA%\OpenWeir\`，macOS 是
-  `~/Library/Application Support/OpenWeir/`。
+  `~/Library/Application Support/OpenWeir/`，Linux 是 `~/.local/share/OpenWeir/`（设了 `XDG_DATA_HOME` 时在它下面）。
 - **运行中的配置**：Windows 上服务把当前用户的配置存在 `C:\ProgramData\OpenWeir\`，只有系统和你本人能读，用于开机后
-  恢复连接；macOS 上存在系统扩展自己的目录里。
+  恢复连接；Linux 上存在 `/var/lib/openweir/users/<你的 uid>/`，只有 root 和你本人能读；macOS 上存在系统扩展自己的目录里。
 - **服务商账户**：登录过的服务商的地址、站点名、账户名、服务商那边的用户 id，以及服务商每份订阅上次同步的账单信息
   （套餐名、状态、用量和到期，不含订阅链接）也在 `openweir.db` 里。钱包、套餐和订单只在「账户」页显示，不保存。
 - **WARP 账户、组网密钥、Google 和服务商的登录**：在应用里注册的 WARP 账户、添加组网时填的密钥、登录 Google Drive
-  得到的令牌和登录服务商得到的令牌存在系统凭据库（Windows 凭据管理器、macOS 钥匙串），不进数据库、备份或诊断信息。组网的登录状态和设备身份由内核存在运行中的配置所在的目录里。
+  得到的令牌和登录服务商得到的令牌存在系统凭据库（Windows 凭据管理器、macOS 钥匙串、Linux 的 Secret Service，如 GNOME
+  钥匙环、KWallet），不进数据库、备份或诊断信息。组网的登录状态和设备身份由内核存在运行中的配置所在的目录里。
 - **日志**：内核日志只在内存里，由你在日志页导出；Windows 服务自己的运行日志（启动、停止、出错）在
-  `C:\ProgramData\OpenWeir\service.log`。
+  `C:\ProgramData\OpenWeir\service.log`，Linux 服务的在系统日志（journal）里，`journalctl -u openweir` 可以查看。
 - **崩溃记录**：界面的未处理异常和致命堆栈保存在用户数据目录的 `crashes/`；Go 宿主的 panic 和运行时致命错误
   保存在其 home 下的 `crashes/`。它们可能含文件路径、错误内容、源代码行或堆栈中的敏感数据，不主动读取局部变量。
   专用日志在启动及界面维护时清理，保留最多 30 天、20 份、64 MiB；崩溃写入期间可能暂时超过限额。
@@ -64,6 +65,8 @@ GitHub、jsDelivr 与它的镜像、Cloudflare、VPN Gate、组网服务、Apple
   小型转储仍可能含少量内存中的数据。操作系统自己的诊断共享由系统设置控制，OpenWeir 不上传这些报告。
 
 Windows 卸载时可以选择删除订阅、设置和日志；凭据库里的账户、密钥和令牌留着，可以在凭据管理器里删除。
+Linux 上 `apt purge` 删除服务在 `/var/lib/openweir` 里保存的配置，`apt remove`、`dnf remove` 保留它；你自己的数据目录和
+凭据库里的内容都不删，需要时自己删除 `~/.local/share/OpenWeir/`。
 
 ## 备份
 
@@ -85,7 +88,7 @@ Windows 卸载时可以选择删除订阅、设置和日志；凭据库里的账
 
 | 文件 | 内容 |
 | --- | --- |
-| `about.json` | OpenWeir、Python、Qt 的版本，操作系统与架构，界面语言，导出时间 |
+| `about.json` | OpenWeir、Python、Qt 的版本，操作系统与架构，界面语言，导出时间；Linux 上另有发行版的 ID 和版本号（os-release 的 `ID`、`VERSION_ID`，如 `ubuntu`、`24.04`）、桌面名（如 `GNOME`、`KDE`，不认识的写 `other`）、会话类型（`wayland` 或 `x11`）和安装包格式（`deb` 或 `rpm`） |
 | `host.json` | 服务或系统扩展报告的版本与运行状态 |
 | `settings.json` | 设置，以及订阅、覆写和分流的概况：订阅只有序号、类型、节点数、更新时间这类信息，不含名称、链接、路径和原文；覆写和规则只有有无和条数，不含内容；登录过的服务商只有个数和是否已登录，服务商的订阅只有接入方式和状态，不含地址、站点名、账户、用户 id 和令牌 |
 | `mihomo.log` | 日志页里内核日志中的警告和错误（日志页最多保留 5000 条），不含逐条记录访问的普通日志；网址一律写成 `https://<redacted>` 这样，不含订阅链接和其中的 token。**仍含连接失败的网站和节点名** |

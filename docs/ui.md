@@ -439,10 +439,10 @@ UI 只保存和传递覆写原文，解析与合并在内核里做；模拟宿�
 | --- | --- | --- | --- | --- |
 | `language` | `system`、`zh`、`en` | `system` | 同步 | 界面语言（第 5 节） |
 | `appearance` | `system`、`light`、`dark` | `system` | 同步 | 外观；主题按它取色 |
-| `close_action` | `tray`、`quit` | `tray` | 本机 | 关闭主窗口时留在托盘，隧道继续运行；还是退出 OpenWeir，先断开隧道（D41） |
-| `launch_at_login` | 布尔 | `false` | 本机 | 登录时打开界面；Windows 同时自动连接。以系统里的登录项为准，界面每次读到系统的状态就写回这里 |
+| `close_action` | `tray`、`quit` | `tray` | 本机 | 关闭主窗口时留在托盘，隧道继续运行；还是退出 OpenWeir，先断开隧道（D41）。Linux 上没有托盘时总是退出（D65） |
+| `launch_at_login` | 布尔 | `false` | 本机 | 登录时打开界面；Windows 和 Linux 同时自动连接。以系统里的登录项为准，界面每次读到系统的状态就写回这里 |
 | `tun` | 布尔 | `true` | 本机 | 设置页「接管方式」的 TUN 开关：连接时是否开启 TUN。macOS 上总是开启，不看这一项 |
-| `system_proxy` | 布尔 | `true` | 本机 | 设置页「接管方式」的系统代理开关：连接时是否设置系统代理。只有 Windows 服务设置系统代理 |
+| `system_proxy` | 布尔 | `true` | 本机 | 设置页「接管方式」的系统代理开关：连接时是否设置系统代理。Windows 服务和 Linux 服务（只在 GNOME、KDE 上，D63）设置系统代理；Windows 和 Linux 的新安装默认关闭（D46） |
 | `mixed_port` | 1024–65535 | 9347 | 本机 | 混合端口，总是覆盖配置里的 `mixed-port`。没改过端口的安装升级后也改用 9347（D53） |
 | `allow_lan` | 布尔 | `false` | 本机 | 允许局域网连接（architecture.md §8"局域网暴露"） |
 | `tun_stack` | `profile`、`system`、`mips`、`gvisor`、`mixed` | `mips` | 本机 | "TUN 协议栈"（D3）：`profile` 是"跟随配置"，用配置里的 `tun.stack`；其余写进 `RunOptions.tun_stack`，盖过配置和覆写（architecture.md §3.1、§3.4）。默认 `mips`，即 mihomo 自己的默认栈 |
@@ -485,14 +485,20 @@ UI 只保存和传递覆写原文，解析与合并在内核里做；模拟宿�
     提醒按系统提示完成设置，并提供「重试连接」。不把重启写成正常安装步骤，不因缓存的上一次结果阻止重试；
     每次重试重新经过宿主激活流程，成功后关闭指引并清除提示。这两种结果都有中英文文案，不显示原始的英文错误，
     也不报作连接失败。
-  - **其他用户的隧道**（Windows，architecture.md §5.4）：另一个用户的隧道在运行时，概览页标题栏写「其他用户正在
+  - **其他用户的隧道**（Windows 和 Linux，architecture.md §5.4、"Linux"一节）：另一个用户的隧道在运行时，概览页标题栏写「其他用户正在
     使用 · 另一位用户已连接，对方断开后才能在这里连接」，连接开关和托盘的「连接」不可用。管理员（D5b）看到的是
     「其他用户正在使用 · 另一位用户已连接」，右侧多一个「接管」按钮。它先弹出破坏性确认框「接管其他用户的隧道？」，
     正文「另一位用户的连接会断开，隧道改由你使用。需要管理员权限。」；确认后 UAC 弹出提示，标题栏写「正在接管…」，
     直到服务为新属主重启完。UAC 里选「否」时什么都不变；接管辅助进程失败、或 60 秒没有结束
     （`elevation.HELPER_WAIT_S`）时标题栏写「无法接管隧道」。UAC 提示开着时等待的是 daemon 线程，退出 OpenWeir
-    不等它。接管后隧道是断开的，由用户自己连接。是不是管理员由组装时的 `take_over` 决定（`app.default_take_over`，只有 Windows 上装好
-    的服务才有），`OverviewViewModel.canTakeOver` 只在其他用户的隧道运行时为真。
+    不等它。接管后隧道是断开的，由用户自己连接。是不是管理员由组装时的 `take_over` 决定（`app.default_take_over`，只有 Windows
+    和 Linux 上装好的服务才有），`OverviewViewModel.canTakeOver` 只在其他用户的隧道运行时为真。
+    - Linux（D66）：「接管」只给 sudo、wheel、admin 组的成员，而且要 `/usr/bin/pkexec` 和装好的服务都在
+      （`elevation.ADMIN_GROUPS`、`helper_available`）。确认后界面运行 `pkexec /opt/openweir/openweir-service -take-over`，
+      polkit 的对话框要管理员密码（`auth_admin`）；最多等 5 分钟（`elevation.PKEXEC_WAIT_S`），因为对话框等人回答。在
+      对话框里取消（pkexec 退出码 126）时什么都不变，不提示；polkit 不授权（127，包括没有验证代理）时标题栏写「没有取得
+      管理员授权」；辅助进程失败或超时写「无法接管隧道」。服务让出属主并重启后，由这个界面认领。Linux 上即便如此，也只有
+      活动的本地会话能认领，从 SSH 或别人的会话里不行。
   - **侧栏的「代理」**（D27，DESIGN.md「侧栏导航」）：代理页列的是运行中内核的策略组，内核只在隧道运行时回答
     `ListGroups`，所以「代理」只在连接开关开着、不在进行中时出现：概览的 `connected` 为真且 `connectionChanging`
     为假，组装时交给 `ShellViewModel.tunnel_running`（`TUNNEL_PAGES`）。正在连接、正在断开（开关一关就算）、宿主
@@ -512,15 +518,16 @@ UI 只保存和传递覆写原文，解析与合并在内核里做；模拟宿�
     | 宿主 | `takeover` | 设置页「接管方式」 | 连接时 |
     | --- | --- | --- | --- |
     | Windows 服务 | `settings` | 「TUN 模式」「系统代理」两个开关；新安装默认只开 TUN，更早的安装两项都开（D46） | 按开关 |
+    | Linux 服务 | `settings` | 同 Windows；新安装默认只开 TUN（D46）。GNOME、KDE 以外的桌面上服务答 `system_proxy_unavailable`，系统代理一行不可用，第二行写「仅 GNOME 和 KDE 支持系统代理」（D63） | 按开关 |
     | macOS 扩展 | `tun` | 「TUN 模式」一行右侧写「已启用」，第二行「macOS 上总是启用」；没有系统代理一行 | 总是 TUN，不设系统代理 |
     | 开发服务 | `none` | 两行右侧都写「不使用」，分组标题右侧写「开发模式只开放混合端口」 | 只开放混合端口 |
 
     分组标题右侧平时写「连接时使用」。两个开关由 `OverviewViewModel` 提供，因为要显示隧道的状态：隧道运行时
     显示内核报告的状态，拨动先改变隧道（TUN 是带新 `RunOptions` 的 Reload，系统代理是 `SetSystemProxy`），
     宿主接受后才记入设置，所以已连接时改这两项立即生效；隧道停止时显示设置里的选择，拨动只改设置。
-  - **两项都关闭**（Windows）：照常连接，内核只开放混合端口（不允许局域网连接时只在回环地址上），系统的设置
+  - **两项都关闭**（Windows、Linux）：照常连接，内核只开放混合端口（不允许局域网连接时只在回环地址上），系统的设置
     一项不改，要走代理的程序自己指向这个端口。系统代理一行第二行写「两项都关闭时，连接后只开放混合端口」。
-  - **只开系统代理**（Windows）：程序经系统代理只走 TCP，UDP 直接发出。系统代理一行第二行写「游戏、语音通话等
+  - **只开系统代理**（Windows、Linux）：程序经系统代理只走 TCP，UDP 直接发出。系统代理一行第二行写「游戏、语音通话等
     UDP 流量不经过系统代理，需要 TUN 模式」。
   - **macOS 不设系统代理**：扩展不提供 `SetSystemProxy`（architecture.md §6.3），TUN 已经接管全部流量，所以
     不列这一行，`system_proxy` 在 macOS 上不起作用。
@@ -533,8 +540,9 @@ UI 只保存和传递覆写原文，解析与合并在内核里做；模拟宿�
     生效」。打开它只写设置，不动运行中的隧道；打开时 TUN 协议栈若是 `system` 或 `mixed`，就和设置一起改成
     `gvisor`，这一步像改栈一样先带新值 Reload。打开期间下拉框里的 `system`、`mixed` 不可选，注记「包含所有网络时
     不可用」。
-  - **开发模式**：开发服务对开启 TUN 或系统代理返回 `unsupported_method`（architecture.md §11）。Windows 以外的
-    服务都是开发服务，`app.default_host` 给它的 `ServiceHost` 是 `TAKEOVER_NONE`，界面不向它要这两项，所以两项
+  - **开发模式**：开发服务对开启 TUN 或系统代理返回 `unsupported_method`（architecture.md §11）。macOS 上的服务和
+    从源码运行时 Linux 上的服务都是开发服务（设了 `OPENWEIR_DEV_SOCKET`；Linux 的安装版连 systemd 的服务），
+    `app.default_host` 给它的 `ServiceHost` 是 `TAKEOVER_NONE`，界面不向它要这两项，所以两项
     默认打开时开发模式照样能连接，只开放混合端口。直接向开发服务要求时，`ProfileLibrary` 仍把拒绝换成
     `tun_unsupported`、`system_proxy_unsupported` 或两者都有的 `tun_and_system_proxy_unsupported`，界面显示
     「开发模式不支持 TUN 模式」等提示，设置不改。
@@ -551,13 +559,18 @@ UI 只保存和传递覆写原文，解析与合并在内核里做；模拟宿�
 - **外观**：设置页只负责选择和保存（`setAppearance` 写设置项 `appearance`），主题跟随第 6 节的外观对象。
 - **托盘**用 `Qt.labs.platform` 的 `SystemTrayIcon`（`ui/components/TrayIcon.qml`）。它在 macOS 和 Windows 上
   有 Qt 平台插件的原生实现，`QGuiApplication` 就够，不必为 `QSystemTrayIcon` 引入 Qt Widgets 和
-  `QApplication`。没有原生托盘的平台（Linux、测试用的 offscreen）上 Labs Platform 会要求 Qt Widgets，所以
-  只在 `cocoa` 和 `windows` 上创建托盘，其余平台关闭窗口即退出 OpenWeir。
+  `QApplication`。Linux（`xcb`、`wayland`）上 Qt 把它做成 D-Bus 上的 StatusNotifierItem，也不要 Qt Widgets，但只有
+  面板接收这种图标时才看得见（D65）：KDE 的面板接收，GNOME 要装 AppIndicator 扩展。所以 `desktop/tray.py` 的
+  `status_notifier_host` 先经 jeepney 问会话总线：`org.kde.StatusNotifierWatcher` 有主人、并且
+  `IsStatusNotifierHostRegistered` 为真（1 秒为限），才创建托盘。其余平台（测试用的 offscreen、没有宿主的 Linux 桌面）
+  不创建托盘，关闭窗口即退出 OpenWeir；设置页「关闭窗口时」只能选退出，「留在托盘」不可用，第二行写「没有托盘；
+  GNOME 装上 AppIndicator 扩展后可用」。
   - 菜单：连接状态（不可点）、连接或断开、出站模式子菜单、打开主窗口、「退出 OpenWeir」（退出前断开期间不可点）。
     这是系统原生菜单，外观跟随平台，不按 DESIGN.md 的窗口内菜单绘制。
   - 图标在 `ui/tray/`，是侧栏标记的线条图形，未连接时调成 45% 不透明度。macOS 用模板图（只看 alpha，由菜单栏
     着色）；Windows 按任务栏主题（注册表 `SystemUsesLightTheme`，Qt 报告的是应用主题，不是任务栏的）选深色或
-    白色图形，每 10 秒和系统配色变化时重读。
+    白色图形，每 10 秒和系统配色变化时重读。Linux 的面板颜色读不到：GNOME 的顶栏两种外观下都是深色，用白色图形；
+    其他桌面按桌面门户的 `color-scheme` 选（DESIGN.md「托盘图标」）。
 - **标题带**（DESIGN.md「顶部区域」）：`viewmodels/titlebar.py` 的 `TitleBar` 给 Main.qml 窗口标志和平台样式，
   平台调用在 `desktop/titlebar.py`，Main.qml 创建完成后调用 `attach`。
   - 窗口用 Qt 的 `ExpandedClientAreaHint` 和 `NoTitleBarBackgroundHint` 去掉系统标题栏，内容铺到上沿；
@@ -583,11 +596,15 @@ UI 只保存和传递覆写原文，解析与合并在内核里做；模拟宿�
       按下和松开不交给系统（否则系统会画出旧式按钮），松开时发出 `maximizeClicked`；
     - Alt+空格：Qt 自己弹出的系统菜单按窗口标志把最小化、最大化置灰，所以截下这个按键，改发
       `WM_SYSCOMMAND`（`SC_KEYMENU`），由系统弹出原生菜单。
-  - 其他平台（如测试用的 offscreen）只有布局，不做平台调用。`tests/test_titlebar.py` 在两种样式下检查布局、
+  - Linux（D64）：样式 `linux`，用系统的标题栏和窗口按钮：普通的 `Qt.Window` 标志，不画 `CaptionButtons`，也不为它们
+    让出位置；窗口管理器画服务端装饰，GNOME 的 Wayland 会话不给服务端装饰，`TitleBar` 构造时设
+    `QT_WAYLAND_DECORATION`，有 Qt 的 `adwaita` 装饰插件就用它，否则用 `bradient`（构建要求两个插件都在）。标题带仍是窗口
+    内容最上面的 48px，侧栏上内边距是 `sidebar-top-linux`（16px）；`TitleBandArea` 照样能拖动窗口，双击最大化。
+  - 其他平台（如测试用的 offscreen）只有布局，不做平台调用。`tests/test_titlebar.py` 在各种样式下检查布局、
     读屏名称、Tab 顺序和双击，并用替身检查 Windows 的命中测试和消息处理；系统实际怎么响应只能在 Windows 上看。
 - **关闭窗口**：`tray`（默认）时隐藏窗口，界面留在托盘，隧道继续运行；托盘菜单的「打开主窗口」恢复窗口，Windows
-  上点托盘图标也可以。`quit` 时先隐藏窗口，再像下面一样退出 OpenWeir。设置页这一行的说明随选项变：「隧道继续运行」
-  或「先断开连接，再退出」。
+  和 Linux 上点托盘图标也可以。`quit` 时先隐藏窗口，再像下面一样退出 OpenWeir。设置页这一行的说明随选项变：「隧道继续运行」
+  或「先断开连接，再退出」；没有托盘的 Linux 桌面上写「没有托盘：先断开连接，再退出」。
   - macOS 上窗口隐藏时 OpenWeir 只留在菜单栏：`desktop/dock.py` 经 Objective-C 运行时把 `NSApp` 的激活策略设为
     Accessory，Dock 和 ⌘Tab 里都没有它。窗口无论从哪里显示（菜单栏的「打开主窗口」、再次打开 OpenWeir、单实例
     转发、一键导入链接、「未能断开连接」对话框、系统扩展的授权引导），都先设回 Regular，再调用 `activate`
@@ -646,6 +663,9 @@ UI 只保存和传递覆写原文，解析与合并在内核里做；模拟宿�
   - 断开最多等 10 秒（`QUIT_DISCONNECT_TIMEOUT_S`）。失败或超时时显示窗口和「未能断开连接」对话框：原因，加上
     「仍然退出时，隧道可能仍在运行」；「重试」（默认）再断开一次，「仍然退出」直接离开，Esc 取消退出、留在应用里。
     断开期间再次要求退出不重复断开；对话框开着时再次要求退出只把窗口带到前面。
+  - Linux：Ctrl+Q（Main.qml 的快捷键，只在 Linux 上）和托盘的「退出 OpenWeir」一样，先断开再退出。会话结束时会话
+    管理器和 systemd 发 SIGTERM，终端里是 SIGINT：`Application.leave_on_signals` 经 `signal.set_wakeup_fd` 唤醒 Qt 的
+    事件循环，像系统的退出一样直接离开，不断开（属主注销时服务停止隧道，D5）。
   - Qt 把 ⌘Q、Dock 的「退出」和系统在注销、重启、关机时的请求都报告为 `Quit` 事件；Qt 6 处理它时会先逐个关闭窗口，
     有窗口拒绝就放弃退出，而主窗口在 `tray` 时正是拒绝关闭、改为隐藏，所以 `app.Application` 自己处理这个事件：
     用户的请求交给 `DesktopViewModel.quit`，系统的请求直接离开事件循环，不断开（Windows 由服务按 D5 在属主注销时
@@ -667,7 +687,11 @@ UI 只保存和传递覆写原文，解析与合并在内核里做；模拟宿�
   后来的界面拿不到锁，就连上这个名字发一行 `activate`，然后退出；第一个界面收到后显示并激活窗口。后来的界面是
   带着一键导入链接启动的（Windows 上链接是命令行参数），就改发 `open <链接>`，第一个界面显示窗口并预填导入表单
   （release.md 第 7 节）；一行超过 16 KiB 的消息被丢弃。Windows 上后来的界面先调用
-  `AllowSetForegroundWindow`，让第一个界面能把窗口带到前台。由锁而不是由服务端名字来判断，是因为 macOS 上
+  `AllowSetForegroundWindow`，让第一个界面能把窗口带到前台。Linux 上窗口要有启动器给的令牌才能抢到焦点
+  （`desktop/activation.py`）：后来的界面把自己的 `XDG_ACTIVATION_TOKEN` 或 `DESKTOP_STARTUP_ID` 以 `\t<名字>=<令牌>`
+  附在这一行后面；第一个界面在 Wayland 上显示窗口时把令牌放进 `XDG_ACTIVATION_TOKEN`，由 Qt 交给合成器，在 X11 上
+  （经 ctypes 调用 libxcb）把它写进窗口的 `_NET_STARTUP_ID`，再发启动通知的 `remove`，结束那次启动的忙碌光标。
+  没有令牌时照旧显示窗口。由锁而不是由服务端名字来判断，是因为 macOS 上
   崩溃的界面会留下 socket 文件，而且两个同时启动的界面拿锁时只有一个能成功。
   - **只写给本用户的界面**：链接里常带着订阅的 token，而名字本身证明不了什么：Windows 的管道名全局可见，
     任何用户都能列出，也能在本用户的界面没有监听时抢先建一个同名管道（Linux 上 `/tmp` 里的 socket 也一样）。
@@ -680,7 +704,8 @@ UI 只保存和传递覆写原文，解析与合并在内核里做；模拟宿�
   正在运行的界面退出：拿不到锁时发一行 `quit`，第一个界面收到后不断开隧道，直接离开事件循环（D41）；
   然后每 100 毫秒试一次锁，拿到（界面已关闭数据库并放开锁，或进程已经不在）就放开并以 0 退出，10 秒还拿不到
   以 1 退出。没有界面在运行时立即以 0 退出，不创建任何文件。它只能请到同一用户、同一数据目录的界面，也只写给以
-  本用户身份运行的服务端（见上）。Windows 安装器和卸载器用它关闭界面（architecture.md 第 9 节）。
+  本用户身份运行的服务端（见上）。Windows 安装器和卸载器用它关闭界面（architecture.md 第 9 节）；Linux 安装包升级和
+  删除前，维护脚本以每个界面的用户运行 `/opt/openweir/openweir-ui --quit`（architecture.md"Linux"一节）。
 - **备份与同步**：设置页左栏的一个分组，由 `viewmodels/backup.py` 的 `BackupViewModel` 提供（storage.md 第 3 到 6 节）。
   备份不加密，但界面不为此单独提示（D30）：导出、开启 iCloud、登录 Google Drive 都不弹确认框，说明里也不写。分组里有：
   - 「导出到文件」：「导出…」直接打开系统的保存对话框，默认文件名 `openweir-backup-<时间>.json`。平时只有标题；导出后
@@ -732,6 +757,10 @@ UI 只保存和传递覆写原文，解析与合并在内核里做；模拟宿�
   - macOS：`SMAppService.mainAppService` 的 `register` / `unregister`（macOS 13 起），经 ctypes 调用
     Objective-C 运行时，不依赖 PyObjC。状态为 `requiresApproval` 时设置页提示到系统设置的登录项里允许，并给出
     「打开系统设置」链接。登录项启动时不带 `--background`，界面会显示窗口。
+  - Linux：`XdgAutostart` 写 `$XDG_CONFIG_HOME/autostart/org.openweir.app.desktop`（默认 `~/.config/autostart`），一步替换
+    整个文件，`Exec=/opt/openweir/openweir-ui --background`，带 `TryExec`（包删掉后桌面不再启动它）和
+    `X-GNOME-Autostart-enabled=true`；关闭时删除这个文件，文件里 `Hidden=true` 或 `X-GNOME-Autostart-enabled=false` 视为
+    关闭。GNOME、KDE 和其他遵守 XDG 自动启动的桌面在登录时启动它，和 Windows 一样随后自动连接一次（同上）。
   - 只有打包后的程序（Nuitka 编译，macOS 上还要在 `.app` 里）才注册；从源码运行时是 `UnavailableLoginItem`，
     开关不可用并注明「仅安装版可用」，避免在开发机上把 Python 解释器注册成登录项。测试只用替身，真实注册在
     测试机上验收（maintenance.md 2.1、2.2 节）。

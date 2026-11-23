@@ -11,7 +11,8 @@
   分流方式与分流方案（策略组和规则，见 [routing.md](routing.md)）、应用内添加的组网网络、登录过的服务商
   （[accounts.md](accounts.md) 5.1 节）、设置。
 - **不在本文范围内**：
-  - Windows 服务在 `C:\ProgramData\OpenWeir\` 下保存的运行副本（architecture.md §5.1），它只用于开机恢复；
+  - Windows 服务在 `C:\ProgramData\OpenWeir\` 下、Linux 服务在 `/var/lib/openweir/` 下保存的运行副本（architecture.md
+    §5.1、"Linux"一节），它只用于开机恢复，见下面"Linux 服务的状态"；
   - mihomo 自己的 provider 缓存和 `cache.db`；
   - 链式出口的 WARP 账户（系统凭据库）、VPN Gate 服务器列表（`state` 表）和 Tor 数据目录，都只在本机，不进备份
     （[exits.md](exits.md) 第 8 节）；
@@ -20,10 +21,21 @@
     备份（[accounts.md](accounts.md) 4.1 节）；账户页的钱包、套餐和订单每次显示时向服务商读取，不存储
     （accounts.md 6.1 节）。
 - **读写方**：数据库只由界面进程以当前用户身份读写。服务和系统扩展都不访问它，它们从宿主请求里拿到配置。
+- **系统凭据库**：上面说的"系统凭据库"经 `keyring` 读写：macOS 是钥匙串，Windows 是凭据管理器，Linux 是 Secret Service
+  （GNOME Keyring、KWallet 等经 D-Bus 提供）。Linux 上界面明确用 `keyring` 的 SecretService 后端，不靠 entry point 去找
+  （打包后的程序里可能找不到）；会话里没有 Secret Service、集合锁着又解不开、D-Bus 出错时，读写都报
+  `credentials_unavailable`，按"暂时读不了"处理，和 macOS 的钥匙串锁着一样，不会退回明文文件。
+- **Linux 服务的状态**（architecture.md"Linux"一节）：`/var/lib/openweir/` 由 systemd 建（`StateDirectory`，0711，root），
+  里面是 `owner.json`（属主的 uid 和会话）和 `users/<uid>/`：属主的 mihomo home，放着服务为开机恢复保存的配置
+  （`profile.json`、`state.json`）、mihomo 的缓存和 `crashes/`；0750 加只给这个用户读的 ACL。`/var/cache/openweir/` 是
+  更新辅助进程复制安装包的地方。它们都不进备份。`apt remove` 和 `dnf remove` 保留它们，重装后属主和他的隧道照旧；
+  `apt purge` 删除这两个目录，用户自己的数据目录（上面的数据库、`ui.lock`、`ui.key`、界面的崩溃日志）不动，卸载也
+  不碰系统凭据库。
 
 ## 2. 本地数据库
 
-- **位置**：用户数据目录下的 `openweir.db`。macOS 为 `~/Library/Application Support/OpenWeir/`，Windows 为 `%LOCALAPPDATA%\OpenWeir\`。
+- **位置**：用户数据目录下的 `openweir.db`。macOS 为 `~/Library/Application Support/OpenWeir/`，Windows 为 `%LOCALAPPDATA%\OpenWeir\`，
+  Linux 为 `$XDG_DATA_HOME/OpenWeir/`（默认 `~/.local/share/OpenWeir/`）。
 - **实现**：使用标准库 `sqlite3`，开启 WAL 模式。schema 版本记在 `PRAGMA user_version` 里，启动时按版本依次迁移。
 - **写入**：每次写入都在一个事务里完成。界面是单实例，所以同一时间只有一个进程打开数据库。
 - **主键**：配置、方案、规则条目、组网网络、服务商和备份目标用 UUID 作主键；覆写、设置和本机状态以 `scope`、
@@ -214,7 +226,7 @@ macOS 上可以和 iCloud 同时开启，各自上传、各自保留快照。实
   账户的邮箱，作为备份目标的账户名。
 - **权限**：只申请 `https://www.googleapis.com/auth/drive.appdata`。快照存放在 Drive 的应用专属隐藏目录
   （appDataFolder）里，在用户的 Drive 中看不到；应用也读不到用户的其他文件。Google 把这个范围列为非敏感。
-- **令牌**（D14）：refresh token 连同账户名以紧凑 JSON 存在系统凭据库（macOS 钥匙串、Windows 凭据管理器，键
+- **令牌**（D14）：refresh token 连同账户名以紧凑 JSON 存在系统凭据库（macOS 钥匙串、Windows 凭据管理器、Linux 的 Secret Service，键
   `google-drive`），用 `keyring` 读写，不进数据库、备份和诊断信息。access token 只在内存里，过期前 60 秒或 Drive
   回 401 时用 refresh token 换新的。凭据库读不出来（如钥匙串锁着）时按没有登录处理，下次再读。Google 拒绝
   refresh token（`invalid_grant`：授权被撤销、令牌失效）时，本机删除它；目标保留，那一行写"需要重新登录"，自动备份

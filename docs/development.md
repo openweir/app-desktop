@@ -4,7 +4,7 @@
 [maintenance.md](maintenance.md)。下面的命令都在仓库根目录运行。
 
 界面用 PySide6（Qt Quick）编写，以 Nuitka 打包；内核是内嵌 mihomo 的 Go 库，Windows 上运行在系统服务里，macOS
-上运行在 NetworkExtension 系统扩展里（[architecture.md](architecture.md)）。
+上运行在 NetworkExtension 系统扩展里，Linux 上运行在 systemd 服务里（[architecture.md](architecture.md)）。
 
 ## 从源码构建
 
@@ -38,6 +38,20 @@
 
   GUI 的 Python、PySide6 和原生扩展必须同架构；构建器会检查解释器及全部打包 PE 文件。Go 服务可交叉编译，GUI 使用
   对应架构的 Windows 构建环境。构建步骤见 [architecture.md](architecture.md) §10。
+- **Linux**：只为本机架构构建，产物在 `build/linux-<x64|arm64>/`：`openweir/`（装成 `/opt/openweir`）、`symbols/` 和
+  `OpenWeir-<版本>-linux-<架构>.deb`、`.rpm`（[package/linux/README.md](../package/linux/README.md)）：
+
+  ```bash
+  uv run --group build python scripts/build_linux.py                   # 目录树和两种安装包
+  uv run --group build python scripts/build_linux.py --skip-packages   # 只到目录树
+  uv run python scripts/build_linux.py --packages-only --format deb    # 用已有的目录树打包
+  ```
+
+  另需 C 编译器（`build-essential`）、`patchelf`（Nuitka 用）、binutils（`readelf`、`objcopy`），以及
+  `package/linux/system-libraries.toml` 列出的运行库（Nuitka 和依赖检查要找得到它们；Debian 系上就是 CI 的
+  `linux-package` job 装的那些），有 `dpkg-deb` 时还核对 `.deb`。nfpm 由脚本以 `go run` 取固定版本，不用另装。要发出去的
+  包在 CI 里构建：x64 在 `ubuntu:22.04` 容器里（glibc 2.35），arm64 在 Ubuntu 24.04 上，换一台更新的机器构建会被
+  glibc 版本的检查拦下。在开发机上不要装自己构建的包：维护脚本会以 root 启动服务（见下面"测试与开发服务"）。
 
   ARM64 上 Nuitka 查 DLL 依赖用的是 pefile（depends.exe 读不了 ARM64 程序，WinDepends 只能在 x64 上跑），x64 用的是
   depends.exe。Nuitka 4.2.2 对每个扩展模块和 DLL 递归查依赖，路上遇到的每个文件都用 pefile 完整解析一遍（数每个字节，
@@ -55,7 +69,7 @@
   版本（`NUITKA_VERSION`），版本不同或被替换的函数不在时直接让构建失败。升级 Nuitka 时要重新核对它，见
   [maintenance.md](maintenance.md) §5.4。
 
-两个脚本都会先下载钉住版本的 GEO 数据（`scripts/fetch_geodata.py`）。发布用的安装包由 GitHub Actions 的发布工作流
+三个脚本都会先下载钉住版本的 GEO 数据（`scripts/fetch_geodata.py`）。发布用的安装包由 GitHub Actions 的发布工作流
 构建（[release.md](release.md)）。
 
 内核通过 go.mod replace 固定到 `openweir/mihomo` `Alpha` 分支上的内核发版提交（D38、D52），包含 Naive、AnyTLS+REALITY 和 Snell v4–v6。
@@ -69,7 +83,14 @@ go -C src/core run -tags with_gvisor,with_naive ./service -socket /tmp/openweir-
 ```
 
 Windows x64 / ARM64 原生配置测试使用 `with_gvisor,with_naive,with_purego`，测试进程的 PATH 需要包含同架构、锁定版本的 Cronet DLL
-目录；已安装的服务只加载自身目录里的 DLL。各目标的构建与验证均已接入 CI。
+目录；已安装的服务只加载自身目录里的 DLL。Linux 同样用 `with_purego`，`LD_LIBRARY_PATH` 指向锁定版本的 `libcronet.so`：
+
+```bash
+native=$(go -C src/core mod download -json "github.com/sagernet/cronet-go/lib/linux_$(go env GOARCH)" | jq -r .Dir)
+LD_LIBRARY_PATH="$native" go -C src/core test -tags with_gvisor,with_naive,with_purego -run '^(TestFork|TestNaiveRuntime)' ./internal/engine ./service
+```
+
+已安装的 Linux 服务只加载 `/opt/openweir/libcronet.so`。各目标的构建与验证均已接入 CI。
 Go 1.27 的竞态运行时不支持 Windows ARM64，该平台运行普通测试与原生配置测试；竞态检查继续在其他受支持平台运行。
 
 与 fork 联调时，可以用本地 `go.work` 将 `github.com/metacubex/mihomo` 替换为 fork 工作区；该文件不提交。
@@ -103,11 +124,13 @@ CI 还运行 `uv run ruff check .`、`uv run ruff format --check .`、`uv run py
 
 CI 按改动范围选择任务，规则集中在 `scripts/ci_changes.py`。main 推送与最近成功的祖先 CI 提交比较，PR 与 merge-base
 比较；未知路径、缺少历史或无法查询成功基线时跑全量。纯说明文档只运行变更判断和 `CI result`，`DESIGN.md`、配置示例
-及随包资源仍按构建输入检查。Python 改动保留 macOS arm64/x64、Windows x64/ARM64 测试、E2E，以及 macOS 和 Windows 打包；Go 改动保留对应的内核与宿主验证。
+及随包资源仍按构建输入检查。Python 改动保留 macOS arm64/x64、Windows x64/ARM64、Linux x64/arm64 测试、E2E，以及 macOS、Windows 和 Linux 打包；Go 改动保留对应的内核与宿主验证，`_linux.go` 只选 Linux 上跑的 `go`、`e2e`、`tun` 和 Linux 打包。`package/linux/`、`scripts/build_linux.py` 和 hicolor 图标选 `python` 和 Linux 的两个 job。推送 develop 时只要构建一个平台的安装包就构建全部，预览版才齐全。
 需要完整复测时，在 Actions 中手动运行 CI 或重新运行全部 jobs；配置必需检查时使用始终返回结果的 `CI result`。
 
-**开发服务**：Windows 服务的二进制在 macOS 和 Linux 上可以作为前台进程运行，以普通用户身份监听一个本地 socket，
-不创建 TUN，不改系统代理、路由和 DNS（[architecture.md](architecture.md) §11）。`scripts/dev.py` 一步构建并启动它，
+**开发服务**：服务的二进制在 macOS 和 Linux 上可以作为前台进程运行（`-socket`），以普通用户身份监听一个本地 socket，
+不创建 TUN，不改系统代理、路由和 DNS（[architecture.md](architecture.md) §11）。Linux 上它就是发布版那个
+`openweir-service`，只是不用 `-system`；以 root 运行时拒绝启动。从源码运行的界面不找 `/run/openweir/control.sock`，
+只连 `OPENWEIR_DEV_SOCKET` 指的开发服务，所以开发机上装没装 OpenWeir 都不影响。`scripts/dev.py` 一步构建并启动它，
 再打开界面；配置和设置放在临时目录（`--data` 可指定目录，保留到下次），不读写用户数据目录，退出界面时停止服务。
 支持 `--lang en|zh`、`--appearance light|dark`：
 
@@ -136,6 +159,27 @@ uv run python scripts/preview.py
 ```
 
 需要 TUN 的测试只在 CI 的网络命名空间或测试机里做，不在开发机上建 TUN。
+
+**Linux 上的准备**：界面的测试离屏运行（`QT_QPA_PLATFORM=offscreen`），PySide6 要几个系统库：Debian、Ubuntu 上是
+`libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3 libglib2.0-0t64 libx11-6`（Ubuntu 22.04、Debian 12 上是
+`libglib2.0-0`），`test_fonts` 还要彩色 emoji 字体 `fonts-noto-color-emoji`。测试不碰系统的凭据库（`tests/conftest.py`
+在整个会话里拒绝它，免得 GNOME Keyring 弹出解锁窗口挂住测试）。Linux 专有的 Python 依赖（secretstorage、jeepney、
+cryptography）只在 Linux 上安装；在 macOS、Windows 上运行 pyright 时它们的导入要么在 `sys.platform` 判断之后，要么带
+`# pyright: ignore[reportMissingImports]`，CI 在三个平台上都跑 pyright。
+
+**网络命名空间里的 TUN 测试**（只在一次性的 Linux 虚拟机或容器里，要 root；CI 的 `tun` job 就是这样跑的，命令见
+`.github/workflows/ci.yml`）：先编出测试，再建 `md-tun`、`md-srv` 两个命名空间并用 veth 连起来，在 `md-srv` 里起
+HTTP（IPv4 和 IPv6）和 UDP 回显服务，然后在 `md-tun` 里运行：
+
+```bash
+go -C src/core test -c -tags tuntest -o /tmp/engine-tun.test ./internal/engine
+sudo env OPENWEIR_TUN_TEST=1 OPENWEIR_TUN_TARGET=http://10.201.0.1:8080/ \
+  OPENWEIR_TUN_TARGET6='http://[fd00:200::1]:8080/' OPENWEIR_TUN_OUTBOUND=md-veth0 \
+  ip netns exec md-tun /tmp/engine-tun.test -test.run '^(TestPinnedTUN|TestCrashedTUN)$' -test.v
+```
+
+测试拒绝在宿主机的网络命名空间里运行；`TestOwnedTUN`、`TestFDTUN` 另要 `OPENWEIR_TUN_UDP_TARGET`，`OPENWEIR_TUN_STACKS`
+选栈（[architecture.md](architecture.md) §11）。
 
 ## 生成的文件
 

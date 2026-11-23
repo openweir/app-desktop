@@ -12,12 +12,26 @@ OpenWeir 管理你导入的代理订阅和 mihomo 配置，本身不提供代理
 | macOS 26 及以上，Apple Silicon / Intel x64 | `OpenWeir-<版本>-macos-universal.dmg` |
 | Windows 10 / 11，x64 | `OpenWeir-<版本>-windows-x64-setup.exe` |
 | Windows 11，ARM64 | `OpenWeir-<版本>-windows-arm64-setup.exe` |
+| Linux x64：Ubuntu 22.04、Debian 12、Fedora 41 及更新 | `OpenWeir-<版本>-linux-x64-unsigned.deb` / `.rpm`（目前只在预览版里） |
+| Linux arm64：Ubuntu 24.04、Debian 13、Fedora 41 及更新 | `OpenWeir-<版本>-linux-arm64-unsigned.deb` / `.rpm`（目前只在预览版里） |
 
 macOS：打开 DMG，将 OpenWeir 拖入「应用程序」。首次连接时按提示允许网络扩展并添加 VPN 配置。
 
 Windows：运行安装程序并允许管理员授权，授权提示里的发布者应是 OpenWeir。首次安装可选择安装位置，
 默认是 `C:\Program Files\OpenWeir`。日常使用无需以管理员身份打开 OpenWeir。SmartScreen 若提示「Windows 已保护你的电脑」，
 点「更多信息」核对发布者后再运行；发布附件中的 `SHA256SUMS` 可用于核对文件。
+
+Linux：Linux 版目前只随[预览版](https://github.com/openweir/app-desktop/releases)发布，安装包没有签名，先用同一页的
+`SHA256SUMS` 核对（`sha256sum --check --ignore-missing SHA256SUMS`），再在下载目录里安装：
+
+```bash
+sudo apt install ./OpenWeir-<版本>-linux-x64-unsigned.deb     # Ubuntu、Debian
+sudo dnf install ./OpenWeir-<版本>-linux-x64-unsigned.rpm     # Fedora
+```
+
+arm64 的机器换成 `arm64` 的包。安装会启用并启动后台服务 `openweir.service`；之后从应用菜单打开 OpenWeir，日常使用无需
+`sudo`。只有坐在这台机器前登录的用户能连接（远程登录的不行）。再装同一版本号的预览版时，用
+`sudo apt install --reinstall ./…` 或 `sudo dnf reinstall ./…`。
 
 ## 第一次连接
 
@@ -31,7 +45,8 @@ Windows：运行安装程序并允许管理员授权，授权提示里的发布�
 
    ![「代理」页：左侧是代理组，右侧是所选组的节点、来源、类型和延迟](images/proxies-light.png)
 
-4. 返回「概览」并连接。Windows 可在设置中选择 TUN、系统代理或同时启用；macOS 使用系统 VPN 接管流量。
+4. 返回「概览」并连接。Windows 和 Linux 可在设置中选择 TUN、系统代理或同时启用（Linux 的系统代理只在 GNOME 和 KDE 上
+   可用）；macOS 使用系统 VPN 接管流量。
 
    ![「概览」页：连接已打开，显示出站模式、当前节点、实时流量和最近连接](images/overview-light.png)
 
@@ -117,9 +132,13 @@ WARP 需要注册账户，VPN Gate 依赖其志愿者服务器。添加出口本
 关闭窗口默认把 OpenWeir 留在托盘（macOS 上是菜单栏），连接继续运行。macOS 上窗口关闭后 OpenWeir 不在 Dock 中显示，
 从菜单栏图标选「打开主窗口」即可回到窗口。在「设置」里可以把关闭窗口改为「退出 OpenWeir」。
 
+Linux 上要桌面支持托盘图标才有托盘：KDE 自带；GNOME 需要装上 AppIndicator 扩展（Ubuntu 默认装好了，其他发行版的
+扩展叫 "AppIndicator and KStatusNotifierItem Support"）。没有托盘时，关闭窗口就会先断开连接再退出 OpenWeir，设置里
+「留在托盘」不可选。在 Linux 上按 Ctrl+Q 也是退出 OpenWeir。
+
 ![「设置」页：接管方式、界面、备份与同步，右侧有「关闭窗口时」等启动选项](images/settings-light.png)
 
-从托盘或菜单栏选「退出 OpenWeir」、在 macOS 上按 ⌘Q 或在 Dock 中退出，都会先断开连接，再退出应用。退出后不会自动重连，
+从托盘或菜单栏选「退出 OpenWeir」、在 macOS 上按 ⌘Q 或在 Dock 中退出、在 Linux 上按 Ctrl+Q，都会先断开连接，再退出应用。退出后不会自动重连，
 包括睡眠唤醒之后；下次打开 OpenWeir 后手动连接。断开失败时会询问重试还是仍然退出；仍然退出时，隧道可能仍在运行。
 
 需要界面运行的自动任务会在退出后暂停，例如订阅和 GEO 数据更新。下次打开时会检查需要处理的更新。
@@ -142,8 +161,13 @@ WARP 需要注册账户，VPN Gate 依赖其志愿者服务器。添加出口本
 后台服务保持，升级后自动恢复；macOS 上先断开连接再退出，把新版本拖入「应用程序」替换旧版本后，重新打开并连接。
 Windows 升级沿用已有安装位置；Windows on ARM 使用 ARM64 安装包。
 
+Linux 的预览版没有应用内安装：有新版本时「关于」里的按钮打开下载页，下载后像安装时一样用 `sudo apt install` 或
+`sudo dnf install` 升级。升级时正在运行的 OpenWeir 会自己退出，连接由后台服务保持，升级后服务重启并恢复连接。
+
 Windows 从「设置 → 应用」卸载，默认保留订阅、设置和日志，也可选择清除。
 macOS 卸载前先在 OpenWeir 设置中停用系统扩展，再删除应用。
+Linux 用 `sudo apt remove openweir` 或 `sudo dnf remove openweir` 卸载，后台服务一并停止；`sudo apt purge openweir` 再删除
+服务保存的数据（`/var/lib/openweir`）。你的订阅和设置在 `~/.local/share/OpenWeir`，卸载时不删除。
 
 ## 常见问题
 
@@ -154,7 +178,10 @@ macOS 卸载前先在 OpenWeir 设置中停用系统扩展，再删除应用。
 | 开着系统代理时 Microsoft Store 等应用打不开 | 这类应用默认不能访问本机回环地址，而系统代理指向本机。在「设置 → 接管方式」保持 TUN 开启、关闭系统代理即可；新安装默认就是这样 |
 | 升级提示文件占用或架构不一致 | 关闭正在使用 OpenWeir 文件的程序后重试；仍失败时提交错误信息，不手动混用不同架构的文件 |
 | TCP 测速成功，但网页打不开 | 再做 HTTP 测速，检查模式、策略组、规则和节点认证信息 |
-| 游戏或语音通话不经过代理 | Windows 上开启 TUN 模式；在「连接」页筛选 UDP，链路显示 `DIRECT` 时换用支持 UDP 的节点 |
+| Linux 上设置里「系统代理」不可用 | 系统代理只支持 GNOME 和 KDE；其他桌面使用 TUN 模式，或让程序直接用混合端口 |
+| Linux 上提示连接被拒绝、只有在这台机器前的用户能使用 | 从远程登录（SSH、远程桌面）或另一个用户的会话里不能连接；在本机登录的桌面里打开 OpenWeir |
+| Linux 上提示后台服务不可用 | 运行 `systemctl status openweir.socket openweir.service` 查看，`sudo systemctl enable --now openweir.socket openweir.service` 重新启用 |
+| 游戏或语音通话不经过代理 | Windows、Linux 上开启 TUN 模式；在「连接」页筛选 UDP，链路显示 `DIRECT` 时换用支持 UDP 的节点 |
 | 导入后仍使用旧节点 | 确认正在使用该订阅的规则，或已将它加入「我的方案」节点池 |
 | 退出后网络仍经代理 | 退出时断开失败并选了仍然退出，或界面意外关闭。重新打开 OpenWeir，使用「断开」停止连接 |
 | 没有 Google Drive 入口 | 该安装包未提供此功能；可使用本地备份，macOS 还可使用 iCloud |

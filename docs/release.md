@@ -9,7 +9,9 @@
 说明的模板 `.github/release-notes.md`。
 
 Windows 安装包由 Azure Artifact Signing 签名（D42），更新时核对校验和与签名者（第 3 节）。`openweir:`、`clash:`、`mihomo:`、
-`clashmeta:` 四个 scheme 由打包向系统注册（macOS 的 Info.plist，Windows 安装器写在 HKLM，第 6 节）。
+`clashmeta:` 四个 scheme 由打包向系统注册（macOS 的 Info.plist，Windows 安装器写在 HKLM，Linux 安装包的 `.desktop` 文件，
+第 6 节）。Linux 的 `.deb` 和 `.rpm`（D61）现在只随预览版发布，不签名（1.2 节）；正式版要等 `SHA256SUMS` 的签名做好
+（1.3 节）。
 
 Windows 安装器采用自定义 Win32 界面（D39），由 MSVC 编译为 NSIS 的 x86 Unicode 插件；它只随安装器/卸载器
 解压到临时目录，不成为应用运行时依赖。界面按实际步骤显示进度，外观见 [DESIGN.md](../DESIGN.md)「Windows 安装器」。原有静默参数保留，发布冒烟测试同时覆盖交互安装和静默升级/卸载。ARM64 上该 x86 安装引导由系统仿真运行，安装后的应用与服务原生运行。
@@ -28,11 +30,14 @@ Windows 安装器采用自定义 Win32 界面（D39），由 MSVC 编译为 NSIS
 | macOS 安装包 | `OpenWeir-<版本>-macos-universal.dmg`：由 `scripts/build_dmg.py` 制作，挂载后是一个固定的窗口，左边 `OpenWeir.app`、右边“应用程序”的快捷方式（apple/README.md 的“磁盘映像”）；磁盘映像用 Developer ID（Team 为 `OPENWEIR_APPLE_TEAM_ID`）签名、公证并 staple |
 | Windows 安装包 | `OpenWeir-<版本>-windows-x64-setup.exe`：NSIS 安装器（architecture.md 第 9 节）。安装器、卸载器和装进去的程序用 Azure Artifact Signing 做 Authenticode 签名并加时间戳，签名者是 `OpenWeir`（D42）；更新时核对校验和与签名者（第 3 节第 4 步）。1.0.0 不签名（D29） |
 | Windows ARM64 安装包 | `OpenWeir-<版本>-windows-arm64-setup.exe`：Windows 11 ARM64 原生应用、服务及匹配的 Cronet/Wintun；NSIS 引导仍为 x86，安装逻辑与签名与 x64 版相同 |
+| Linux 安装包 | `OpenWeir-<版本>-linux-<x64\|arm64>.<deb\|rpm>`：`scripts/build_linux.py` 构建（architecture.md"Linux"一节），界面按本机装的那一种（`/opt/openweir/package-format`）和架构找它。**还没有进正式版**，只在预览版里（1.2、1.3 节） |
+| 校验和的签名 | `SHA256SUMS.sig`：Ed25519 对 `SHA256SUMS` 原样字节的签名，64 字节，Linux 的更新先验它再信 `SHA256SUMS`（D62，第 3 节）；本身不列在 `SHA256SUMS` 里。**还没有**，1.3 节 |
 | 校验和 | `SHA256SUMS`：`sha256sum` 的输出格式，每行 `<64 位小写十六进制>  <文件名>`，覆盖本次发布的其他每个文件 |
 | 源代码 | 不上传源代码包（D43）：源代码是本仓库的 `v<版本>` 标签，mihomo 和其他 Go 依赖由标签里的 `src/core/go.mod`、`go.sum` 固定；发布说明和 NOTICES 写明这些位置（第 5 节）。1.0.0 的 Release 另有 `OpenWeir-1.0.0-source.tar.gz`，保留不动 |
 
-Release 上有三个安装包和 SHA256SUMS，共四个文件（1.0.0 另有源代码包）。支持 Windows x64、Windows 11 ARM64 和 macOS arm64 / x64（通用包，D2、D40）。其他平台的界面不提供
-下载，「检查更新」照常显示有没有新版本。
+Release 上有三个安装包和 SHA256SUMS，共四个文件（1.0.0 另有源代码包）。支持 Windows x64、Windows 11 ARM64 和 macOS arm64 / x64（通用包，D2、D40）。Linux x64 和
+arm64 的安装包暂时只在预览版里；在 Release 带上它们之前，Linux 上的「检查更新」照常显示有没有新版本，但写「这个版本没有
+适合本机的安装包」。其他平台的界面不提供下载。
 
 ### 1.1 发布工作流
 
@@ -91,14 +96,16 @@ GitHub 把正文里的换行原样显示，所以模板的段落不折行；除 
 
 推送 `develop` 后 CI 全部通过，最后的 `preview` job 调用 `.github/workflows/prerelease.yml`（`workflow_call`），把这次 CI 构建的未签名安装包发成 GitHub 预发布版本：tag 为
 `v<版本>-preview.<n>`（同一版本从 1 起编号，标题即 tag），附件是 `OpenWeir-<版本>-preview.<n>-macos-universal-unsigned.dmg`、
-`OpenWeir-<版本>-preview.<n>-windows-<x64|arm64>-unsigned-setup.exe` 和 `SHA256SUMS`。测试人员从 Releases 页面下载，不必进
-Actions 找构建产物。
+`OpenWeir-<版本>-preview.<n>-windows-<x64|arm64>-unsigned-setup.exe`、`OpenWeir-<版本>-preview.<n>-linux-<x64|arm64>-unsigned.<deb|rpm>`
+和 `SHA256SUMS`。测试人员从 Releases 页面下载，不必进 Actions 找构建产物。Linux 的四个包来自 CI 的 `linux-package` job，
+各带一个构建时写的 `.sha256`：预览发布先用它核对下载到的文件（对不上这个 job 就失败），`.sha256` 不上传，`SHA256SUMS` 列出
+全部七个安装包。
 
 - develop 与 main 指向同一提交时（例如刚发布正式版），develop 的 CI 不跑任何检查，也不发预览版，由 main 那次运行覆盖。
-- 只保留最新的一个预览版：发布新的之后，之前的连同 tag 一起删除。所以预览版总是三个安装包齐全：推送到 develop 时，
-  只要构建一个安装包就构建全部三个（`scripts/ci_changes.py`，例如只改了 macOS 的代码也构建 Windows 的两个）；万一缺了
-  哪个，这次不发布，之前的预览版保留。只改文档、CI 没有构建安装包时不发布。CI 的安装包 artifact 保留 7 天，重跑预览发布
-  的 job 时还取得到。
+- 只保留最新的一个预览版：发布新的之后，之前的连同 tag 一起删除。所以预览版总是各平台齐全（macOS、两种 Windows、
+  两种架构的 Linux `.deb` 和 `.rpm`）：推送到 develop 时，只要构建一个平台的安装包就构建全部（`scripts/ci_changes.py`，
+  例如只改了 macOS 的代码也构建 Windows 和 Linux 的）；万一缺了哪个，这次不发布，之前的预览版保留。只改文档、CI 没有
+  构建安装包时不发布。CI 的安装包 artifact 保留 7 天，重跑预览发布的 job 时还取得到。
 - 较新的提交会取消还在进行的 CI 和预览发布（main 的 CI 除外），每次发布预览版后删除 develop 上已取消的 CI 运行记录（只删
   `ci.yml` 在 develop 上的，别的分支和工作流的不动）。
 - 正式版发布后，`remove-previews.yml` 删除同一版本的全部预览版及其 tag；`main` 的 CI 最后也调用它补删遗漏的。
@@ -107,6 +114,31 @@ Actions 找构建产物。
 - 发布不用 `workflow_run` 或 tag 推送触发：`workflow_run` 总是跑默认分支上的工作流文件，而 `workflow_call` 跑的是这次提交的。
 - 预览版不签名，签名和公证只在正式版（1.1）里做，所以预览版不需要任何证书或签名用的变量。Windows 安装时 SmartScreen 提示未知发布者；macOS 版可以打开界面，但系统扩展需要 Developer ID 签名与公证才能激活，
   所以连不上。发布说明里写明这两点。
+- Linux 预览版：发布说明写怎么装（`sudo apt install ./OpenWeir-…-linux-x64-unsigned.deb`、
+  `sudo dnf install ./OpenWeir-…-linux-x64-unsigned.rpm`，arm64 同理）、支持的最老发行版、安装包没有签名所以先用
+  `SHA256SUMS` 核对，以及 GNOME 上没有 AppIndicator 扩展时没有托盘。包里的版本号是 `X.Y.Z`，同一版本的两个预览版号码
+  相同，apt 和 dnf 会认为已经装好了，所以说明里写着重装要用 `sudo apt install --reinstall ./…` 或 `sudo dnf reinstall ./…`。
+  预览版构建时没有更新公钥（`OPENWEIR_LINUX_UPDATE_KEY`），界面不提供安装（第 3 节）。
+
+### 1.3 Linux 安装包的签名（尚未做）
+
+2026-11-23 决定先不做签名、只发预览版，所以 `release.yml` 不构建 Linux 安装包，Release 上也没有它们。D62 的设计要等
+做的时候按下面的步骤接上，在那之前不要往 `release.yml` 里加签名步骤：
+
+1. 在可信的机器上运行 `uv run python scripts/sign_sums.py --generate`（要 Linux，`cryptography` 只在 Linux 上装），
+   把公钥存为 `release` Environment 的变量 `OPENWEIR_LINUX_UPDATE_KEY`，私钥（RFC 8032 的 32 字节种子，base64）存为机密
+   `OPENWEIR_LINUX_UPDATE_SIGNING_KEY`，不留别的副本。
+2. `release.yml` 加一个 Linux 构建 job，矩阵与 CI 的 `linux-package` 相同（x64 在 `ubuntu:22.04` 容器里，arm64 在
+   `ubuntu-24.04-arm` 上），带着 `OPENWEIR_LINUX_UPDATE_KEY` 构建（`build_linux.py` 把它写进 `product.json` 并链接进服务），
+   用 `package/linux/smoke-test.sh` 装一遍，产出四个包和各自的 `.sha256`、symbols artifact。
+3. release job 用 `.sha256` 核对四个包，把它们写进 `SHA256SUMS`，再在 Linux runner 上运行
+   `uv run --frozen python scripts/sign_sums.py SHA256SUMS` 和 `--verify SHA256SUMS`（带上机密和变量），把 `SHA256SUMS.sig`
+   和四个包一起放进草稿；`.sig` 不列在 `SHA256SUMS` 里。`tests/test_release_workflow.py` 改为核对九个文件，发布说明模板
+   `.github/release-notes.md` 加上 Linux 的安装说明。
+4. 之后正式版的 Linux 界面不再停在「请从发布页下载安装包」，而是下载、验签并经 pkexec 安装（第 3 节）。
+
+给 `.deb`、`.rpm` 本身签名（`dpkg-sig`、`rpm --addsign`）或提供 apt/dnf 仓库都不在 D62 之内：更新只信 `SHA256SUMS` 的签名，
+手动安装的人用 `SHA256SUMS` 核对。
 
 ## 2. 检查更新
 
@@ -132,10 +164,15 @@ Actions 找构建产物。
 
 点「下载」后依次进行，每一步失败都停在那一步，删掉已下载的文件，原因写在说明里：
 
-1. **选安装包**：检查更新时已按平台和架构从 Release 的资源里找第 1 节命名的文件；找不到时说明写「有新版本 1.1.0 ·
-   这个版本没有适合本机的安装包」，不提供「下载」。资源声明的大小超过 1 GiB 时拒绝下载。
+1. **选安装包**：检查更新时已按平台和架构从 Release 的资源里找第 1 节命名的文件（Linux 上还按 `package-format` 选
+   `.deb` 或 `.rpm`）；找不到时说明写「有新版本 1.1.0 · 这个版本没有适合本机的安装包」，不提供「下载」。资源声明的大小超过
+   1 GiB 时拒绝下载。Linux 上构建没有更新公钥（`signing.linuxUpdateKey` 为空，现在的预览版都是）或没有 `cryptography` 时，
+   找到了安装包也不下载：说明写「有新版本 1.1.0 · 请从发布页下载安装包」，按钮「打开下载页」打开 Release 页面（`manual`
+   状态）。
 2. **取校验和**：下载 `SHA256SUMS`（不超过 64 KiB），找到安装包那一行。没有这个文件或没有那一行就拒绝
-  （「发布没有附带校验和」），不跳过校验。
+  （「发布没有附带校验和」），不跳过校验。Linux 上先下载 `SHA256SUMS.sig`，用构建时的公钥验 Ed25519 签名
+  （`update/signature.py`，`cryptography`），验过才信 `SHA256SUMS`：没有 `.sig` 是 `signature_missing`（「发布没有附带校验和的
+  签名」），签名不对是 `signature_invalid`。
 3. **下载**到用户数据目录的 `updates/`，先写 `<文件名>.part`，边下载边算 SHA-256，说明里显示进度，可以取消。
    收到的字节超过声明的大小立即停止；完成后大小和哈希都对上才改成正式文件名。开始下载前和界面启动时清空
    `updates/` 里的旧文件（删不掉的，如正在运行的安装器，就留着）。
@@ -159,6 +196,7 @@ Actions 找构建产物。
        `WINDOWS_SIGNER_EKU`，Artifact Signing 只把它发给 OpenWeir 的证书配置文件，同名的别的组织拿不到。两个常量与
        `product.WindowsSigner`、`product.WindowsSignerEKU` 相同。Artifact Signing 每天换证书，中间 CA 也会变，所以不认
        具体证书。未签名的、别人签的安装包都被拒绝。
+   - **Linux**：安装包本身没有签名要验，第 2 步验过的 `SHA256SUMS` 已经担保了它的哈希；安装辅助进程以 root 再验一次。
    - 其他平台没有安装包，不会走到这一步。
 5. **确认安装**：校验通过后按钮变成「打开安装包…」。点它先弹普通确认框「打开 OpenWeir 1.1.0 的安装包？」，
    正文写明接下来发生什么：
@@ -174,8 +212,17 @@ Actions 找构建产物。
      里的隧道会在没有界面时继续运行，而替换后的新界面要和旧扩展通信。断开失败时照常询问重试还是仍然退出；用户
      取消退出时这一行回到「打开安装包…」，可以再打开一次。替换后由用户打开新版本、手动连接，首次连接激活新扩展。
 
-   若校验或打开失败，界面会显示错误。界面从不静默安装，也不自己替换文件；升级本身由安装器和 Finder 完成
-   （architecture.md 第 9 节）。
+   - Linux：确认框写「OpenWeir 会先退出，系统随后请求管理员授权来安装更新；安装结束后 OpenWeir 会重新打开。」确认后
+     界面启动一个脱离的 shell（`update/linux.py`）：`pkexec /opt/openweir/openweir-service -install-update <包> <SHA256SUMS>
+     <SHA256SUMS.sig>`，然后最多等 15 秒让旧界面退出，再以 `--update-result=<退出码>` 启动界面；界面随即像 Windows 一样
+     不断开就离开，包的升级由服务恢复隧道。辅助进程（`service/update_linux.go`，architecture.md"Linux"一节"更新"）把三个
+     文件复制到只有 root 能写的地方，再验签名和哈希，核对包名、架构和版本，用 apt-get、dnf 或 zypper 安装。重新打开的
+     界面在「版本」一行写结果：0「已更新到 1.1.0」；3「安装包没有通过校验，更新没有安装」；4「系统的包管理器没能装上
+     更新，详见系统日志」；126「已取消授权，更新没有安装」（不标红）；127「没有取得管理员授权，更新没有安装」；其他
+     「更新没有安装（退出码 N）」。只有 4 可能已经改动了系统。
+
+   若校验或打开失败，界面会显示错误。界面从不静默安装，也不自己替换文件；升级本身由安装器、Finder 和 Linux 的包管理器
+   完成（architecture.md 第 9 节）。
 
 错误码与说明：
 
@@ -187,7 +234,8 @@ Actions 找构建产物。
 | `checksum_missing` | 「发布没有附带校验和」 |
 | `checksum_mismatch` | 「下载的文件与校验和不符」 |
 | `download_failed` | 「下载失败：…」 |
-| `signature_invalid` | 「安装包的签名无效：…」，细节是 codesign、spctl 或 WinVerifyTrust 的原话 |
+| `signature_missing` | 「发布没有附带校验和的签名」：Linux 上 Release 没有 `SHA256SUMS.sig` |
+| `signature_invalid` | 「安装包的签名无效：…」，细节是 codesign、spctl 或 WinVerifyTrust 的原话；Linux 上是 `SHA256SUMS.sig` 验不过 |
 | `signer_mismatch` | 「安装包不是由 OpenWeir 的开发者签名的」；Windows 上签名者的显示名不符，或证书没有 OpenWeir 证书配置文件的 EKU。只在配置了签名者的构建里出现 |
 
 ## 4. 诊断信息
@@ -197,7 +245,7 @@ Actions 找构建产物。
 
 | 文件 | 内容 |
 | --- | --- |
-| `about.json` | 界面版本、Python、PySide6 与 Qt 的版本、操作系统与架构、是否打包版、界面语言、导出时间 |
+| `about.json` | 界面版本、Python、PySide6 与 Qt 的版本、操作系统与架构、是否打包版、界面语言、导出时间；Linux 上另有 `linux`：os-release 的 `ID` 和 `VERSION_ID`（如 `ubuntu`、`24.04`，其余字段不读）、`XDG_CURRENT_DESKTOP` 里的桌面名、`XDG_SESSION_TYPE`、包格式（`deb`、`rpm`），都按白名单写，不认识的写 `other`（`diagnostics.linux_about`） |
 | `host.json` | 宿主的 `GetInfo` 和 `GetStatus`；连不上服务时写错误码和原话 |
 | `settings.json` | 设置（[ui.md](ui.md) 第 8 节的表），以及脱敏后的订阅、覆写和分流概况，见下文 |
 | `mihomo.log` | 日志页缓冲（最多 5000 条）里的内核警告和错误，网址脱敏，见下文；格式与日志页的导出相同，开头一行注明这两点 |
@@ -242,8 +290,9 @@ Actions 找构建产物。
 
 | 类别 | 来源 |
 | --- | --- |
-| Python | 从 `openweir` 的 `Requires-Dist` 递归求出的运行时依赖（protobuf、PySide6 及其拆分出的包、shiboken6、keyring 等），读安装的包元数据和 `.dist-info` 里的许可证文件；再加上 CPython 自身（Nuitka 把解释器打进包里）和它的构建链接进解释器的第三方库，见下文 |
-| Go | `go list -deps` 使用两平台真实发布标签（D38）列出实际链接的模块，并跟随 replace 记录来源和版本；许可证文件取自模块缓存里模块的根目录，根目录没有时取被链接的包所在目录。另加 Go 标准库、Wintun，以及 purego 动态加载而不出现在 Go 包依赖中的 Windows Cronet 原生模块 |
+| Python | 从 `openweir` 的 `Requires-Dist` 按 macOS、Windows、Linux 三个平台的环境标记分别递归求出的运行时依赖（protobuf、PySide6 及其拆分出的包、shiboken6、keyring，Linux 上还有 secretstorage、jeepney、cryptography 等），本机装着的读安装的包元数据和 `.dist-info` 里的许可证文件，别的平台的下载 `uv.lock` 固定的轮子并核对哈希；再加上 CPython 自身（Nuitka 把解释器打进包里）和它的构建链接进解释器的第三方库，见下文 |
+| Go | `go list -deps` 使用各平台真实的发布标签（D38）列出 Windows、Linux 服务和 macOS 扩展实际链接的模块，并跟随 replace 记录来源和版本；许可证文件取自模块缓存里模块的根目录，根目录没有时取被链接的包所在目录。另加 Go 标准库、Wintun，以及 purego 动态加载而不出现在 Go 包依赖中的 Windows 和 Linux 的 Cronet 原生模块 |
+| 轮子带的原生库 | `package/licenses/wheels.json`：轮子里打进去、元数据没有写的原生代码，现在是 Linux 的 cryptography 轮子静态链接的 OpenSSL 和 PySide6 Linux 轮子带的 ICU |
 | Qt | Qt 6.12.0 本身（LGPL-3.0-only，全文在 `package/licenses/LGPL-3.0-only.txt`），以及随附的 Qt 模块（Core、GUI、Network、Qml、Quick、Quick Controls、Image Formats）里的第三方代码。后者来自 Qt 文档的《Third-Party Code Used in Qt》和各组件的说明页，由 `--qt-docs <Qt 文档目录>` 读取后存成 `package/licenses/qt.json`，平时生成时直接用它；升级 Qt 时用新版本的文档重新生成 |
 | 字体 | `ui/fonts/` 下的 Inter、JetBrains Mono、Noto Sans SC、Noto Sans Symbols 2 和 Noto Color Emoji，版本读自字体文件的 name 表，全文是各自的 `OFL.txt`；固定来源及哈希见 `sources.json` |
 
@@ -255,8 +304,9 @@ Actions 找构建产物。
 - **现有的特例**：`github.com/metacubex/chacha` 的许可证文件在子目录里（MIT）；`github.com/rasky/go-lzo`
   （mihomo 的 OpenVPN 传输引入）只附 GPL-2.0 全文，它说明自己沿用 LZO 的许可证，而 LZO 是"GPL 第 2 版或任何
   更新的版本"，所以记为 `GPL-2.0-or-later`，可以与 GPL-3.0 的代码合并发布。
-- **CPython 带的库**：uv 安装的 Python 是 python-build-standalone 的构建（现在是 3.14.7，发布日期 20260901），它把
-  一些第三方库链接进解释器：macOS 上静态链接进 `libpython`，Windows 上是 `DLLs\` 里的 DLL 和 `.pyd`。
+- **CPython 带的库**：uv 安装的 Python 是 python-build-standalone 的构建（现在是 3.14.7，macOS 和 Windows 的发布日期
+  20260901，Linux 的 20260929），它把一些第三方库链接进解释器：macOS 和 Linux 上静态链接进 `libpython`，Windows 上是
+  `DLLs\` 里的 DLL 和 `.pyd`。
   `package/licenses/cpython.json` 逐个列出，每项写库的名称、版本、SPDX、用它的 CPython 模块、平台和全文，清单里
   的名称形如 `OpenSSL (CPython _ssl, _hashlib)`：
   - 两个平台：OpenSSL 3.5.8（`_ssl`、`_hashlib`）、SQLite 3.53.1（`_sqlite3`）、bzip2 1.0.8（`_bz2`）、XZ Utils 5.8.3
@@ -264,6 +314,11 @@ Actions 找构建产物。
   - 两个平台版本不同，各列一项：libffi（`_ctypes`，macOS 3.4.8，Windows 3.4.7）、Expat（`pyexpat`，macOS 2.8.4，
     Windows 用 CPython 源码自带的 2.8.2）；
   - 只在一个平台：libuuid 1.0.3（`_uuid`，macOS）、zlib-ng 2.2.4（`zlib`、`binascii`，Windows）。
+  - Linux 的构建晚一些，版本另列：OpenSSL 3.5.9、XZ Utils 5.8.4、Expat 2.8.5；libffi 3.4.8 和 libuuid 1.0.3 与 macOS
+    相同；只在 Linux 上的有 zlib 1.3.2（`zlib`、`binascii`）、libedit 和 ncurses（`readline`、`_curses`）。
+
+  上面"两个平台"的几项（SQLite、bzip2、Zstandard、mpdecimal）Linux 上是同一版本。`--check` 和 `tests/test_licenses.py`
+  按平台核对：三个平台的清单是同一份文件，在哪个平台生成都一样。
 
   不列的：macOS 自带的 zlib、libedit、ncurses（系统库，不随包分发），Tcl/Tk（只有 `_tkinter` 用，界面不导入，
   Nuitka 不打包）。CPython 一项除了 `LICENSE.txt`，还附上同一版本 `Doc/license.rst` 的"Licenses and
@@ -299,8 +354,9 @@ Actions 找构建产物。
 - Nuitka 打包时，`package/entry.py` 的 `nuitka-project` 选项把 `src/openweir/licenses/` 复制到
   `openweir/licenses/`，把仓库根目录的 `LICENSE` 复制到程序目录；还要带上 `openweir` 的包元数据
   （`--include-distribution-metadata=openweir`），否则 `__version__` 是 `0.0.0`，每个 Release 都会被当成新版本。
-- Windows 的界面由 `scripts/build_windows.py` 用同一个 `package/entry.py` 构建（architecture.md 第 10 节），这些选项
-  两个平台共用。
+- Windows 的界面由 `scripts/build_windows.py`、Linux 的由 `scripts/build_linux.py` 用同一个 `package/entry.py` 构建
+  （architecture.md 第 10 节），这些选项三个平台共用。Linux 的构建另外带上 Secret Service、jeepney 和 cryptography 的
+  Ed25519（都只在 Linux 上导入，有的是延迟导入），见 architecture.md"Linux"一节。
 - Google OAuth 客户端不进仓库：环境变量 `OPENWEIR_GOOGLE_CLIENT_ID`、`OPENWEIR_GOOGLE_CLIENT_SECRET` 都设了时，两个构建
   脚本把它写成 `build/<平台>/google_client.json`，以 `--include-data-files` 放到 `openweir/google_client.json`；只设了一个
   时构建失败（storage.md 第 4 节）。
@@ -324,6 +380,14 @@ Actions 找构建产物。
     映射盘）、读注册表或文件出错时也一样。
   - 只在 Windows 自己的 Qt 平台（`windows`）上做；macOS、Linux 和测试用的 `offscreen` 平台不碰注册表。只有拿到
     单实例锁的界面做，转交链接后退出的第二个界面不做。
+- Linux：安装包的 `/usr/share/applications/org.openweir.app.desktop` 以 `MimeType=x-scheme-handler/<scheme>;…` 声明四个
+  scheme（取自 `product.json` 的 `urlSchemes`），发行版的触发器更新 MIME 缓存。用户自己 `~/.config/mimeapps.list`
+  （`$XDG_CONFIG_HOME`）的 `[Default Applications]` 优先，其中可能留着别的客户端删除前写的默认程序（D45）。安装版的界面在
+  xcb 或 Wayland 平台上启动时（`desktop/associations.clear_stale_defaults`，后台线程）对四个 scheme 逐个检查：
+  - 默认程序指向的每个 desktop 文件都已不在（按 XDG 数据目录查，含 Flatpak 和 Snap 导出的目录），或它的 `Exec` 用完整
+    路径指向已经不存在的程序时，删掉这一项，记一条警告；
+  - 程序还在、经 PATH 找、经别的程序启动（`flatpak run`、`env`）或经 D-Bus 激活的，判断不了，不动；
+  - 文件其余部分逐字节不变；文件是链接（如 dotfiles 管理的）时整个不动。
 
 ## 7. 一键导入
 
@@ -361,13 +425,19 @@ Actions 找构建产物。
   Windows 安装包在确认框里写明未签名和"未知发布者"；诊断 zip
   的内容，订阅链接、名称、路径、覆写原文和方案内容不出现在任何文件里，设置项全部归了类；许可证列表与搜索。
 - `tests/test_licenses.py`：见第 5 节。
+- `tests/test_update_linux.py`：Linux 的更新：`SHA256SUMS.sig` 的 Ed25519 校验（缺少、不对、换了公钥）、没有公钥时的
+  `manual` 状态、按 `package-format` 选安装包、pkexec 那段 shell 的参数，以及它把辅助进程的退出码交给重新启动的界面；服务一侧
+  的安装辅助进程由 `service/update_linux_test.go` 测（复制、验签、包名架构版本、调用哪个包管理器）。
+- `tests/test_build_linux.py`、`tests/test_linux_smoke.py`：Linux 安装包的构建检查、维护脚本和 CI 的安装冒烟测试，见
+  `package/linux/README.md`；`tests/test_prerelease_workflow.py` 用替身 `gh` 跑预览版命名那一步：各平台齐全才发布、Linux 包
+  先对 `.sha256`、`SHA256SUMS` 列出全部。
 - `tests/test_links.py`：四种 scheme 的解析（大小写、末尾的 `/`）和拒绝（缺 `url`、别的主机或 scheme）；命令行和
   `QFileOpenEvent` 收到每种 scheme 的链接；第二个界面把链接转交给第一个；打开订阅页、预填表单、焦点在订阅链接上、
   没有自动导入。
 - `tests/test_associations.py`：在假的注册表和文件系统上清除 HKCU 失效注册的规则（带引号、不带引号、带参数、
   环境变量、程序在与不在、盘不在、键不存在、判断不了、读写出错），以及只在 Windows 的 Qt 平台上运行；Windows 上另用
-  一个临时键测真实的读取和删除。`tests/test_build_windows.py` 核对安装器注册、卸载的 scheme 与 `links.SCHEMES`
-  一致，`tests/test_apple.py` 核对 `Info.plist` 的 `CFBundleURLTypes`。CI 的 `smoke-test.ps1` 在真实安装上检查
+  一个临时键测真实的读取和删除；Linux 的 `mimeapps.list` 清理在临时目录里测。`tests/test_build_windows.py` 核对安装器注册、卸载的 scheme 与 `links.SCHEMES`
+  一致，`tests/test_apple.py` 核对 `Info.plist` 的 `CFBundleURLTypes`，`tests/test_build_linux.py` 核对 `.desktop` 文件的 `MimeType`。CI 的 `smoke-test.ps1` 在真实安装上检查
   四个 scheme 的注册和卸载，并确认界面启动时删除指向不存在程序的 HKCU 注册、保留指向存在程序的。
 - 组装整个界面的测试和预览都不连 GitHub：测试用 `offline_updater`，`scripts/preview.py` 用回环地址上的假发布，
   `--update` 时它比当前版本新。

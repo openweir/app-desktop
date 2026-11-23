@@ -1,7 +1,7 @@
 # Linux 安装包
 
 本目录是 `.deb` 和 `.rpm`（D61）除 `/opt/openweir` 以外装进系统的文件，以及 nfpm 的配置。安装包由
-`scripts/build_linux.py` 构建，设计见 [architecture.md](../../docs/architecture.md)"Linux（进行中）"和决策 D60–D67。
+`scripts/build_linux.py` 构建，设计见 [architecture.md](../../docs/architecture.md)"Linux"和决策 D60–D67。
 
 ```sh
 uv run --group build python scripts/build_linux.py                   # 目录树和两种安装包

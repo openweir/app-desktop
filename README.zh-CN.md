@@ -6,7 +6,7 @@
 
 <p align="center"><strong>让 mihomo 融入操作系统。</strong></p>
 
-<p align="center">采用平台原生系统架构的开源网络代理客户端，支持 macOS 和 Windows。</p>
+<p align="center">采用平台原生系统架构的开源网络代理客户端，支持 macOS、Windows 和 Linux。</p>
 
 <p align="center"><a href="README.md">English</a> · 简体中文</p>
 
@@ -35,14 +35,15 @@ OpenWeir 用来管理你的代理订阅、节点和分流规则。OpenWeir 本�
 ## 原生系统集成
 
 - **后台保持连接**：关闭窗口后 OpenWeir 留在托盘或菜单栏，连接继续运行；「退出 OpenWeir」会先断开连接再退出。
-- **日常使用无需管理员权限**：macOS 首次连接时请求系统扩展和 VPN 授权；Windows 安装时注册后台服务。
+- **日常使用无需管理员权限**：macOS 首次连接时请求系统扩展和 VPN 授权；Windows 安装时注册后台服务，Linux 安装包装上
+  systemd 服务。
 - **随系统使用**：支持托盘操作、登录时打开及睡眠唤醒后的连接恢复。主动断开后不会自动重连。
 - **双平台签名**：正式版的 macOS 版使用 Developer ID 签名并经 Apple 公证，Windows 版使用 Authenticode 签名，
   应用内更新会核对安装包的签名。签名证书就绪前发布的测试版没有签名。
 
 ## 连接与分流
 
-- **一个开关连接**：Windows 可选择 TUN、系统代理或同时启用；macOS 通过 Network Extension 接管流量。
+- **一个开关连接**：Windows 和 Linux 可选择 TUN、系统代理（Linux 上限 GNOME 和 KDE）或同时启用；macOS 通过 Network Extension 接管流量。
   在概览页查看连接状态、当前模式和实时流量。
 - **集中管理订阅**：导入各种常见格式的订阅（mihomo/Clash、sing-box、Xray、分享链接、Surge、Loon、Shadowrocket、Quantumult X、SIP008），或本地配置文件，设置定时更新，通过 `openweir://`、`clash://`、
   `mihomo://`、`clashmeta://` 链接一键导入。支持全局覆写和单份订阅覆写。
@@ -95,9 +96,15 @@ EasyTier** 网络，通过分流规则访问网络中的设备。
 | macOS 26 及以上，Apple Silicon / Intel x64 | `OpenWeir-<版本>-macos-universal.dmg` |
 | Windows 10 / 11，x64 | `OpenWeir-<版本>-windows-x64-setup.exe` |
 | Windows 11，ARM64 | `OpenWeir-<版本>-windows-arm64-setup.exe` |
+| Linux x64：Ubuntu 22.04、Debian 12、Fedora 41 及更新 | `OpenWeir-<版本>-linux-x64-unsigned.deb` / `.rpm`（目前只在预览版里） |
+| Linux arm64：Ubuntu 24.04、Debian 13、Fedora 41 及更新 | `OpenWeir-<版本>-linux-arm64-unsigned.deb` / `.rpm`（目前只在预览版里） |
 
 - **macOS**：打开 DMG，把 OpenWeir 拖入「应用程序」；首次连接时按提示允许网络扩展和 VPN 配置。
 - **Windows**：运行安装程序并允许管理员授权。
+- **Linux**：Linux 版目前随[预览版](https://github.com/openweir/app-desktop/releases)发布，没有签名：先用 `SHA256SUMS` 核对，
+  再用 `sudo apt install ./OpenWeir-<版本>-linux-x64-unsigned.deb` 或 `sudo dnf install ./OpenWeir-<版本>-linux-x64-unsigned.rpm`
+  安装（arm64 同理）。安装包会启动后台服务，之后从应用菜单打开 OpenWeir。GNOME 上要装 AppIndicator 扩展才有托盘图标；
+  没有托盘时，关闭窗口即退出 OpenWeir。
 
 安装位置、SmartScreen 提示、更新与卸载，见 [使用指南](docs/usage.md#安装)。`SHA256SUMS` 可用于核对下载文件。
 

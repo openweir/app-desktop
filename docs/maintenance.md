@@ -5,8 +5,9 @@
 
 ## 1. 支持范围与验证要求
 
-支持 macOS 26 及以上的 Apple Silicon / Intel x64、Windows 10/11 x64 和 Windows 11 ARM64。
-依赖版本以 `uv.lock`、`src/core/go.mod` 和 `src/core/go.sum` 为准；功能限制见 1.4 节。
+支持 macOS 26 及以上的 Apple Silicon / Intel x64、Windows 10/11 x64 和 Windows 11 ARM64；Linux 的 x64（Ubuntu 22.04、
+Debian 12、Fedora 41 及更新）和 arm64（Ubuntu 24.04、Debian 13、Fedora 41 及更新）现在只有不签名的预览版（D60–D67）。
+依赖版本以 `uv.lock`、`src/core/go.mod` 和 `src/core/go.sum` 为准；功能限制见 1.5 节。
 每个发布候选版本按第 2 节验收，结果随对应的 CI 运行、Issue 或 Release 记录。
 
 ### 1.1 CI 覆盖
@@ -17,16 +18,18 @@
 | job | 平台 | 内容 |
 | --- | --- | --- |
 | `changes` | Linux | 从完整 Git 差异选择任务；依赖锁、CI 配置、选择脚本自身和未知输入触发全量 |
-| `python` | macOS arm64 / x64、Windows x64 / ARM64 | ruff 只在 macOS 运行一次；各平台保留 pyright、pytest（含主题与翻译一致性）。协议输入变化时额外核对生成绑定。Windows 上再带上构建用的 Nuitka，核对 ARM64 构建的依赖分析插件与它替换的 Nuitka 函数结果一致（`tests/test_nuitka_pefile.py`） |
-| `e2e` | macOS arm64 / x64 | 界面连真实的开发服务（`tests/e2e`）：导入、连接、各页数据、分流与方案、重载不断开连接；节点是本机起的代理，只走回环地址 |
-| `go` | macOS arm64 / x64、Windows x64 / ARM64、Linux | `go vet`、`go test`，再在支持的架构以 `-race` 跑一遍（Go 1.27 不支持 Windows ARM64 race）；Linux 上以 `with_gvisor` 带 `-race` 再跑安全项和组网测试，交叉编译 Windows 服务；macOS 上编扩展用的 C archive |
+| `python` | macOS arm64 / x64、Windows x64 / ARM64、Linux x64 / arm64 | ruff 只在 macOS 运行一次；各平台保留 pyright、pytest（含主题与翻译一致性）；Linux 上先装 Qt 要的系统库，离屏运行。协议输入变化时额外核对生成绑定。Windows 上再带上构建用的 Nuitka，核对 ARM64 构建的依赖分析插件与它替换的 Nuitka 函数结果一致（`tests/test_nuitka_pefile.py`） |
+| `e2e` | macOS arm64 / x64、Linux x64 | 界面连真实的开发服务（`tests/e2e`）：导入、连接、各页数据、分流与方案、重载不断开连接；节点是本机起的代理，只走回环地址 |
+| `go` | macOS arm64 / x64、Windows x64 / ARM64、Linux | `go vet`、`go test`，再在支持的架构以 `-race` 跑一遍（Go 1.27 不支持 Windows ARM64 race）；Linux 上以 `with_gvisor` 带 `-race` 再跑安全项和组网测试，用 Linux 的 `libcronet.so` 跑 Cronet 的 fork 测试，交叉编译 Windows 和 Linux 的发布服务；macOS 上编扩展用的 C archive |
 | `apple` | macOS | 两份匹配架构的 Python/Nuitka UI、双架构管理库和扩展，合并后检查全部 Mach-O，ad hoc 签名并制作真实通用 DMG；再分别以 arm64 和 Rosetta 下的 x86_64 启动界面，等到它的窗口出现，用 `--quit` 让它退出（退出码 0，没有崩溃记录）。不连接，不激活扩展；失败时上传界面输出和崩溃记录（artifact `macos-ui-<提交>`） |
 | `windows-installer` | Windows x64 / ARM64 | 构建不签名的安装包，在 runner 上安装、打开界面、升级、卸载（`package/windows/smoke-test.ps1`）；失败时上传界面每次启动的输出，界面启动即退出时还有它的崩溃目录（artifact `windows-ui-<架构>-<提交>`） |
 | `installer-ui` | Windows x64 / ARM64 | 检查自定义路径的 ACL、所有者及链接拒绝；编译真实 Win32 界面，在只读宿主（`package/windows/ui/preview.nsi`）中走完安装、更新、卸载：GPL 全文、同意项与协议链接、路径输入、Tab/Enter/Esc、中英文、浅深色、150% 布局、每一步、详细信息、完成与失败、数据选项；每个状态存一张截图，在 artifact `installer-ui-<架构>-<提交>` 的 `screenshots/` 里 |
 | `windows-arm64-upgrade` | Windows ARM64 | 安装 x64 版后原位升级 ARM64，检查服务、GUI、同架构文件、数据保留及卸载 |
-| `tun` | Linux | 在网络命名空间里建真实的 TUN：自管模式和 fd 模式，四种栈，fd 模式另测 `includeAllNetworks` |
+| `linux-package` | Linux x64（`ubuntu:22.04` 容器）/ arm64 | 构建不签名的 `.deb` 和 `.rpm`（`scripts/build_linux.py`），另把同一棵目录树打成下一个修订号的 `.deb` 给升级测试；上传安装包和 `.sha256`（预览版用）、升级包和崩溃符号。构建失败的原因和每个未知的 soname 写成错误注释 |
+| `linux-install` | Ubuntu 24.04 x64 / arm64 虚拟机；`ubuntu:22.04`、`debian:12`、`debian:13`、`fedora:41` 容器 | `package/linux/smoke-test.sh`：虚拟机上安装 `.deb`，检查单元、套接字、服务和日志、目录、polkit、`.desktop`、`ldd`，`kill -9` 后清理恢复 IPv4 和 IPv6 路由，界面 `--quit` 和带着运行中的界面升级，删除保留状态、清除删掉；容器里以 root 装 `.deb`（最老的发行版）和 `.rpm`（`rpm -V`、依赖）再删除。每项失败的检查都是一条写着检查名的错误注释；失败时上传日志（artifact `linux-install-…`） |
+| `tun` | Linux | 在网络命名空间里建真实的 TUN：自管模式和 fd 模式，四种栈，fd 模式另测 `includeAllNetworks`；Linux 服务固定的 TUN 和崩溃后的清理（IPv4 与 IPv6） |
 | `result` | Linux | 汇总为 `CI result`；被选中的任务失败、取消或意外跳过都不能通过 |
-| `preview` | Linux | 只在 develop 推送、`result` 通过后：调用 `prerelease.yml`，把三个安装包发成预览版（release.md 1.2）。develop 推送只要构建一个安装包就构建全部三个 |
+| `preview` | Linux | 只在 develop 推送、`result` 通过后：调用 `prerelease.yml`，把 macOS、两种 Windows 和两种架构的 Linux 安装包发成预览版（release.md 1.2）。develop 推送只要构建一个平台的安装包就构建全部 |
 | `release`、`remove-previews` | Linux | 只在 main 推送、`result` 通过后：调用 `release.yml` 建草稿 Release（第 4 节），调用 `remove-previews.yml` 删掉已发布版本的预览版 |
 
 版本只在 `changes` job 里算一次（`scripts/next_version.py`，要完整历史），作为输出交给构建安装包的 job 和发布用的两个
@@ -48,7 +51,19 @@ CI 覆盖构建、安装器界面、文件清理和架构迁移。发布验收�
 
 操作清单见 2.1 节。
 
-### 1.3 macOS 发布检查
+### 1.3 Linux 发布检查
+
+CI 覆盖构建、依赖、安装、升级、删除与清除和 `kill -9` 后的清理（不跑真正的 TUN）。预览版发出后还须在真机或虚拟机的
+桌面会话里覆盖：
+
+- 真实的 TUN 流量、DNS（systemd-resolved 和没有它的系统）、IPv6，以及 `kill -9` 正在运行隧道的服务后的恢复；
+- GNOME 和 KDE 的系统代理（写入、断开写回、崩溃后和下次登录时写回），以及其他桌面上这一行不可用；
+- pkexec 接管，尤其是 Ubuntu 22.04 的 polkit 0.105 认不认 `exec.argv1`；
+- 托盘（有和没有 StatusNotifier 宿主）、窗口装饰、启动令牌、登录时打开、`mimeapps.list` 的清理。
+
+操作清单见 2.9 节。
+
+### 1.4 macOS 发布检查
 
 - 使用签名并公证的完整安装包验证启动、扩展授权、VPN 配置和登录项；
 - 验证 TUN 流量、DNS/IPv6、`includeAllNetworks`、重连与睡眠唤醒；
@@ -57,9 +72,11 @@ CI 覆盖构建、安装器界面、文件清理和架构迁移。发布验收�
 
 操作清单见 2.2 至 2.8 节。平台替身和回环测试用于自动回归，正式包的系统集成另行验收。
 
-### 1.4 没有实现的
+### 1.5 没有实现的
 
 - Tor 出口（D23，[exits.md](exits.md) 第 4 节）：只有设计。
+- Linux 正式版和应用内安装（D62）：2026-11-23 决定先只发不签名的预览版；`release.yml` 不构建 Linux 安装包，
+  `SHA256SUMS.sig` 和更新密钥都还没有（[release.md](release.md) 1.3 节列出接上的步骤）。
 
 Windows 代码签名（D42）已接上：发布工作流经 GitHub OIDC 登录 Azure，用 Artifact Signing 给 Windows 安装包和它装的程序
 签名，服务和更新器核对签名者 `OpenWeir` 及证书配置文件的 EKU（[release.md](release.md) 第 1.1、3 节）。Azure 一侧：
@@ -98,8 +115,9 @@ Profile Signer」角色。仓库改名、转移或换 Environment 时要同步�
 | 一个测试用的 Google 账户，以及 Google Cloud 里的项目和 OAuth 客户端 | 2.8 |
 | 一个只有 TCP 的真实节点（另有一个支持 UDP 的更好） | 2.5、2.6 |
 | 自己的 Tailscale、ZeroTier 或 EasyTier 网络 | 2.7 |
+| 带桌面的 Linux 虚拟机：x64 的 Ubuntu 22.04 和 24.04（GNOME）、Fedora 41（KDE），arm64 的 Ubuntu 24.04；另有一台 Xfce 之类的 | 2.9 |
 
-2.1 到 2.4 要建 TUN、激活系统扩展或改系统代理，只在测试机上做（5.1 节）。2.5 到 2.7 用开发服务做，不建 TUN：
+2.1 到 2.4 和 2.9 要建 TUN、激活系统扩展或改系统代理，只在测试机上做（5.1 节）。2.5 到 2.7 用开发服务做，不建 TUN：
 `uv run python scripts/dev.py --data ~/openweir-dev`，经混合端口访问。脚本按发布版本的标签 `with_gvisor` 构建开发服务，
 不带它 mihomo 会拒绝 Tailscale 出站。
 
@@ -309,11 +327,64 @@ exits.md 第 9 节的待实测项。
     重新登录后立即备份一次。
 11. 账户的存储空间满时，失败原因是"储存空间已满"。
 
+### 2.9 Linux
+
+在虚拟机的桌面会话里，用预览版的安装包（x64 的 Ubuntu 22.04 和 24.04 用 GNOME，Fedora 41 用 KDE；arm64 至少 Ubuntu 24.04）。
+CI 的 `linux-install` 已经在虚拟机和容器里装过、升级过、删过（1.1 节），这里看它做不到的：
+
+1. **安装**：`sudo apt install ./OpenWeir-…-linux-x64-unsigned.deb`（Fedora：`sudo dnf install ./….rpm`）。
+   `systemctl status openweir.socket openweir.service` 都在运行且已启用，`journalctl -u openweir` 里有 `service started`；
+   `ls -ld /opt/openweir /var/lib/openweir` 是 root 的 755 和 711。从应用菜单打开 OpenWeir：图标和名字对，窗口带系统的
+   标题栏（GNOME 的 Wayland 会话里是 Qt 的 adwaita 装饰）。
+2. **连接**：导入订阅，开 TUN 连接，DNS 泄漏测试通过。`ip rule`、`ip -6 rule` 里只有 9347–9357 的 OpenWeir 规则，
+   `ip route show table 9347` 有路由，有 systemd-resolved 时 `resolvectl status openweir0` 有 DNS；IPv6 走隧道或被挡住，
+   不漏。断开后规则、路由表和设备都没了。没有 systemd-resolved 的系统（如精简安装的 Debian）也试一次。
+3. **崩溃后的清理（IPv4 和 IPv6）**：连着时 `sudo systemctl kill -s KILL openweir.service`：几秒内服务重启，期间和之后
+   `ip rule`、`ip -6 rule`、`ip route show table 9347` 里没有留下 OpenWeir 的东西，`ping -4`、`ping -6`（网络有 IPv6 时）和
+   浏览照常，服务为属主恢复隧道。再用 `sudo kill -STOP <MainPID>` 让服务挂住：网络不通；`sudo systemctl stop
+   openweir.service`（systemd 先发 SIGTERM，超时后 SIGKILL）之后恢复。
+4. **升级（界面在运行）**：开着界面并连着，装下一个预览版（版本号相同时加 `--reinstall`）：界面马上自己退出（不是 15 秒
+   后被结束），隧道不断；服务重启后隧道恢复，两个单元仍启用。
+5. **系统代理**：
+   - GNOME：先设一个自己的手动代理，再开系统代理连接：`gsettings get org.gnome.system.proxy mode` 是 `'manual'`，
+     Firefox、Chromium 经代理；断开后原来的设置原样回来。
+   - KDE：`kreadconfig6 --file kioslaverc --group 'Proxy Settings' --key ProxyType` 与系统设置的显示一致，Firefox、
+     Dolphin 经代理，断开后写回。
+   - 两边都要：第 3 步的崩溃后、注销再登录后也写回。
+   - Xfce 等其他桌面：系统代理一行不可用，写「仅 GNOME 和 KDE 支持系统代理」；新安装默认只开 TUN。
+6. **认领与接管**（D66）：标准用户是属主；另一个 sudo（Fedora 是 wheel）组的用户经快速切换用户登录：看到「接管」，
+   pkexec 的对话框要密码；取消时什么都不变，确认后服务重启、他能连接，原属主的系统代理写回。不在 sudo、wheel、admin 组的
+   用户看不到「接管」。SSH 登录的用户和别人会话里的程序不能认领。**Ubuntu 22.04 的 polkit 0.105**：确认
+   `pkexec /opt/openweir/openweir-service -take-over` 弹出的是「从其他用户接管 OpenWeir 的隧道」那一条提示：两个动作的
+   `exec.path` 相同，只靠 `exec.argv1` 区分，老版本的 polkit 不认它时提示会是更新的那条（两者都要管理员，权限不变，
+   但要记下来并回到 D62、D66 重新决定）。
+7. **会话与睡眠**：属主注销时隧道停止，再登录后恢复；睡眠唤醒后恢复；开机后先登录的其他用户不走属主的隧道。
+8. **桌面**：
+   - 托盘：GNOME 没装 AppIndicator 扩展时没有托盘，「关闭窗口时」只能选退出，关窗口先断开再退出；装上扩展（或在 KDE 上）
+     有托盘图标，颜色看得清，「留在托盘」可用，单击打开窗口。
+   - 已打开时再从应用菜单或 Dock 打开：窗口到前台，Wayland 和 X11 会话都试；光标不一直转圈。
+   - Ctrl+Q 先断开再退出；注销时界面直接退出，不断开（服务按 D5 处理）。
+   - 「登录时打开」：`~/.config/autostart/org.openweir.app.desktop` 出现，下次登录时界面进托盘（没有托盘时显示窗口）并
+     自动连接一次；关掉后文件删除。
+   - 一键导入：浏览器里的 `openweir://` 和 `clash://` 链接打开导入表单；事先让 `~/.config/mimeapps.list` 的
+     `x-scheme-handler/clash` 指向一个已经删除的客户端，确认界面启动后清掉了这一项、别的不动。
+   - 凭据：Google Drive 登录后注销再登录不用重登（GNOME Keyring、KWallet）；没有 Secret Service 的会话里写凭据库
+     不可用，不崩溃。
+   - 中英文、浅色与深色、125% / 150% 缩放，只用键盘走完各页，Orca 读一遍主要页面。
+9. **删除与清除**：`sudo apt remove openweir`：服务停止，`/var/lib/openweir` 保留；`sudo apt purge openweir`：它也删掉；
+   `~/.local/share/OpenWeir` 都不动。`sudo dnf remove openweir` 保留 `/var/lib/openweir`。
+
+往 `package/linux/system-libraries.toml` 加系统库之前，先确认支持的最老发行版（x64：Ubuntu 22.04、Debian 12；arm64：
+Ubuntu 24.04、Debian 13）和 Fedora 41 都有它；CI 的 `linux-install` 在这些发行版的容器里装一遍，缺了会失败。
+
 ## 3. 已知限制
 
 - macOS 的登录项启动 app 后会显示窗口；Windows 的登录任务仅进入托盘。
 - WARP 注册使用第三方接口，服务方变动或限流可能导致失败；失败时拒绝连接，不切换到未经选择的出口。
-- Tor 出口尚未实现，见 1.4 节。
+- Tor 出口尚未实现，见 1.5 节。
+- Linux 只有不签名的预览版，界面不提供应用内安装（1.5 节）；同一版本号的两个预览版要 `--reinstall` 才装得上。系统代理只在
+  GNOME 和 KDE 上可用；GNOME 没装 AppIndicator 扩展时没有托盘，关闭窗口即退出；TUN 对整台机器生效，只有坐在机器前的
+  用户能打开它。
 - Windows 安装包的签名刚开始还没有 SmartScreen 信誉，最初的一些版本下载后仍可能看到 SmartScreen 的提示（发布者
   一栏是 `OpenWeir`），直到微软积累了足够的下载和安装数据。
 
@@ -327,7 +398,7 @@ exits.md 第 9 节的待实测项。
 部署分支只允许 `main`，签名用的机密和变量都放在这里（release.md 1.1、本文 2.8 节）。步骤：
 
 1. **在 develop 上准备**：提交用约定式提交（`feat:` 升次版本，`fix:` 等其他类型升修订号，`!` 或 `BREAKING CHANGE:`
-   升主版本）。每次推送 develop、CI 全绿后发一个预览版（release.md 1.2），先在测试 Mac 和 Windows 虚拟机上试它。
+   升主版本）。每次推送 develop、CI 全绿后发一个预览版（release.md 1.2），先在测试 Mac、Windows 和 Linux 虚拟机上试它（Linux 按 2.9 节）。
    确认 `src/core/go.mod` 的 `replace` 固定的是 `openweir/mihomo` 上一个已发布的内核版本，也就是 `openweir-v<内核版本>`
    标签指向的提交（5.4 节）。这个标签由内核发版自动打出，以后变基强推 `main` 时它仍然取得到，不需要另打标签：
 
@@ -406,7 +477,7 @@ exits.md 第 9 节的待实测项。
   随之加一；已经发布的迁移不再修改。每个迁移都要有测试：用上一个版本的表结构和数据建库，打开后数据完整
   （[storage.md](storage.md) 第 2 节）。
 - **存下的格式要让后来的版本能读**：数据库里的设置和记录、备份快照（`openweir-backup`，版本 2）、方案 JSON（版本 1，
-  [routing.md](routing.md) §8.5）、Windows 服务 home 里的 `profile.json`、`state.json` 和 `owner.json`。只加有默认值的
+  [routing.md](routing.md) §8.5）、Windows 和 Linux 服务 home 里的 `profile.json`、`state.json` 和 `owner.json`。只加有默认值的
   字段；不得不改格式时升版本号，并保留读旧版本的代码。旧版本的应用遇到新格式时：数据库改名放到一边
   （`.bad`）、换一个空库，快照拒绝恢复（`newer_backup`）。
 
@@ -430,6 +501,10 @@ exits.md 第 9 节的待实测项。
   subconv 自己的 `testdata/<格式>/input.*`，新版加了格式就照样补一份。subconv 改了警告代码或略去规则的写法时，同步
   `host/base.py` 的 `NODE_LEFT_OUT`、`RULE_LEFT_OUT` 和模拟宿主（`tests/support/simulated_core.py`）。路由模板的主机
   和清单格式归 subconv 的 `rules` 包，升级时读它的 docs/rules.md。
+- **Linux 打包**：nfpm 以 `go run github.com/goreleaser/nfpm/v2/cmd/nfpm@<版本>` 运行，版本是 `scripts/build_linux.py` 的
+  `NFPM_VERSION`（现为 v2.48.0），换版本就改这里，再看 `tests/test_build_linux.py` 和 CI 的 `linux-package`、`linux-install`。
+  CI 的容器镜像（`ubuntu:22.04`、`debian:12`、`debian:13`、`fedora:41`）只写到标签：x64 的构建镜像决定 glibc 的下限
+  （`build_linux.TARGETS`），换它要同时改那里和支持的最老发行版；Fedora 41 到期后改成仍受支持的最老版本。
 - **构建工具**：Nuitka 和 dmgbuild 在 `pyproject.toml` 的 `build` 依赖组里，锁在 `uv.lock`；CI 和发布的 Windows 构建用 Chocolatey 装固定版本的 NSIS
   （`package/windows/install-nsis.ps1` 的 `$Version`，现为 3.13.0，`--allow-downgrade` 盖过 runner 镜像自带的版本），换版本
   就改这里。XcodeGen 是唯一没有固定版本的：Homebrew 只装它当前的版本，CI 的日志里有 `xcodegen --version`；新版本生成的
