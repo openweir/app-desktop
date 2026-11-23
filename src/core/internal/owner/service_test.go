@@ -738,7 +738,7 @@ func TestClaimRestartGivesTheProxyToTheFormerOwner(t *testing.T) {
 			if signedIn && (saved || m.proxies[alice] != theirs) {
 				t.Fatalf("saved %v, alice's proxy %+v as the service stopped", saved, m.proxies[alice])
 			}
-			if !signedIn && (!saved || m.proxies[alice] != sysproxy.Core(7890)) {
+			if !signedIn && (!saved || m.proxies[alice] != sysproxy.Core(9347)) {
 				t.Fatalf("saved %v, alice's proxy %+v while she is away", saved, m.proxies[alice])
 			}
 			if record, _, _ := LoadRecord(root); record != (Record{SID: bob, Session: 2}) {

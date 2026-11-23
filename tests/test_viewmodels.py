@@ -120,16 +120,28 @@ def test_while_the_window_hides_only_the_status_is_polled(
 
         return counted
 
-    for name in ("get_status", "poll_traffic", "poll_connections", "list_groups"):
+    for name in ("get_status", "poll_traffic", "poll_connections"):
         monkeypatch.setattr(host, name, counting(name))
+    # The overview's own refreshes, by what they ask for: other pages may still read the groups
+    # once (the proxies page on a connection change), which is not the overview polling them.
+    asked: list[dict[str, bool]] = []
+    refresh = overview._session.refresh
+
+    def recording(**kwargs: bool) -> Any:
+        asked.append(kwargs)
+        return refresh(**kwargs)
+
+    monkeypatch.setattr(overview._session, "refresh", recording)
     overview.refreshGroups()
-    qtbot.waitUntil(lambda: calls.count("get_status") >= 2, timeout=5000)
+    qtbot.waitUntil(lambda: calls.count("get_status") >= 2 and len(asked) >= 2, timeout=15000)
     qtbot.waitUntil(lambda: not overview._refreshing)
     assert set(calls) == {"get_status"}
+    assert all(not a["include_groups"] and not a["include_traffic"] for a in asked)
     assert prop(overview, "connected")
 
     view_models.desktop.setWindowShown(True)
-    qtbot.waitUntil(lambda: {"poll_traffic", "poll_connections", "list_groups"} <= set(calls))
+    qtbot.waitUntil(lambda: {"poll_traffic", "poll_connections"} <= set(calls))
+    qtbot.waitUntil(lambda: any(a["include_groups"] and a["include_traffic"] for a in asked))
     assert connections._timer.isActive()
     assert logs._timer.interval() == POLL_MS
 
@@ -299,7 +311,7 @@ def test_a_failed_connection_returns_the_switch(qtbot: QtBot, view_models: ViewM
     qtbot.waitUntil(lambda: not prop(overview, "busy"))
     assert not prop(overview, "connectionOn")
     assert prop(overview, "connectionFailed")
-    assert prop(overview, "connectionDetail") == "未能打开端口或 TUN：mixed-port 7890"  # noqa: RUF001
+    assert prop(overview, "connectionDetail") == "未能打开端口或 TUN：mixed-port 9347"  # noqa: RUF001
     assert prop(overview, "statusDetail") == ""  # the reason is the switch's
     host.busy_ports.clear()
     overview.setConnected(True)
