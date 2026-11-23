@@ -705,7 +705,8 @@ def test_in_english_the_links_say_they_open_the_browser(qtbot: QtBot, window: Lo
     qtbot.waitUntil(lambda: "account" in listed(view_models), timeout=WAIT)
     view_models.shell.setPage("account")
     account = view_models.account
-    qtbot.waitUntil(lambda: prop(account, "walletBalance").startswith("¥"), timeout=WAIT)
+    # The wallet can come before the sync that brings the subscriptions and their 续费.
+    qtbot.waitUntil(lambda: ready(view_models), timeout=WAIT)
     page = window.item(lambda i: kind(i) == "AccountPage")
     renew = button(page, "Renew")
     assert accessible(renew).name == "Renew (opens in browser)"

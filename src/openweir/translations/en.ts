@@ -387,7 +387,7 @@
     </message>
     <message>
         <source>这个账户的订阅会从本机移除</source>
-        <translation>This account’s subscriptions are removed from this device</translation>
+        <translation>This account’s subscriptions are removed from this computer</translation>
     </message>
     <message>
         <source>刷新</source>
@@ -406,7 +406,7 @@
     </message>
     <message>
         <source>需要重新登录 · {site}</source>
-        <translation>Sign in again · {site}</translation>
+        <translation>Sign-in required · {site}</translation>
     </message>
     <message>
         <source>账户已停用 · {site}</source>
@@ -425,18 +425,6 @@
         <translation>{account} · {site}</translation>
     </message>
     <message>
-        <source>没有订阅链接</source>
-        <translation>No subscription link</translation>
-    </message>
-    <message>
-        <source>有效</source>
-        <translation>Active</translation>
-    </message>
-    <message>
-        <source>试用 · {status}</source>
-        <translation>Trial · {status}</translation>
-    </message>
-    <message>
         <source>长期有效</source>
         <translation>Never expires</translation>
     </message>
@@ -447,8 +435,8 @@
     <message numerus="yes">
         <source>%n 台在线 · 不限台数</source>
         <translation>
-            <numerusform>%n online · no limit</numerusform>
-            <numerusform>%n online · no limit</numerusform>
+            <numerusform>%n online · no device limit</numerusform>
+            <numerusform>%n online · no device limit</numerusform>
         </translation>
     </message>
     <message>
@@ -516,7 +504,7 @@
     </message>
     <message>
         <source>新购</source>
-        <translation>New</translation>
+        <translation>New purchase</translation>
     </message>
     <message>
         <source>续费</source>
@@ -569,14 +557,6 @@
     <message>
         <source>已退款</source>
         <translation>Refunded</translation>
-    </message>
-    <message>
-        <source>账户已停用</source>
-        <translation>Account disabled</translation>
-    </message>
-    <message>
-        <source>需要重新登录</source>
-        <translation>Sign in again</translation>
     </message>
     <message>
         <source>{used} · 不限流量</source>
@@ -1477,7 +1457,7 @@
     </message>
     <message>
         <source>这个服务商已登录另一个账户</source>
-        <translation>Another account of this provider is signed in</translation>
+        <translation>Another account is signed in to this provider</translation>
     </message>
     <message>
         <source>需要重新登录服务商</source>
@@ -1501,7 +1481,7 @@
     </message>
     <message>
         <source>服务商没有提供订阅链接</source>
-        <translation>The provider gives no subscription link</translation>
+        <translation>The provider doesn’t offer a subscription link</translation>
     </message>
     <message>
         <source>服务商暂不向应用提供配置</source>
@@ -2558,7 +2538,7 @@ prepend-rules:
     </message>
     <message>
         <source>登录服务商</source>
-        <translation>Sign in to provider</translation>
+        <translation>Sign in to a provider</translation>
     </message>
     <message>
         <source>接管其他用户的隧道？</source>
@@ -3332,7 +3312,7 @@ prepend-rules:
     </message>
     <message>
         <source>登录服务商…</source>
-        <translation>Sign in to provider…</translation>
+        <translation>Sign in to a provider…</translation>
     </message>
     <message>
         <source>编辑信息…</source>
@@ -3488,60 +3468,6 @@ prepend-rules:
             <numerusform>Update every %n hours</numerusform>
         </translation>
     </message>
-    <message numerus="yes">
-        <source>%n 天后到期</source>
-        <translation>
-            <numerusform>Expires in %n day</numerusform>
-            <numerusform>Expires in %n days</numerusform>
-        </translation>
-    </message>
-    <message numerus="yes">
-        <source>%n 小时后到期</source>
-        <translation>
-            <numerusform>Expires in %n hour</numerusform>
-            <numerusform>Expires in %n hours</numerusform>
-        </translation>
-    </message>
-    <message>
-        <source>流量已用 {percent}%</source>
-        <translation>{percent}% of traffic used</translation>
-    </message>
-    <message>
-        <source>流量已用完</source>
-        <translation>Traffic used up</translation>
-    </message>
-    <message>
-        <source>未开始</source>
-        <translation>Not started</translation>
-    </message>
-    <message>
-        <source>已到期</source>
-        <translation>Expired</translation>
-    </message>
-    <message>
-        <source>已停用</source>
-        <translation>Disabled</translation>
-    </message>
-    <message>
-        <source>暂不可用</source>
-        <translation>Unavailable for now</translation>
-    </message>
-    <message>
-        <source>需要重新登录</source>
-        <translation>Sign-in required</translation>
-    </message>
-    <message>
-        <source>账户已停用</source>
-        <translation>Account disabled</translation>
-    </message>
-    <message>
-        <source>已不在账户中</source>
-        <translation>No longer in the account</translation>
-    </message>
-    <message>
-        <source>没有订阅链接</source>
-        <translation>No subscription link</translation>
-    </message>
     <message>
         <source>「{name}」</source>
         <translation>“{name}”</translation>
@@ -3580,10 +3506,6 @@ prepend-rules:
     <message>
         <source>{removed}服务商那边的订阅不受影响。</source>
         <translation>{removed} The subscriptions stay with the provider.</translation>
-    </message>
-    <message>
-        <source>试用</source>
-        <translation>Trial</translation>
     </message>
     <message>
         <source>服务商</source>
@@ -3791,7 +3713,7 @@ prepend-rules:
     </message>
     <message>
         <source>登录服务商</source>
-        <translation>Sign in to provider</translation>
+        <translation>Sign in to a provider</translation>
     </message>
     <message>
         <source>输入身份验证器中的验证码。</source>
@@ -3804,15 +3726,15 @@ prepend-rules:
     <message numerus="yes">
         <source>将移除它的 %n 份订阅，改用「{successor}」的规则。</source>
         <translation>
-            <numerusform>Its %n subscription will be removed, and the rules of “{successor}” used instead.</numerusform>
-            <numerusform>Its %n subscriptions will be removed, and the rules of “{successor}” used instead.</numerusform>
+            <numerusform>Its %n subscription will be removed. The rules of “{successor}” take over.</numerusform>
+            <numerusform>Its %n subscriptions will be removed. The rules of “{successor}” take over.</numerusform>
         </translation>
     </message>
     <message numerus="yes">
         <source>将移除它的 %n 份订阅，改用我的方案。</source>
         <translation>
-            <numerusform>Its %n subscription will be removed, and my plan used instead.</numerusform>
-            <numerusform>Its %n subscriptions will be removed, and my plan used instead.</numerusform>
+            <numerusform>Its %n subscription will be removed. My plan takes over.</numerusform>
+            <numerusform>Its %n subscriptions will be removed. My plan takes over.</numerusform>
         </translation>
     </message>
     <message numerus="yes">
@@ -3832,7 +3754,7 @@ prepend-rules:
     </message>
     <message>
         <source>邮箱或用户名</source>
-        <translation>Email or user name</translation>
+        <translation>Email or username</translation>
     </message>
     <message>
         <source>邮箱</source>
@@ -3855,9 +3777,16 @@ prepend-rules:
         <translation>Send code</translation>
     </message>
     <message>
-        <source>试用 · {status}</source>
-        <translation>Trial · {status}</translation>
+        <source>已用 {usage}</source>
+        <translation>{usage} used</translation>
     </message>
+    <message>
+        <source>{date} 到期</source>
+        <translation>Expires {date}</translation>
+    </message>
+</context>
+<context>
+    <name>ProviderText</name>
     <message numerus="yes">
         <source>%n 天后到期</source>
         <translation>
@@ -3865,17 +3794,16 @@ prepend-rules:
             <numerusform>Expires in %n days</numerusform>
         </translation>
     </message>
+    <message numerus="yes">
+        <source>%n 小时后到期</source>
+        <translation>
+            <numerusform>Expires in %n hour</numerusform>
+            <numerusform>Expires in %n hours</numerusform>
+        </translation>
+    </message>
     <message>
         <source>流量已用 {percent}%</source>
         <translation>{percent}% of traffic used</translation>
-    </message>
-    <message>
-        <source>有效</source>
-        <translation>Active</translation>
-    </message>
-    <message>
-        <source>已到期</source>
-        <translation>Expired</translation>
     </message>
     <message>
         <source>流量已用完</source>
@@ -3886,20 +3814,44 @@ prepend-rules:
         <translation>Not started</translation>
     </message>
     <message>
+        <source>已不在账户中</source>
+        <translation>No longer in the account</translation>
+    </message>
+    <message>
+        <source>没有订阅链接</source>
+        <translation>No subscription link</translation>
+    </message>
+    <message>
+        <source>需要重新登录</source>
+        <translation>Sign-in required</translation>
+    </message>
+    <message>
+        <source>账户已停用</source>
+        <translation>Account disabled</translation>
+    </message>
+    <message>
+        <source>有效</source>
+        <translation>Active</translation>
+    </message>
+    <message>
+        <source>试用 · {status}</source>
+        <translation>Trial · {status}</translation>
+    </message>
+    <message>
+        <source>试用</source>
+        <translation>Trial</translation>
+    </message>
+    <message>
+        <source>已到期</source>
+        <translation>Expired</translation>
+    </message>
+    <message>
         <source>已停用</source>
         <translation>Disabled</translation>
     </message>
     <message>
         <source>暂不可用</source>
         <translation>Unavailable</translation>
-    </message>
-    <message>
-        <source>已用 {usage}</source>
-        <translation>{usage} used</translation>
-    </message>
-    <message>
-        <source>{date} 到期</source>
-        <translation>Expires {date}</translation>
     </message>
 </context>
 <context>

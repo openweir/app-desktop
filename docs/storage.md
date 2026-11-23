@@ -17,7 +17,8 @@
     （[exits.md](exits.md) 第 8 节）；
   - 应用内组网网络的凭据（系统凭据库），不进备份；网络本身进备份（[mesh.md](mesh.md) 10.2 节）。
   - 服务商账户的会话令牌（系统凭据库的 `provider:<服务商 id>`，D56）和订阅链接（只在内存里，D57），都不进数据库和
-    备份（[accounts.md](accounts.md) 4.1 节）。
+    备份（[accounts.md](accounts.md) 4.1 节）；账户页的钱包、套餐和订单每次显示时向服务商读取，不存储
+    （accounts.md 6.1 节）。
 - **读写方**：数据库只由界面进程以当前用户身份读写。服务和系统扩展都不访问它，它们从宿主请求里拿到配置。
 
 ## 2. 本地数据库
@@ -62,7 +63,7 @@
 | `state` | 只属于本机的状态（`key`、`value`（JSON）、`updated_at`）：每个备份目标上次上传的快照摘要（`backup_digest:<目标 id>`）；VPN Gate 出口的服务器列表、在用的服务器和近一小时失效的服务器（`vpngate`，exits.md 5.2 节） |
 | `backup_targets` | 已开启的备份目标：`id`、提供方、显示用的账户名、上次成功备份的时间、上次的错误、`created_at`、`updated_at`、`deleted_at`。不存令牌（见 4 节） |
 | `providers` | 登录过的服务商（数据库 v4，[accounts.md](accounts.md) 5.1 节）：`id`、`origin`、`name`（站点名）、`account`（显示的账户名）、`user_id`（服务商的用户 id）、`position`、`created_at`、`updated_at`、`deleted_at`。退出登录是软删除。令牌不在这里，在系统凭据库 |
-| `provider_subscriptions` | 服务商的每份配置上次同步时的账单（数据库 v4）：`profile_id`、`data`（`RemoteSubscription.record()` 的 JSON，不含订阅链接）、`synced_at`。这是本机缓存，不进备份；配置删除时（`delete_config`）、服务商退出登录时、恢复备份后配置已不在时一并删除 |
+| `provider_subscriptions` | 服务商的每份配置上次同步时的账单（数据库 v4）：`profile_id`、`data`（`RemoteSubscription.record()` 的 JSON，不含订阅链接）、`synced_at`。这是本机缓存，不进备份；同步发现订阅已不在账户中时删除这一行（配置留着，所以没有这一行的服务商配置就是「已不在账户中」），配置删除时（`delete_config`）、服务商退出登录时、恢复备份后配置已不在时一并删除 |
 | `mesh_networks` | 应用内添加的组网网络：`id`、`kind`（`tailscale` / `zerotier` / `easytier`）、`name`、`via`、`settings`（JSON，不含凭据）、`position`、`created_at`、`updated_at`、`deleted_at`。凭据在系统凭据库（mesh.md 10.2 节） |
 
 当前使用的配置存在 `routing_state` 里，作为"订阅自带"时用的配置（routing.md 第 9 节），不在 `state` 里。

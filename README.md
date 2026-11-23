@@ -29,7 +29,7 @@
 
 ---
 
-OpenWeir manages your proxy subscriptions, nodes and routing rules. There is no OpenWeir account to create: import your own subscription or configuration and start.
+OpenWeir manages your proxy subscriptions, nodes and routing rules. OpenWeir itself has no account and no servers of its own: import your own subscription or configuration and start. If your provider runs an OpenWeir panel, you can also sign in to it and use your account's subscriptions directly; signing in is optional.
 
 The user guide, development and other documents under `docs/` are in Chinese.
 
@@ -44,6 +44,7 @@ The user guide, development and other documents under `docs/` are in Chinese.
 
 - **One switch to connect**: on Windows choose TUN, the system proxy or both; on macOS a Network Extension takes over traffic. The overview shows the connection state, current mode and live traffic.
 - **Subscriptions in one place**: import subscriptions in any common format (mihomo/Clash, sing-box, Xray, share links, Surge, Loon, Shadowrocket, Quantumult X, SIP008), or local configuration files, refresh them on a schedule, and import with one click from `openweir://`, `clash://`, `mihomo://` and `clashmeta://` links. Overrides apply to all subscriptions or to one.
+- **Provider accounts (optional)**: sign in to one or more OpenWeir providers, and the subscriptions in your accounts show up next to your others. The Account page shows traffic, expiry, wallet, plans and orders; renewing and paying happen on the provider's website.
 - **Use the subscription's rules, or build your own**: pool nodes from several subscriptions, group them by region, create policy groups, and route by service, domain and IP range. The rule tester previews which rule a site will take; routing setups can be imported and exported.
 - **Choose and troubleshoot nodes**: switch between rule, global and direct modes, pick policy groups and nodes, run HTTP or TCP handshake latency tests, and view the connection list and core logs.
 
@@ -95,7 +96,7 @@ Install locations, the SmartScreen prompt, updating and uninstalling are covered
 
 ## Privacy
 
-OpenWeir collects no usage statistics and never uploads logs or crash reports automatically. Subscriptions, configuration and settings stay on this computer; it only makes the network requests a feature needs, to subscription servers, proxy nodes, the update service or the cloud backup service you choose.
+OpenWeir collects no usage statistics and never uploads logs or crash reports automatically. Subscriptions, configuration and settings stay on this computer; it only makes the network requests a feature needs, to subscription servers, proxy nodes, the update service, the cloud backup service you choose or the OpenWeir provider you sign in to.
 
 Diagnostic files may contain visited domains, node names or error text, and you decide whether to export and share them. Data storage, cloud backup and third-party services are described in full in the [privacy notice](PRIVACY.md).
 
