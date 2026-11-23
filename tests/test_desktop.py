@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from PySide6.QtCore import QCoreApplication
+from PySide6.QtCore import SIGNAL, QCoreApplication, Qt
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQuick import QQuickWindow
 from pytestqt.qtbot import QtBot
@@ -410,6 +410,28 @@ def test_opened_into_the_menu_bar_qt_does_not_activate_openweir() -> None:
     assert environ == {}
     open_in_menu_bar(environ, platform="darwin")
     assert environ == {QT_NO_FOREGROUND_ENV: "1"}
+
+
+@pytest.mark.parametrize("platform", ["win32", "darwin"])
+def test_becoming_active_is_told_on_every_platform(
+    qapp: QCoreApplication, tmp_path: Path, platform: str
+) -> None:
+    """Back from the browser, a provider's account syncs (D58); only macOS's Dock reopens
+    the window."""
+    settings = DatabaseSettingsStore(open_database(tmp_path))
+    desktop = DesktopViewModel(settings, tray_available=True, platform=platform)
+    heard: list[str] = []
+    desktop.activated.connect(lambda: heard.append("activated"))
+    desktop.reopened.connect(lambda: heard.append("reopened"))
+    app = QGuiApplication.instance()
+    assert isinstance(app, QGuiApplication)
+    app.applicationStateChanged.emit(Qt.ApplicationState.ApplicationInactive)
+    app.applicationStateChanged.emit(Qt.ApplicationState.ApplicationActive)
+    assert heard == (["activated", "reopened"] if platform == "darwin" else ["activated"])
+    # The subscriptions page takes it up, where the accounts sync.
+    store = ProfileStore(tmp_path / "composed")
+    composed = compose(SimulatedHost(), store, SimulatedFetcher())
+    assert composed.desktop.receivers(SIGNAL("activated()")) == 1
 
 
 @pytest.mark.parametrize(("platform", "tray"), [("win32", True), ("darwin", False)])

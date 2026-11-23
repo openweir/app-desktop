@@ -13,7 +13,15 @@ ScrollView {
     property bool importOpen: false
     property Item overrideTrigger  // gets focus back when the override editor closes
     property int overrideFocusReason: Qt.OtherFocusReason
-    property string removingId  // the profile whose removal was confirmed
+    // The profiles whose removal, or whose account's sign-out, was confirmed.
+    property var removingIds: []
+    // What opened the provider sign-in dialog last (登录服务商…, 重新登录…), which gets focus
+    // back when it closes.
+    property Item signInTrigger
+    property int signInFocusReason: Qt.OtherFocusReason
+    // The page's one primary action (DESIGN.md "添加菜单"); the focus goes there when there is
+    // nowhere else, such as after the last row went.
+    readonly property alias addButton: addMenuButton
 
     readonly property int tableMinWidth: 680
     readonly property int usageWidth: 170
@@ -25,7 +33,7 @@ ScrollView {
         urlField.forceActiveFocus()
     }
 
-    // Closing the form hands its focus back to the button that opened it.
+    // Closing the form hands its focus back to the button whose menu opened it.
     function closeImport() {
         const focused = Window.activeFocusItem
         const refocus = Focus.within(focused, importForm)
@@ -35,7 +43,18 @@ ScrollView {
         autoUpdate.setInterval(true, 0)
         page.profiles.clearImportError()
         if (refocus)
-            linkButton.forceActiveFocus(Focus.reasonAfter(focused))
+            addMenuButton.forceActiveFocus(Focus.reasonAfter(focused))
+    }
+
+    // The provider sign-in dialog, which the window opens: on the provider of the
+    // subscription `profileId`, or on no address for "". `trigger` gets the focus back.
+    function requestSignIn(trigger: Item, reason: int, profileId: string) {
+        signInTrigger = trigger
+        signInFocusReason = reason
+        if (profileId === "")
+            page.profiles.requestProviderSignIn("")
+        else
+            page.profiles.signInAgain(profileId)
     }
 
     // The import form as the user left it, which the window keeps while it lets the page go
@@ -61,16 +80,34 @@ ScrollView {
         return profileRepeater.itemAt(Math.max(0, Math.min(index, profileRepeater.count - 1))) as ProfileRow
     }
 
+    // The row that takes the place of one at `index` that went: the first after it that
+    // stays, else the last before it; null when none stays.
+    function survivor(index: int): ProfileRow {
+        for (let i = index; i < profileRepeater.count; i++) {
+            const row = profileRepeater.itemAt(i) as ProfileRow
+            if (!removingIds.includes(row.profileId))
+                return row
+        }
+        for (let i = Math.min(index, profileRepeater.count) - 1; i >= 0; i--) {
+            const row = profileRepeater.itemAt(i) as ProfileRow
+            if (!removingIds.includes(row.profileId))
+                return row
+        }
+        return null
+    }
+
     // A removed row takes the focus with it, so the focus moves to the row that takes its
-    // place, or the one above when it was the last; with no rows left, to the import button.
-    // While the confirmation is still closing, it hands its focus there instead.
+    // place, or the one above when it was the last; with no rows left, to 添加. Signing out
+    // removes several rows at once: the focus skips those that go too. While the
+    // confirmation is still closing, it hands its focus there instead.
     function rowRemoved(index: int, row: ProfileRow) {
-        if (row.profileId !== removingId)
+        if (!removingIds.includes(row.profileId))
             return
-        removingId = ""
-        const next = profileRepeater.count > 0 ? rowAt(index).moreButton : linkButton
-        if (removeDialog.visible)
-            removeDialog.returnFocusTo = next
+        removingIds = removingIds.filter(id => id !== row.profileId)
+        const next = survivor(index)?.moreButton ?? addMenuButton
+        const dialog = removeDialog.visible ? removeDialog : signOutDialog.visible ? signOutDialog : null
+        if (dialog)
+            dialog.returnFocusTo = next
         else if (row.moreButton.activeFocus)
             next.forceActiveFocus(removeDialog.returnFocusReason)
     }
@@ -123,6 +160,10 @@ ScrollView {
             removeDialog.showFor(profileMenu.trigger, profileMenu.triggerFocusReason)
         }
 
+        function onSignOutRequested() {
+            signOutDialog.showFor(profileMenu.trigger, profileMenu.triggerFocusReason)
+        }
+
         function onOverrideOpened() {
             overrideDialog.showFor(page.overrideTrigger, page.overrideFocusReason)
         }
@@ -145,28 +186,14 @@ ScrollView {
             detail: page.profiles.summary
             detailColor: page.profiles.hasError ? Theme.danger : Theme.textMuted
 
-            AppButton {
-                id: nodeLinksButton
+            // Every way to add a subscription (DESIGN.md "添加菜单"). It is the page's one
+            // primary action; the form's own button takes over while the form is open.
+            MenuButton {
+                id: addMenuButton
 
-                text: qsTr("导入节点")
-                enabled: !page.profiles.importing
-                onClicked: nodeLinksDialog.showFor(nodeLinksButton, Focus.reasonAfter(nodeLinksButton))
-            }
-
-            AppButton {
-                text: qsTr("导入文件")
-                enabled: !page.profiles.importing
-                onClicked: fileDialog.open()
-            }
-
-            // The page's one primary action; the form's own button takes over while it is open.
-            AppButton {
-                id: linkButton
-
-                text: qsTr("从链接导入")
+                text: qsTr("添加")
                 variant: page.importOpen ? "secondary" : "primary"
-                enabled: !page.importOpen
-                onClicked: page.openImport()
+                menu: addMenu
             }
         }
 
@@ -477,13 +504,23 @@ ScrollView {
         required property string autoUpdateLabel
         required property bool inPool
         required property bool hasRules
+        required property bool canAutoUpdate
+        required property bool isProvider
+        required property string status
+        required property bool statusDanger
+        required property bool canRemove
+        required property bool canRenew
+        required property bool needsSignIn
+        required property string providerName
         readonly property alias moreButton: moreButton
+        // The caption as it reads: where it comes from, then its note and status.
+        readonly property string caption: [source, note, status].filter(part => part !== "").join(qsTr(" · "))
 
         Layout.fillWidth: true
         implicitHeight: Theme.rowDouble
         Accessible.role: Accessible.ListItem
         Accessible.name: name
-        Accessible.description: qsTr("%1。用量 %2，到期 %3，更新 %4").arg(note ? qsTr("%1 · %2").arg(source).arg(note) : source).arg(usage).arg(expiry).arg(updated)
+        Accessible.description: qsTr("%1。用量 %2，到期 %3，更新 %4").arg(caption).arg(usage).arg(expiry).arg(updated)
         // A right-click opens its menu at the pointer (DESIGN.md "右键菜单").
         ContextMenu.onRequested: position => profileMenu.openContext(profileRow.moreButton, profileRow, position)
 
@@ -543,12 +580,21 @@ ScrollView {
                     }
 
                     // What the core left out reading it (D54), as DESIGN.md "分组与行" colours
-                    // a warning.
+                    // a warning; a line has one, and a provider's status comes first.
                     UiText {
-                        visible: profileRow.leftOut !== ""
+                        visible: profileRow.leftOut !== "" && profileRow.status === ""
                         text: qsTr(" · %1").arg(profileRow.leftOut)
                         role: Theme.type.caption
                         color: Theme.warning
+                    }
+
+                    // What the account says of a provider's subscription (DESIGN.md "服务商的
+                    // 订阅行"): danger when the provider stopped it.
+                    UiText {
+                        visible: profileRow.status !== ""
+                        text: qsTr(" · %1").arg(profileRow.status)
+                        role: Theme.type.caption
+                        color: profileRow.statusDanger ? Theme.danger : Theme.warning
                     }
 
                     Item {
@@ -608,22 +654,60 @@ ScrollView {
     }
 
     AppMenu {
+        id: addMenu
+
+        AppMenuItem {
+            text: qsTr("从链接导入…")
+            enabled: !page.profiles.importing
+            onTriggered: page.openImport()
+        }
+
+        AppMenuItem {
+            text: qsTr("导入文件…")
+            enabled: !page.profiles.importing
+            onTriggered: fileDialog.open()
+        }
+
+        AppMenuItem {
+            text: qsTr("导入节点…")
+            enabled: !page.profiles.importing
+            onTriggered: nodeLinksDialog.showFor(addMenu.trigger, addMenu.triggerFocusReason)
+        }
+
+        AppMenuItem {
+            text: qsTr("登录服务商…")
+            separatorBefore: true
+            onTriggered: page.requestSignIn(addMenu.trigger, addMenu.triggerFocusReason, "")
+        }
+    }
+
+    // A provider's subscription has the account's name, no link, and goes with the account,
+    // so its menu has neither 编辑信息… nor 复制订阅链接 nor 删除, unless the account no
+    // longer has it; it has the account's pages and sign-in instead (docs/accounts.md §7.2).
+    AppMenu {
         id: profileMenu
 
         // What the items act on, copied when the menu opens: the row may go meanwhile.
         property string profileId
         property bool isSubscription
         property bool canUpdate
+        property bool canAutoUpdate
         property bool updating
         property string refreshLabel
         property bool inPool
         property bool hasRules
         property string autoUpdateLabel
+        property bool isProvider
+        property bool canRemove
+        property bool canRenew
+        property bool needsSignIn
+        property string providerName
 
         function openFor(row: ProfileRow, anchor: Item) {
             profileId = row.profileId
             isSubscription = row.isSubscription
             canUpdate = row.canUpdate
+            canAutoUpdate = row.canAutoUpdate
             updating = row.updating
             refreshLabel = row.refreshLabel
             inPool = row.inPool
@@ -631,10 +715,16 @@ ScrollView {
             // Triggering toggles `checked` itself, so it is set here rather than bound.
             autoUpdateItem.checked = row.autoUpdate
             autoUpdateLabel = row.autoUpdateLabel
+            isProvider = row.isProvider
+            canRemove = row.canRemove
+            canRenew = row.canRenew
+            needsSignIn = row.needsSignIn
+            providerName = row.providerName
             openBelow(anchor)
         }
 
         AppMenuItem {
+            visible: !profileMenu.isProvider
             text: qsTr("编辑信息…")
             onTriggered: page.profiles.editProfile(profileMenu.profileId)
         }
@@ -650,11 +740,12 @@ ScrollView {
 
             text: profileMenu.autoUpdateLabel
             checkable: true
-            enabled: profileMenu.isSubscription
+            enabled: profileMenu.canAutoUpdate
             onTriggered: page.profiles.setAutoUpdate(profileMenu.profileId, checked)
         }
 
         AppMenuItem {
+            visible: !profileMenu.isProvider
             text: qsTr("复制订阅链接")
             enabled: profileMenu.isSubscription
             onTriggered: page.profiles.copyLink(profileMenu.profileId)
@@ -681,12 +772,42 @@ ScrollView {
             onTriggered: page.profiles.setInPool(profileMenu.profileId, !profileMenu.inPool)
         }
 
-        AppMenuSeparator {}
+        // The user center in the browser, where renewing happens (D58); the menu says so in
+        // words, as items have no icons (DESIGN.md "外链按钮").
+        AppMenuItem {
+            id: renewItem
+
+            visible: profileMenu.isProvider && profileMenu.canRenew
+            separatorBefore: true
+            text: qsTr("在网页上续费")
+            onTriggered: page.profiles.renew(profileMenu.profileId)
+        }
 
         AppMenuItem {
+            visible: profileMenu.isProvider && profileMenu.needsSignIn
+            separatorBefore: !renewItem.visible
+            text: qsTr("重新登录…")
+            onTriggered: page.requestSignIn(profileMenu.trigger, profileMenu.triggerFocusReason, profileMenu.profileId)
+        }
+
+        AppMenuItem {
+            id: removeItem
+
+            visible: profileMenu.canRemove
+            separatorBefore: true
             text: qsTr("删除")
             destructive: true
             onTriggered: page.profiles.requestRemove(profileMenu.profileId)
+        }
+
+        // It asks first, so it has no "…" (DESIGN.md "菜单"). It waits for the account to be
+        // read, which names the site.
+        AppMenuItem {
+            visible: profileMenu.isProvider && profileMenu.providerName !== ""
+            separatorBefore: !removeItem.visible
+            text: qsTr("退出「%1」").arg(profileMenu.providerName)
+            destructive: true
+            onTriggered: page.profiles.requestSignOut(profileMenu.profileId)
         }
     }
 
@@ -698,10 +819,24 @@ ScrollView {
         confirmText: qsTr("删除")
         destructive: true
         onAccepted: {
-            page.removingId = profileMenu.profileId
+            page.removingIds = [profileMenu.profileId]
             page.profiles.confirmRemove()
         }
         onRejected: page.profiles.cancelRemove()
+    }
+
+    ConfirmDialog {
+        id: signOutDialog
+
+        title: page.profiles.signOutTitle
+        message: page.profiles.signOutText
+        confirmText: qsTr("退出登录")
+        destructive: true
+        onAccepted: {
+            page.removingIds = page.profiles.signOutProfiles
+            page.profiles.confirmSignOut()
+        }
+        onRejected: page.profiles.cancelSignOut()
     }
 
     OverrideDialog {

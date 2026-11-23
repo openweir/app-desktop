@@ -385,7 +385,7 @@ def test_a_locked_credential_store_fails_closed(
     with qtbot.waitSignal(routing.applied):
         exit_.setActive(True)
     qtbot.waitUntil(lambda: prop(exit_, "error") != "")
-    assert prop(exit_, "error") == "操作失败：the keychain is locked"
+    assert prop(exit_, "error") == "无法读写系统的凭据库"
     assert prop(exit_, "status") == "不可用"
     openai_to(qtbot, routing, plans.WARP)
     assert entry_target(host, routing, "OpenAI") == "REJECT"

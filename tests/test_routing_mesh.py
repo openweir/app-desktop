@@ -377,7 +377,7 @@ def test_a_locked_credential_store_keeps_the_network_out(
     networks.openAdd()
     networks.save(values(name="家里", login="key", auth_key="k"))
     qtbot.waitUntil(lambda: prop(networks, "error") != "")
-    assert prop(networks, "error") == "操作失败：the keychain is locked"
+    assert prop(networks, "error") == "无法读写系统的凭据库"
     assert not prop(networks, "hasRows")
 
 

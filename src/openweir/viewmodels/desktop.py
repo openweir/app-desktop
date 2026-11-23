@@ -49,6 +49,9 @@ class DesktopViewModel(QObject):
     closeActionChanged = Signal()
     showWindowRequested = Signal()  # another UI started, or the tray asked for the window
     reopened = Signal()  # macOS: opened again (the Dock, the Finder); show a hidden window
+    # OpenWeir became the active application: back from the browser, say, where a provider's
+    # user center was opened (D58), so its account syncs again.
+    activated = Signal()
     quitRequested = Signal()  # leave the event loop now
     quitChanged = Signal()
     quitFailed = Signal()  # the disconnect before quitting failed; ask what to do
@@ -91,8 +94,7 @@ class DesktopViewModel(QObject):
         self._timer.setInterval(TASKBAR_POLL_MS)
         self._timer.timeout.connect(self.refreshTaskbar)
         app = QGuiApplication.instance()
-        if self._mac and isinstance(app, QGuiApplication):
-            # Qt reports every Dock click as the application becoming active.
+        if isinstance(app, QGuiApplication):
             app.applicationStateChanged.connect(self._state_changed)
 
     def start(self) -> None:
@@ -106,7 +108,11 @@ class DesktopViewModel(QObject):
         self._timer.stop()
 
     def _state_changed(self, state: Qt.ApplicationState) -> None:
-        if state == Qt.ApplicationState.ApplicationActive:
+        if state != Qt.ApplicationState.ApplicationActive:
+            return
+        self.activated.emit()
+        if self._mac:
+            # Qt reports every Dock click as the application becoming active.
             self.reopened.emit()
 
     # -- tray --------------------------------------------------------------------------------

@@ -255,6 +255,8 @@ def compose(
             proxies.refresh()
         elif shell.currentPage == "routing":
             routing.refresh()
+        elif shell.currentPage == "profiles":
+            profiles.pageShown()
         elif shell.currentPage == "settings":
             settings_page.refreshInfo()
             settings_page.refreshLoginItem()
@@ -274,6 +276,8 @@ def compose(
 
     shell.currentPageChanged.connect(page_shown)
     desktop.windowShownChanged.connect(window_shown)
+    # Back from a provider's user center in the browser, its account syncs (D58).
+    desktop.activated.connect(profiles.windowActivated)
     window_shown()
     proxies.selectionApplied.connect(overview.refreshGroups)
     profiles.applied.connect(overview.refreshGroups)
@@ -281,6 +285,9 @@ def compose(
     profiles.applied.connect(profiles_applied)
     # Signing in to a provider adds its subscriptions as profiles, and using one of them
     # changes what the tunnel runs (docs/accounts.md §7.3).
+    # 登录服务商… on the subscriptions page and the overview, and 重新登录… on a provider's row,
+    # which names the provider's address.
+    profiles.providerSignInRequested.connect(provider_sign_in.open)
     provider_sign_in.profilesChanged.connect(profiles.reload)
     provider_sign_in.profilesChanged.connect(routing.reload)
     provider_sign_in.applied.connect(overview.refreshGroups)

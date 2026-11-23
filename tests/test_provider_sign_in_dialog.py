@@ -90,10 +90,10 @@ def drain(qtbot: QtBot, loaded: Loaded) -> None:
 
 
 def page_button(qtbot: QtBot, loaded: Loaded) -> QQuickItem:
-    """The subscriptions page's 从链接导入, focused as the keyboard would."""
+    """The subscriptions page's 添加, focused as the keyboard would."""
     loaded.view_models.shell.setPage("profiles")
     qtbot.wait(100)
-    found = loaded.item(lambda i: kind(i) == "AppButton" and i.property("text") == "从链接导入")
+    found = loaded.item(lambda i: kind(i) == "MenuButton" and i.property("text") == "添加")
     found.forceActiveFocus(Qt.FocusReason.TabFocusReason)
     return found
 
