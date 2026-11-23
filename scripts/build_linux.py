@@ -1,7 +1,6 @@
-"""Build OpenWeir's Linux packages (docs/decisions.md D60-D67, docs/architecture.md "Linux (in
-progress)"): the UI by Nuitka in standalone mode, the service by go build, Cronet and the GEO
-data beside it, together the tree that installs as /opt/openweir, then a .deb and a .rpm around
-it by nfpm.
+"""Build OpenWeir's Linux packages (docs/decisions.md D60-D67, docs/architecture.md "Linux"):
+the UI by Nuitka in standalone mode, the service by go build, Cronet and the GEO data beside
+it, together the tree that installs as /opt/openweir, then a .deb and a .rpm around it by nfpm.
 
     uv run --group build python scripts/build_linux.py                   # tree and packages
     uv run --group build python scripts/build_linux.py --skip-packages   # the tree

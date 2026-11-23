@@ -1,5 +1,5 @@
 // Package tunclean removes what the Linux service's TUN leaves behind when the service dies
-// without closing it (docs/architecture.md "Linux (in progress)", D67): sing-tun's policy
+// without closing it (docs/architecture.md "Linux", D67): sing-tun's policy
 // routing rules and table, and systemd-resolved's settings for the device. With strict-route
 // those rules send every packet of a family the TUN has no address for nowhere until
 // something removes them, and sing-tun itself does so only at its next start. The service runs

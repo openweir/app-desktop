@@ -38,7 +38,7 @@ type Settings struct {
 // that is present: GNOME's org.gnome.system.proxy keys and KDE's kioslaverc [Proxy Settings]
 // entries, each value as the desktop's own tool reads and writes it. Giving them back
 // restores exactly what the user had, which the WinINet fields cannot hold
-// (docs/architecture.md "Linux (in progress)", D63). A nil map is a store the desktop did not
+// (docs/architecture.md "Linux", D63). A nil map is a store the desktop did not
 // have; an empty one a store with none of the keys set, which giving back deletes again.
 type Desktop struct {
 	GNOME map[string]string `json:"gnome"`

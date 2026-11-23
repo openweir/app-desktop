@@ -1,4 +1,4 @@
-# OpenWeir's control socket (docs/architecture.md "Linux (in progress)", D60). Every local user
+# OpenWeir's control socket (docs/architecture.md "Linux", D60). Every local user
 # may connect; the service checks each peer itself, by SO_PEERCRED and /proc/<pid>/exe, and
 # answers only /opt/openweir/openweir-ui, and its own executable for root (the pkexec helpers).
 [Unit]

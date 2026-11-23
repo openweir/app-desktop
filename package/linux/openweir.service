@@ -1,4 +1,4 @@
-# OpenWeir's service (docs/architecture.md "Linux (in progress)", D60): the Go service as root,
+# OpenWeir's service (docs/architecture.md "Linux", D60): the Go service as root,
 # started by openweir.socket and at boot, holding the tunnel for the user who owns it.
 [Unit]
 Description=OpenWeir service

@@ -45,7 +45,7 @@ type Platform interface {
 	// MayClaim refuses a caller who may not own the tunnel from where they are, before a
 	// claim or take-over makes them the owner. Windows lets every caller the pipe verified
 	// claim; Linux allows only a user in an active local session (docs/architecture.md
-	// "Linux (in progress)", D66). The owner claiming again is not asked.
+	// "Linux", D66). The owner claiming again is not asked.
 	MayClaim(caller peer.Identity) error
 }
 

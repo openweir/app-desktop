@@ -1,5 +1,5 @@
-// Package logind follows systemd-logind for the Linux service (docs/architecture.md "Linux
-// (in progress)", D66): which users are signed in, and when the machine sleeps and wakes. The
+// Package logind follows systemd-logind for the Linux service (docs/architecture.md "Linux",
+// D66): which users are signed in, and when the machine sleeps and wakes. The
 // owner's Linux platform turns them into the service's session and power events, as session
 // notifications and power broadcasts are on Windows, and asks it whether a caller sits in an
 // active local session.

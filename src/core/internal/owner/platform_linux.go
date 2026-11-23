@@ -18,7 +18,7 @@ import (
 // Linux is the Linux service's Platform; restart ends the process for systemd to start
 // again. Users are decimal uids, and a session is a user logind has signed in, numbered by
 // their uid: the service follows users, not their sessions, as peer gives a caller's uid for
-// both (docs/architecture.md "Linux (in progress)"). logind.Watch brings logind's sign-ins
+// both (docs/architecture.md "Linux"). logind.Watch brings logind's sign-ins
 // to Service.SessionChanged and its sleeps to Service.Sleep.
 func Linux(restart func()) Platform {
 	return &linuxPlatform{restart: restart, logind: logind.System(), proxies: desktop{}, dirs: rootDirs}

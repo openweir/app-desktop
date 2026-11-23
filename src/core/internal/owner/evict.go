@@ -7,7 +7,7 @@ import (
 	"github.com/openweir/app-desktop/src/core/internal/peer"
 )
 
-// evict is TakeOver's way for root on Linux (docs/architecture.md "Linux (in progress)", D66).
+// evict is TakeOver's way for root on Linux (docs/architecture.md "Linux", D66).
 // There the administrator confirms through pkexec, and the helper the UI runs that way
 // connects as root (caller.Administrator, UserID "0"), not as the user who asked; root must
 // not become the owner, whose home mihomo runs in. So evict ends the current owner's claim

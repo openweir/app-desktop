@@ -54,7 +54,7 @@ const (
 	PipeName = `{pipe}`
 )
 
-// The Linux package's identifiers (docs/architecture.md "Linux (in progress)", D60 to D67). The
+// The Linux package's identifiers (docs/architecture.md "Linux", D60 to D67). The
 // service, LinuxServicePath, runs as the systemd units <LinuxUnit>.service and
 // <LinuxUnit>.socket, which listens on LinuxSocket; the only client it accepts is LinuxUIPath.
 const (

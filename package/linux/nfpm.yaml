@@ -35,7 +35,7 @@ overrides:
 contents:
   # /opt/openweir: the UI, the service, Cronet, the GEO data and the licenses. Root owns every
   # file and directory, and only root may write to them: the service accepts a UI only from
-  # such a tree (docs/architecture.md "Linux (in progress)"). scripts/build_linux.py sets the
+  # such a tree (docs/architecture.md "Linux"). scripts/build_linux.py sets the
   # modes before nfpm copies them.
   - src: @TREE@
     dst: /opt/openweir

@@ -29,7 +29,7 @@ const (
 
 // Record is owner.json: the owner's SID and the session they last claimed or signed in from.
 // On Linux SID holds the owner's decimal uid, and their session is that uid too: the service
-// follows logind's users, not their sessions (docs/architecture.md "Linux (in progress)").
+// follows logind's users, not their sessions (docs/architecture.md "Linux").
 type Record struct {
 	SID     string `json:"sid"`
 	Session uint32 `json:"session"`

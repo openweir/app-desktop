@@ -31,7 +31,7 @@ import (
 )
 
 // The Linux release runs this binary as product.LinuxServicePath in the modes below
-// (docs/architecture.md "Linux (in progress)", D60); -socket stays the development server.
+// (docs/architecture.md "Linux", D60); -socket stays the development server.
 // systemd runs -system for <product.LinuxUnit>.service, with -cleanup before it starts and
 // after it stops; the UI runs -take-over and -install-update through pkexec.
 const noMode = "-system or -socket is required: -system runs the service under systemd, -socket the development server"

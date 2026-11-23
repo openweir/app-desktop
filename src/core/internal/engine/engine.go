@@ -69,7 +69,7 @@ type Options struct {
 	TemplateHTTP  *http.Client
 	// Pins are the TUN device, route table and rule index that the Linux service holds
 	// owned mode to, so that its cleanup (tunclean) removes exactly what a TUN left behind
-	// (docs/architecture.md "Linux (in progress)", D67); admission forces them on every
+	// (docs/architecture.md "Linux", D67); admission forces them on every
 	// profile (admission.Host.Pins). The zero value pins nothing, as on Windows. Only owned
 	// mode takes them.
 	Pins tunclean.Pins

@@ -1,5 +1,5 @@
 """An administrator taking over another user's tunnel (decisions D5b and D66,
-docs/architecture.md §5.4 and "Linux (in progress)").
+docs/architecture.md §5.4 and "Linux").
 
 On Windows the UI runs with the user's filtered token, which the service does not let take
 over. Once the user confirmed it, the UI starts the service's own executable as the take-over

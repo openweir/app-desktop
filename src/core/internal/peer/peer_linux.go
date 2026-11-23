@@ -19,7 +19,7 @@ import (
 const userHZ = 100
 
 // LinuxClientVerifier backs the Linux service's socket, which every local user may connect to
-// (docs/architecture.md "Linux (in progress)", D60): the check here is the access control. It
+// (docs/architecture.md "Linux", D60): the check here is the access control. It
 // accepts uiPath, the installed UI, run by any user but root, and returns that user's uid as
 // UserID and as SessionID (the service follows logind's users), with the caller's process. It
 // also accepts servicePath, the service's own executable, run as root: the take-over helper

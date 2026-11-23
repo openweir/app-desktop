@@ -69,7 +69,7 @@ UI_EXECUTABLE: str = _DATA["windows"]["uiExecutable"]
 SERVICE_EXECUTABLE: str = _DATA["windows"]["serviceExecutable"]
 PIPE_NAME = rf"\\.\pipe\ProtectedPrefix\Administrators\{PRODUCT_ID}"
 
-# The Linux package (docs/architecture.md "Linux (in progress)", D60 to D67): installed to
+# The Linux package (docs/architecture.md "Linux", D60 to D67): installed to
 # LINUX_INSTALL_DIR, its service runs as the systemd units <LINUX_UNIT>.service and .socket.
 _LINUX: dict[str, Any] = _DATA["linux"]
 LINUX_INSTALL_DIR: str = _LINUX["installDir"]
