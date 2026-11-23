@@ -3,6 +3,7 @@ import subprocess
 import sys
 from functools import partial
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 from PySide6.QtCore import QCoreApplication, Qt, QUrl
@@ -312,7 +313,8 @@ def test_values_that_change_every_second_keep_their_items(qtbot: QtBot, loaded: 
     )
     made: list[int] = []
     came: list[int] = []
-    repeater.itemAdded.connect(lambda index, item: made.append(index))
+    # itemAdded is the Repeater's own signal, which QQuickItem's stubs don't know.
+    cast(Any, repeater).itemAdded.connect(lambda index, item: made.append(index))
     recent.rowsInserted.connect(lambda parent, first, last: came.extend(range(first, last + 1)))
 
     view_models.shell.setPage("connections")
