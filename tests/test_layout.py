@@ -115,7 +115,13 @@ def runs_past(root: QQuickItem) -> list[str]:
     A row that needs more than its width takes it from the layout around it, so it is that
     layout's end the row runs past."""
     found = []
-    for layout in find_all(root, lambda i: kind(i) in LAYOUTS):
+    layouts = find_all(root, lambda i: kind(i) in LAYOUTS)
+    # A layout places its items when the window next polishes it, before it draws. Values
+    # that change every second (the overview's busiest connections) can be newer than that,
+    # so lay them out as the next frame will, the outer layouts first.
+    for layout in layouts:
+        layout.ensurePolished()
+    for layout in layouts:
         before = None
         for item in shown(layout):
             if item.x() + item.width() > layout.width() + 0.5:
