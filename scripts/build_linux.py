@@ -831,7 +831,7 @@ def _annotation(title: str, message: str) -> str:
     )
 
 
-def annotations(error: BaseException) -> list[str]:
+def error_annotations(error: BaseException) -> list[str]:
     """The error annotations of a failed build, which a CI run's page shows to anyone, without
     the logs that need a signed-in account: one for each soname nothing provides, or one for
     the error."""
@@ -859,7 +859,7 @@ def annotations(error: BaseException) -> list[str]:
 def report(error: BaseException) -> None:
     """Writes ``error``'s annotations when GitHub Actions runs the build."""
     if os.environ.get("GITHUB_ACTIONS") == "true":
-        for line in annotations(error):
+        for line in error_annotations(error):
             print(line, flush=True)
 
 
