@@ -7,11 +7,20 @@ import pytest
 
 from openweir.models.profiles import (
     KIND_FILE,
+    KIND_PROVIDER,
     KIND_SUBSCRIPTION,
     Profile,
     ProfileError,
     ProfileList,
     Usage,
+)
+from openweir.models.provider.store import ProviderStore, StoredSubscription
+from openweir.models.provider.types import (
+    PROVIDER_ACCOUNT_CONFLICT,
+    PROVIDER_UNKNOWN,
+    ProviderError,
+    ProviderRecord,
+    RemoteSubscription,
 )
 from openweir.models.settings import DatabaseSettingsStore
 from openweir.models.store import ProfileStore, default_data_dir
@@ -28,6 +37,18 @@ SUBSCRIPTION = Profile(
     proxy_count=48,
 )
 LOCAL = Profile(id="b2", name="config", kind=KIND_FILE, path="/tmp/config.yaml", in_pool=False)
+PLAN = Profile(
+    id="c3",
+    name="标准套餐",
+    kind=KIND_PROVIDER,
+    auto_update_hours=24,
+    provider_id="prov1",
+    remote_id=7,
+    usage=Usage(1, 2, 300, 0),
+    updated_at=1_790_000_000.0,
+)
+ORIGIN = "https://example.com"
+LINK = "https://example.com/api/v1/app/proxy/s/secret-token"
 
 
 class Clock:
@@ -286,3 +307,248 @@ def test_default_data_dir(
     for key, value in env.items():
         monkeypatch.setenv(key, value.format(home=tmp_path))
     assert default_data_dir() == tmp_path / expected
+
+
+# -- provider accounts (docs/accounts.md §5.1) -----------------------------------------------
+def remote(remote_id: int, **values: object) -> RemoteSubscription:
+    return RemoteSubscription(
+        **{
+            "id": remote_id,
+            "plan_id": "basic",
+            "status": "active",
+            "usable": True,
+            "plan_name": "标准套餐",
+            "user_id": "user-1",
+            "expire_at": 1_800_000_000.0,
+            "total": 300,
+            "access": "both",
+            "url": LINK,
+            "urls": (LINK + "-mirror",),
+            **values,
+        }  # type: ignore[arg-type]
+    )
+
+
+def test_provider_profiles_round_trip(tmp_path: Path) -> None:
+    store = ProfileStore(tmp_path)
+    for profile in (SUBSCRIPTION, PLAN, LOCAL):
+        store.write_config(profile.id, "proxies: []\n")
+    store.save(ProfileList((SUBSCRIPTION, PLAN, LOCAL), "c3"))
+    store.close()
+    store = ProfileStore(tmp_path)
+    assert store.load() == ProfileList((SUBSCRIPTION, PLAN, LOCAL), "c3")
+    columns = "id, kind, url, path, provider_id, remote_id"
+    assert rows(tmp_path, "profiles", columns) == {
+        "a1": ("subscription", SUBSCRIPTION.url, "", None, None),
+        "b2": ("file", "", "/tmp/config.yaml", None, None),
+        "c3": ("provider", "", "", "prov1", 7),
+    }
+
+
+@pytest.mark.parametrize(
+    "values",
+    [
+        {"kind": KIND_PROVIDER, "remote_id": 7},  # no provider
+        {"kind": KIND_PROVIDER, "provider_id": "", "remote_id": 7},
+        {"kind": KIND_PROVIDER, "provider_id": "prov1"},  # no subscription
+        {"kind": KIND_PROVIDER, "provider_id": "prov1", "remote_id": "7"},
+        # The link stays in memory (D57); a provider profile has no file either.
+        {"kind": KIND_PROVIDER, "provider_id": "prov1", "remote_id": 7, "url": LINK},
+        {"kind": KIND_PROVIDER, "provider_id": "prov1", "remote_id": 7, "path": "/tmp/x"},
+        {"kind": KIND_SUBSCRIPTION, "url": LINK, "provider_id": "prov1"},
+        {"kind": KIND_FILE, "path": "/tmp/x", "remote_id": 7},
+    ],
+)
+def test_only_a_provider_profile_names_a_provider_and_it_has_no_link(
+    values: dict[str, object],
+) -> None:
+    with pytest.raises(ValueError, match="provider"):
+        Profile(id="x", name="x", **values)  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="no link"):
+        replace(PLAN, url=LINK)
+
+
+def test_a_provider_profile_updates_through_its_account() -> None:
+    nodes = Profile(id="n", name="nodes", kind=KIND_FILE)
+    kinds = {
+        "subscription": SUBSCRIPTION,
+        "provider": PLAN,
+        "file": LOCAL,
+        "nodes": nodes,
+    }
+    assert {k: p.can_update for k, p in kinds.items()} == {
+        "subscription": True,
+        "provider": True,
+        "file": True,
+        "nodes": False,
+    }
+    assert {k: p.can_auto_update for k, p in kinds.items()} == {
+        "subscription": True,
+        "provider": True,
+        "file": False,
+        "nodes": False,
+    }
+    # It has no link of its own: no subscription link, nor node links.
+    assert (PLAN.is_provider, PLAN.is_subscription, PLAN.is_node_links) == (True, False, False)
+    assert not any(p.is_provider for p in (SUBSCRIPTION, LOCAL, nodes))
+
+
+def test_providers_in_order(tmp_path: Path) -> None:
+    clock = Clock()
+    database = ProfileStore(tmp_path, clock=clock).database
+    providers = ProviderStore(database)
+    assert providers.providers() == ()
+    assert providers.by_origin(ORIGIN) is None
+    first = providers.add(ORIGIN, "示例服务商", "user@example.com", "user-1")
+    assert first == ProviderRecord(
+        first.id, ORIGIN, "示例服务商", "user@example.com", "user-1", 0, 1_000.0, 1_000.0
+    )
+    assert len(first.id) == 32
+    clock.now = 2_000.0
+    second = providers.add("https://b.example:8443", "B", "b", "user-9")
+    assert second.position == 1
+    assert providers.providers() == (first, second)
+    assert providers.provider(second.id) == second
+    assert providers.by_origin(ORIGIN) == first
+
+    # Moved first: the order follows the positions.
+    clock.now = 3_000.0
+    moved = providers.update(replace(second, position=-1))
+    assert (moved.position, moved.created_at, moved.updated_at) == (-1, 2_000.0, 3_000.0)
+    assert providers.providers() == (moved, first)
+
+
+def test_one_provider_per_origin(tmp_path: Path) -> None:
+    providers = ProviderStore(ProfileStore(tmp_path).database)
+    first = providers.add(ORIGIN, "示例服务商", "user@example.com", "user-1")
+    with pytest.raises(ProviderError) as raised:
+        providers.add(ORIGIN, "示例服务商", "other@example.com", "user-2")
+    assert raised.value.code == PROVIDER_ACCOUNT_CONFLICT
+    assert providers.providers() == (first,)
+    # Once it is signed out of, another account may sign in: a new provider.
+    providers.delete(first.id)
+    again = providers.add(ORIGIN, "示例服务商", "other@example.com", "user-2")
+    assert again.id != first.id
+    assert providers.providers() == (again,)
+
+
+def test_a_provider_changes_only_when_its_values_do(tmp_path: Path) -> None:
+    clock = Clock()
+    providers = ProviderStore(ProfileStore(tmp_path, clock=clock).database)
+    record = providers.add(ORIGIN, "示例服务商", "user@example.com", "user-1")
+    clock.now = 2_000.0
+    assert providers.update(record) == record  # nothing changed
+    # The id and origin are the provider's for good; the times are the store's.
+    renamed = providers.update(
+        replace(record, name="Example", origin="https://elsewhere", created_at=5.0)
+    )
+    assert renamed == replace(record, name="Example", updated_at=2_000.0)
+    columns = "id, origin, name, created_at, updated_at, deleted_at"
+    assert rows(tmp_path, "providers", columns) == {
+        record.id: (ORIGIN, "Example", 1_000.0, 2_000.0, None)
+    }
+
+
+def test_signing_out_marks_the_provider_deleted(tmp_path: Path) -> None:
+    clock = Clock()
+    providers = ProviderStore(ProfileStore(tmp_path, clock=clock).database)
+    record = providers.add(ORIGIN, "示例服务商", "user@example.com", "user-1")
+    clock.now = 2_000.0
+    providers.delete(record.id)
+    providers.delete(record.id)  # twice is fine
+    assert providers.providers() == ()
+    assert providers.by_origin(ORIGIN) is None
+    for call in (lambda: providers.provider(record.id), lambda: providers.update(record)):
+        with pytest.raises(ProviderError) as raised:
+            call()
+        assert raised.value.code == PROVIDER_UNKNOWN
+    # The record stays, marked, for a backup to merge; signing out meanwhile keeps it so.
+    columns = "id, updated_at, deleted_at"
+    assert rows(tmp_path, "providers", columns) == {record.id: (2_000.0, 2_000.0)}
+
+
+def test_what_billing_said_is_stored_without_links(tmp_path: Path) -> None:
+    clock = Clock()
+    store = ProfileStore(tmp_path, clock=clock)
+    providers = ProviderStore(store.database)
+    other = replace(PLAN, id="d4", name="Other", remote_id=3)
+    store.save(ProfileList((PLAN, other, SUBSCRIPTION)))
+    assert providers.subscriptions("prov1") == ()
+    written = providers.save_subscriptions({"c3": remote(7), "d4": remote(3, status="expired")})
+    assert written == 2
+    assert providers.subscriptions("prov1") == (
+        StoredSubscription("d4", remote(3, status="expired"), 1_000.0),
+        StoredSubscription("c3", remote(7), 1_000.0),
+    )
+    data = stored(tmp_path, "SELECT data FROM provider_subscriptions")
+    assert len(data) == 2
+    assert all("secret-token" not in text and '"url' not in text for (text,) in data)
+    assert all(s.subscription.url is None for s in providers.subscriptions("prov1"))
+
+    clock.now = 2_000.0
+    providers.save_subscriptions({"c3": remote(7, auto_renew=True)})
+    (_, latest) = providers.subscriptions("prov1")
+    assert (latest.subscription.auto_renew, latest.synced_at) == (True, 2_000.0)
+    assert providers.subscriptions("prov2") == ()
+
+
+def test_only_a_live_provider_profile_takes_its_subscription(tmp_path: Path) -> None:
+    store = ProfileStore(tmp_path)
+    providers = ProviderStore(store.database)
+    store.save(ProfileList((PLAN, SUBSCRIPTION)))
+    written = providers.save_subscriptions(
+        {
+            "a1": remote(7),  # no provider profile
+            "c3": remote(8),  # another subscription than the profile's
+            "missing": remote(7),  # not saved yet, or removed meanwhile
+        }
+    )
+    assert written == 0
+    assert stored(tmp_path, "SELECT * FROM provider_subscriptions") == []
+
+
+def test_the_billing_cache_goes_with_its_profile(tmp_path: Path) -> None:
+    store = ProfileStore(tmp_path)
+    providers = ProviderStore(store.database)
+    record = providers.add(ORIGIN, "示例服务商", "user@example.com", "user-1")
+    first = replace(PLAN, provider_id=record.id)
+    second = replace(first, id="d4", remote_id=3)
+    third = replace(first, id="e5", remote_id=9)
+    store.save(ProfileList((first, second, third)))
+    providers.save_subscriptions({"c3": remote(7), "d4": remote(3), "e5": remote(9)})
+
+    # Removed like any profile: its config, override and billing go.
+    store.save(ProfileList((first, third)))
+    store.delete_config("d4")
+    assert [s.profile_id for s in providers.subscriptions(record.id)] == ["c3", "e5"]
+    # A profile marked deleted shows nothing, and its row goes at the next start.
+    store.save(ProfileList((first,)))
+    assert [s.profile_id for s in providers.subscriptions(record.id)] == ["c3"]
+    store.close()
+    store = ProfileStore(tmp_path)
+    assert stored(tmp_path, "SELECT profile_id FROM provider_subscriptions") == [("c3",)]
+    # Signing out drops what is left.
+    ProviderStore(store.database).delete(record.id)
+    assert stored(tmp_path, "SELECT profile_id FROM provider_subscriptions") == []
+
+
+def test_a_billing_row_this_version_cannot_read_is_left_out(tmp_path: Path) -> None:
+    store = ProfileStore(tmp_path)
+    providers = ProviderStore(store.database)
+    store.save(ProfileList((PLAN, replace(PLAN, id="d4", remote_id=3))))
+    providers.save_subscriptions({"c3": remote(7), "d4": remote(3)})
+    with store.database.transaction() as connection:
+        connection.execute("UPDATE provider_subscriptions SET data = '[]' WHERE profile_id = 'd4'")
+    assert [s.profile_id for s in providers.subscriptions("prov1")] == ["c3"]
+    with store.database.transaction() as connection:
+        connection.execute("UPDATE provider_subscriptions SET data = '{\"id\": 3}'")
+    assert providers.subscriptions("prov1") == ()
+
+
+def test_failed_provider_writes_are_profile_errors(tmp_path: Path) -> None:
+    providers = ProviderStore(ProfileStore(tmp_path).database)
+    refuse_writes(tmp_path, "providers")
+    with pytest.raises(ProfileError) as raised:
+        providers.add(ORIGIN, "示例服务商", "user@example.com", "user-1")
+    assert raised.value.code == "storage_failed"
+    assert providers.providers() == ()

@@ -11,8 +11,10 @@ from openweir.models.database import (
     DATABASE_NAME,
     MIGRATIONS,
     SCHEMA_VERSION,
+    TOMBSTONE_DAYS,
     Database,
     Migration,
+    purge_tombstones,
     read_state,
     sync_rows,
     write_state,
@@ -30,6 +32,8 @@ TABLES = {
     "plan_groups",
     "plan_rules",
     "mesh_networks",
+    "providers",
+    "provider_subscriptions",
 }
 
 
@@ -295,3 +299,107 @@ def test_v2_routing_migration_preserves_an_existing_choice(tmp_path: Path) -> No
         assert routing.plans()[0].name == "Personal"
     finally:
         database.close()
+
+
+def test_v3_profiles_migrate_to_provider_accounts(tmp_path: Path) -> None:
+    """Version 4 adds the providers, their billing cache and two columns of profiles; the
+    profiles there before keep everything and name no provider."""
+    from openweir.models.provider.store import ProviderStore
+    from openweir.models.store import ProfileStore
+
+    old = Database(tmp_path / DATABASE_NAME, migrations=MIGRATIONS[:3])
+    with old.transaction() as connection:
+        connection.execute(
+            "INSERT INTO profiles "
+            "(id, name, kind, url, auto_update_hours, in_pool, position, created_at, updated_at) "
+            "VALUES ('p', 'Personal', 'subscription', 'https://sub.example', 6, 0, 0, 1, 2)"
+        )
+        connection.execute(
+            "INSERT INTO profile_contents (profile_id, yaml, total, upload, download, expire, "
+            "updated_at) VALUES ('p', 'saved', 300, 1, 2, 0, 1)"
+        )
+        connection.execute("UPDATE routing_state SET profile_id = 'p', resume_profile = 1")
+    old.close()
+    store = ProfileStore(tmp_path)
+    try:
+        assert store.database.version == 4
+        listed = store.load()
+        p = listed.get("p")
+        assert (p.name, p.kind, p.url, p.auto_update_hours, p.in_pool) == (
+            "Personal",
+            "subscription",
+            "https://sub.example",
+            6,
+            False,
+        )
+        assert (p.provider_id, p.remote_id, p.usage and p.usage.total) == (None, None, 300)
+        assert listed.active == "p"
+        assert store.read_config("p") == "saved"
+        providers = ProviderStore(store.database)
+        assert providers.providers() == ()
+        with store.database.reading() as connection:
+            assert connection.execute("SELECT * FROM provider_subscriptions").fetchall() == []
+            row = connection.execute("SELECT created_at, updated_at FROM profiles").fetchone()
+            assert tuple(row) == (1.0, 2.0)  # the migration changed no record
+    finally:
+        store.close()
+
+
+def test_an_older_app_sets_a_database_with_providers_aside(tmp_path: Path) -> None:
+    """An app of version 3 meets a database with provider accounts (downgrading): it keeps
+    the file as ``.bad`` and starts empty (ui.md §2.3), the accounts' rows untouched."""
+    path = tmp_path / DATABASE_NAME
+    database = Database(path, clock=lambda: 1_800_000_000)
+    with database.transaction() as connection:
+        connection.execute(
+            "INSERT INTO providers (id, origin, name, account, user_id, position, created_at, "
+            "updated_at) VALUES ('a', 'https://example.com', 'Site', 'u@example.com', 'u1', 0, "
+            "1, 1)"
+        )
+    database.close()
+    older = Database(path, migrations=MIGRATIONS[:3], clock=lambda: 1_800_000_000)
+    assert older.version == 3
+    with older.reading() as connection:
+        names = {row[0] for row in connection.execute("SELECT name FROM sqlite_master")}
+        assert "providers" not in names
+    older.close()
+    aside = tmp_path / f"{DATABASE_NAME}.1800000000.bad"
+    assert version(aside) == SCHEMA_VERSION
+    with closing(sqlite3.connect(aside)) as connection:
+        assert connection.execute("SELECT id, origin FROM providers").fetchall() == [
+            ("a", "https://example.com")
+        ]
+
+
+def test_signed_out_providers_go_with_the_other_tombstones(tmp_path: Path) -> None:
+    database = Database(tmp_path / DATABASE_NAME)
+    now = 1_000.0 + TOMBSTONE_DAYS * 86_400
+    with database.transaction() as connection:
+        for provider_id, deleted_at in (("old", 999.0), ("recent", 1_001.0), ("live", None)):
+            connection.execute(
+                "INSERT INTO providers (id, origin, name, account, user_id, position, "
+                "created_at, updated_at, deleted_at) VALUES (?, ?, '', '', '', 0, 1, 1, ?)",
+                (provider_id, f"https://{provider_id}.example", deleted_at),
+            )
+        assert purge_tombstones(connection, now) == 1
+        left = {row[0] for row in connection.execute("SELECT id FROM providers")}
+    assert left == {"recent", "live"}
+    database.close()
+
+
+@pytest.mark.parametrize(
+    "statement",
+    [
+        # Times are REAL, as in every other table; text is no time.
+        "INSERT INTO providers (id, origin, name, account, user_id, position, created_at, "
+        "updated_at) VALUES ('a', 'https://e', 'n', 'a', 'u', 0, 'now', 1)",
+        "INSERT INTO provider_subscriptions (profile_id, data, synced_at) VALUES ('p', '{}', 'x')",
+        "INSERT INTO profiles (id, name, kind, position, created_at, updated_at, remote_id) "
+        "VALUES ('p', 'P', 'provider', 0, 0, 0, 'seven')",
+    ],
+)
+def test_the_account_tables_are_strict(tmp_path: Path, statement: str) -> None:
+    database = Database(tmp_path / DATABASE_NAME)
+    with pytest.raises(sqlite3.IntegrityError), database.transaction() as connection:
+        connection.execute(statement)
+    database.close()
