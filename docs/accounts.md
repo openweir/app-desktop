@@ -70,8 +70,11 @@ v1 只做原生登录（D56）：
 `ProviderApi`（`models/provider/api.py`）的每个请求：
 
 - 在常驻的 daemon 工作线程上发出（`host/workers.py`），跟随系统代理，超时 30 秒；
-- `User-Agent: OpenWeir/<版本> (Windows|macOS)`；下载配置（5.4 节）用订阅下载的
-  `OpenWeir/<版本> (Windows|macOS) clash.meta`（D48），服务商因此给出 OpenWeir 模板；
+- `User-Agent: OpenWeir/<版本> (Windows|macOS|Linux)`；下载配置（5.4 节）用订阅下载的
+  `OpenWeir/<版本> (Windows|macOS|Linux) clash.meta`（D48）。api-edge 按 `^openweir(/|$)` 不分大小写匹配
+  User-Agent，优先级 11，高于 Clash 的 10，所以三个系统都拿到 OpenWeir 模板（preset-openweir）。服务商的管理员可以停用
+  或调整预设的顺序，那时应用拿到的是 Clash 的预设（preset-clash：`mixed-port: 7890`，`node.clash` 不写 Naive、带
+  REALITY 的 AnyTLS 和 NW3 节点），这些节点在应用里就没有了；
 - `Accept-Language` 按界面语言写 `zh-CN` 或 `en-US`，套餐名、等级名和说明随之本地化；切换界面语言后重新同步；
 - `Accept: application/json`（下载配置和链接时不带，与订阅下载相同）；`/api/auth/*` 的 POST 另带 `Origin: <origin>`；
 - **不跟随重定向**，3xx 报 `provider_bad_response`；令牌只发给 origin 本身；
@@ -493,6 +496,11 @@ v1 只做原生登录（D56）：
 - **预览和截图**：`scripts/preview.py --provider` 在回环端口上起假的服务商，以示例用户登录（`tests/support/simulated.py`
   的 `seed_provider`，`FakeProvider.move_to` 按真实时钟排日期）。`scripts/gen_screenshots.py` 的 `account` 同样登录，在
   单独的窗口里拍，其余截图里没有账户。
+- **模板兼容**：`testdata/openweir-template.yaml` 是 api-edge 为应用渲染的 preset-openweir（端口、DNS、嗅探、GEO、
+  内置分流的策略组、规则集和规则，以及 node.openweir 写出的每种节点）。`src/core/internal/engine/openweir_template_test.go`
+  检查内核原样接受它（开关 TUN、fd 模式、局域网、覆写、我的方案），`tests/test_openweir_template.py` 检查应用的 User-Agent
+  在三个系统上都选中 OpenWeir 预设，`tests/e2e/test_openweir_template.py` 经假的服务商和开发用服务在真实内核上读它。
+  api-edge 的模板变了时更新这份文件。
 - **真实服务商**（[maintenance.md](maintenance.md)）：对一个本地 api-edge 核对两步验证的 Origin 检查、邮箱验证码、
   打开人机验证后的提示、三种接入方式、401 之后的界面和退出登录。
 
@@ -502,4 +510,6 @@ v1 只做原生登录（D56）：
 - **Better Auth 的来源检查**：带 cookie 的两步验证请求要带 `Origin`，以真实的本地 api-edge 核对。
 - **要求人机验证的服务商**不能在应用里登录，只能用链接导入。
 - **渲染缓存**：服务商把配置缓存 10 分钟，续费后的配置可能晚一点才变。
+- **规则集缓存**：配置里的规则集（rule-provider）文件按 id 存在内核共用的 home 下（`rulesets/<id>.yaml`）。在两个服务商的
+  配置之间换用后，mihomo 可能沿用另一个服务商同 id 的缓存文件，最长一天（`interval: 86400`）后才重新下载。
 - **钥匙串提示**：macOS 上应用的签名变了时，读令牌会让系统询问（D14）。

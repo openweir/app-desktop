@@ -162,7 +162,8 @@
 ## 3. 订阅与切换
 
 - **下载**在用户上下文中进行（urllib，在工作线程里执行），跟随系统代理设置。User-Agent 为
-  `openweir/<版本> clash.meta`，让订阅服务返回 Clash YAML。只接受 http 和 https；超过一个请求帧能装下的
+  `OpenWeir/<版本> (Windows|macOS|Linux) clash.meta`（D48）：OpenWeir 服务商据此返回 OpenWeir 模板，其他订阅服务返回
+  Clash YAML。只接受 http 和 https；超过一个请求帧能装下的
   大小（16 MiB 减 1 MiB）即拒绝。`Content-Disposition` 里的文件名作为默认名称。
 - 首次导入时，手填名称优先于 `Profile-Title`（文本或 `base64:` UTF-8）、文件名和主机名。勾选自动更新并留空间隔时采用 `Profile-Update-Interval` 建议的正整数小时，无有效建议用 12 小时。以后刷新保留已保存的名称和间隔。
 - 「编辑信息…」按需显示服务端的 `Profile-Web-Page-Url` 和 `Support-Url`，仅在用户点击时打开 HTTP(S) 页面。
