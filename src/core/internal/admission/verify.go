@@ -61,6 +61,11 @@ func verify(cfg *config.Config, host Host, options RunOptions) error {
 			return err
 		}
 	}
+	if mode == TunOwned && pinned(host.Pins) {
+		if err := verifyPins(general.Tun, general.RedirPort, general.TProxyPort, host.Pins); err != nil {
+			return err
+		}
+	}
 	// Without with_gvisor these stacks only fail once mihomo opens the TUN.
 	if stack := general.Tun.Stack; general.Tun.Enable && !features.WithGVisor &&
 		(stack == C.TunGvisor || stack == C.TunMixed) {

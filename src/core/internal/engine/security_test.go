@@ -21,12 +21,16 @@ import (
 	"time"
 
 	"github.com/metacubex/mihomo/adapter/provider"
+	"github.com/metacubex/mihomo/common/yaml"
 	C "github.com/metacubex/mihomo/constant"
 	"github.com/metacubex/mihomo/constant/features"
+	"github.com/metacubex/mihomo/hub/executor"
 	"github.com/metacubex/mihomo/hub/route"
 
 	"github.com/openweir/app-desktop/src/core/internal/admission"
 	"github.com/openweir/app-desktop/src/core/internal/porttest"
+	"github.com/openweir/app-desktop/src/core/internal/product"
+	"github.com/openweir/app-desktop/src/core/internal/tunclean"
 )
 
 // Regression tests for the requirements of docs/architecture.md §3.3, in order.
@@ -372,6 +376,128 @@ proxy-providers:
 			len(loaded["proxy-networks"].([]any)) != 0 || len(loaded["mapped-listeners"].([]any)) != 0 ||
 			len(loaded["listeners"].([]any)) != 0 {
 			t.Errorf("loaded as %v", loaded)
+		}
+	}
+}
+
+// #7: the Linux service's TUN stays on the product's device, route table and rule priorities,
+// so its -cleanup removes exactly what a crashed TUN left (D67), and it takes the whole
+// machine's traffic (D66): neither the profile nor an override moves them, picks users, apps
+// or interfaces, or opens redir and tproxy ports; and should mihomo ever read otherwise,
+// Verify refuses the configuration. The TUN tests run it on a real TUN (tun_pins_linux_test.go).
+func TestSecurity7LinuxTUNStaysPinned(t *testing.T) {
+	pins := tunclean.Pins{Device: product.LinuxTunDevice, Table: product.LinuxRouteTable, RuleIndex: product.LinuxRuleIndex}
+	host := admission.Host{Tun: admission.TunOwned, Pins: pins}
+	const moved = `redir-port: 7892
+tproxy-port: 7893
+tun:
+  device: elsewhere0
+  iproute2-table-index: 2022
+  iproute2-rule-index: 9000
+  include-uid: [0]
+  include-uid-range: ['1000:1999']
+  exclude-uid: [1000]
+  exclude-uid-range: ['2000:2999']
+  include-android-user: [0, 10]
+  include-package: [com.example]
+  exclude-package: [com.example.other]
+  include-interface: [eth0]
+  exclude-interface: [wlan0]
+  route-address-set: [lan]
+  route-exclude-address-set: [cn]
+  auto-redirect: true
+  auto-redirect-input-mark: 8227
+  auto-redirect-output-mark: 8228
+  auto-redirect-iproute2-fallback-rule-index: 32768
+`
+	for name, profile := range map[string]admission.Profile{
+		"profile":  profileOf(minimal + moved),
+		"override": {Config: []byte(minimal), Overrides: [][]byte{[]byte(moved), []byte("tun: {device: again0, iproute2-rule-index: 1}\n")}},
+	} {
+		for _, on := range []bool{true, false} {
+			profile.Options.TUN = on
+			admitted, err := admitProfile(profile, host)
+			if err != nil {
+				t.Fatalf("%s, TUN %v: %v", name, on, err)
+			}
+			general := admitted.cfg.General
+			tun := general.Tun
+			if tun.Device != product.LinuxTunDevice || tun.IPRoute2TableIndex != product.LinuxRouteTable ||
+				tun.IPRoute2RuleIndex != product.LinuxRuleIndex {
+				t.Errorf("%s, TUN %v: device %q, table %d, rules from %d", name, on, tun.Device, tun.IPRoute2TableIndex, tun.IPRoute2RuleIndex)
+			}
+			if len(tun.IncludeUID)+len(tun.IncludeUIDRange)+len(tun.ExcludeUID)+len(tun.ExcludeUIDRange)+
+				len(tun.IncludeAndroidUser)+len(tun.IncludePackage)+len(tun.ExcludePackage)+
+				len(tun.IncludeInterface)+len(tun.ExcludeInterface)+len(tun.RouteAddressSet)+len(tun.RouteExcludeAddressSet) != 0 {
+				t.Errorf("%s, TUN %v: the TUN still picks users, apps, interfaces or sets: %+v", name, on, tun)
+			}
+			if tun.AutoRedirect || tun.AutoRedirectInputMark != 0 || tun.AutoRedirectOutputMark != 0 ||
+				tun.AutoRedirectIPRoute2FallbackRuleIndex != 0 || general.RedirPort != 0 || general.TProxyPort != 0 {
+				t.Errorf("%s, TUN %v: auto-redirect %v, marks %d/%d, fallback rule %d, redir-port %d, tproxy-port %d", name, on,
+					tun.AutoRedirect, tun.AutoRedirectInputMark, tun.AutoRedirectOutputMark,
+					tun.AutoRedirectIPRoute2FallbackRuleIndex, general.RedirPort, general.TProxyPort)
+			}
+			if !tun.AutoRoute || !tun.StrictRoute {
+				t.Errorf("%s, TUN %v: auto-route %v, strict-route %v", name, on, tun.AutoRoute, tun.StrictRoute)
+			}
+		}
+	}
+
+	// Verify checks what mihomo parsed, not what the patch wrote: each of these, slipped in
+	// after the patch, fails the configuration.
+	prepared, err := admission.Prepare(admission.Profile{Config: []byte(minimal), Options: admission.RunOptions{TUN: true}}, host)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, slipped := range []map[string]any{
+		{"device": "elsewhere0"},
+		{"iproute2-table-index": 2022},
+		{"iproute2-rule-index": 9000},
+		{"include-uid": []any{0}},
+		{"exclude-uid-range": []any{"1000:1999"}},
+		{"include-interface": []any{"eth0"}},
+		{"route-exclude-address-set": []any{"cn"}},
+		{"auto-redirect-output-mark": 8228},
+		{"auto-redirect-iproute2-fallback-rule-index": 32768},
+		{"redir-port": 7892},
+	} {
+		var doc map[string]any
+		if err := yaml.Unmarshal(prepared.YAML, &doc); err != nil {
+			t.Fatal(err)
+		}
+		for key, value := range slipped {
+			if key == "redir-port" {
+				doc[key] = value
+			} else {
+				doc["tun"].(map[string]any)[key] = value
+			}
+		}
+		raw, err := yaml.Marshal(doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cfg, err := executor.ParseWithBytes(raw)
+		if err != nil {
+			t.Fatalf("%v: %v", slipped, err)
+		}
+		if err := admission.Verify(cfg, prepared); !errors.Is(err, ErrInvalidConfig) {
+			t.Errorf("%v slipped in, and Verify = %v", slipped, err)
+		}
+	}
+
+	// The engine takes pins for owned mode only, and only pins that keep the clean-up off
+	// the kernel's tables and rules.
+	for _, options := range []Options{
+		{HomeDir: testHome, Tun: admission.TunNone, Pins: pins},
+		{HomeDir: testHome, Tun: admission.TunFD, TunFD: -1, Pins: pins},
+		{HomeDir: testHome, Tun: admission.TunOwned, Pins: tunclean.Pins{Device: product.LinuxTunDevice, Table: 254, RuleIndex: product.LinuxRuleIndex}},
+	} {
+		engine, err := New(options)
+		if err == nil {
+			engine.Close()
+			t.Errorf("%v with %+v: New passed", options.Tun, options.Pins)
+		} else if !strings.Contains(err.Error(), "pins") && !strings.Contains(err.Error(), "table 254") {
+			t.Errorf("%v with %+v: refused for another reason: %v", options.Tun, options.Pins, err)
 		}
 	}
 }

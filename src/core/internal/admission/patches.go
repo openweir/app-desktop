@@ -9,6 +9,8 @@ import (
 
 	C "github.com/metacubex/mihomo/constant"
 	"github.com/metacubex/mihomo/constant/features"
+
+	"github.com/openweir/app-desktop/src/core/internal/tunclean"
 )
 
 const loopback = "127.0.0.1"
@@ -45,9 +47,10 @@ func patchNoTUN(doc map[string]any, options RunOptions) error {
 	return restrictToLoopback(doc)
 }
 
-// patchOwnedTUN writes the TUN section mihomo creates and routes itself; the user's
-// device, MTU and exclusions stay, and so does the stack unless the options name one.
-func patchOwnedTUN(doc map[string]any, options RunOptions) error {
+// patchOwnedTUN writes the TUN section mihomo creates and routes itself. The user's MTU and
+// exclusions stay, the device unless the host pins one (pinTun), and the stack unless the
+// options name one.
+func patchOwnedTUN(doc map[string]any, options RunOptions, pins tunclean.Pins) error {
 	tun := section(doc, "tun")
 	tun["enable"] = options.TUN
 	tun["auto-route"] = true
@@ -57,6 +60,9 @@ func patchOwnedTUN(doc map[string]any, options RunOptions) error {
 	tun["file-descriptor"] = 0
 	if options.Stack != "" {
 		tun["stack"] = options.Stack
+	}
+	if pinned(pins) {
+		pinTun(doc, tun, pins)
 	}
 	if options.TUN {
 		// The TUN hijacks DNS into mihomo's resolver, which only exists when DNS is on.

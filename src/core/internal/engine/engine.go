@@ -69,8 +69,9 @@ type Options struct {
 	TemplateHTTP  *http.Client
 	// Pins are the TUN device, route table and rule index that the Linux service holds
 	// owned mode to, so that its cleanup (tunclean) removes exactly what a TUN left behind
-	// (docs/architecture.md "Linux (in progress)", D67). The zero value pins nothing, as
-	// on Windows. Not applied yet.
+	// (docs/architecture.md "Linux (in progress)", D67); admission forces them on every
+	// profile (admission.Host.Pins). The zero value pins nothing, as on Windows. Only owned
+	// mode takes them.
 	Pins tunclean.Pins
 }
 
@@ -79,6 +80,8 @@ type Engine struct {
 	home    string
 	// includeAllNetworks is Options.IncludeAllNetworks in fd mode.
 	includeAllNetworks bool
+	// pins are Options.Pins, which admission holds the owned TUN to.
+	pins tunclean.Pins
 	// template keeps subconv's routing template; nil without Options.TemplateHosts.
 	template *routingtemplate.Source
 	// tun is the host's TUN in fd mode, nil otherwise; the lifecycle lock guards it.
@@ -137,6 +140,14 @@ func newEngine(options Options) (*Engine, error) {
 	if options.HomeDir == "" {
 		return nil, errors.New("engine needs a home directory")
 	}
+	if options.Pins != (tunclean.Pins{}) {
+		if options.Tun != admission.TunOwned {
+			return nil, fmt.Errorf("TUN pins are for owned mode, not %v", options.Tun)
+		}
+		if err := options.Pins.Validate(); err != nil {
+			return nil, err
+		}
+	}
 	home, err := filepath.Abs(options.HomeDir)
 	if err != nil {
 		return nil, err
@@ -161,6 +172,7 @@ func newEngine(options Options) (*Engine, error) {
 		tunMode:            options.Tun,
 		home:               home,
 		includeAllNetworks: options.Tun == admission.TunFD && options.IncludeAllNetworks,
+		pins:               options.Pins,
 		template:           newTemplate(home, options),
 		state:              controlpb.RunState_RUN_STATE_STOPPED,
 	}

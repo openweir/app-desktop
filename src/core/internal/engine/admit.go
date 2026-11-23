@@ -29,7 +29,7 @@ type admittedConfig struct {
 func (e *Engine) admit(profile admission.Profile) (*admittedConfig, error) {
 	homeInUse = e.home
 	return admitProfile(profile, admission.Host{
-		Tun: e.tunMode, IncludeAllNetworks: e.includeAllNetworks, Template: e.template.Client(),
+		Tun: e.tunMode, IncludeAllNetworks: e.includeAllNetworks, Template: e.template.Client(), Pins: e.pins,
 	})
 }
 

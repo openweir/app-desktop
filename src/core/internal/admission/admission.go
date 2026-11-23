@@ -18,6 +18,7 @@ import (
 	"github.com/openweir/subconv/rules"
 
 	"github.com/openweir/app-desktop/src/core/internal/compose"
+	"github.com/openweir/app-desktop/src/core/internal/tunclean"
 )
 
 var (
@@ -67,6 +68,11 @@ type Host struct {
 	// Template reads subconv's routing template for a profile of its own whose routing is
 	// missing or too lossy (compose.Normalize, D54); nil keeps every profile's own.
 	Template *rules.Client
+	// Pins hold the owned-mode TUN to the Linux service's device, route table and rule
+	// priorities (engine.Options.Pins, D67), so that its clean-up removes what the TUN left
+	// behind and nothing else (pinTun); other modes have no use for them. The zero value pins
+	// nothing: Windows, and the TUN tests that name their own device.
+	Pins tunclean.Pins
 }
 
 // RunOptions are the host's settings that the pipeline lays over the user's profile.
@@ -116,6 +122,11 @@ func Prepare(profile Profile, host Host) (*Prepared, error) {
 	if profile.Options.TUN && host.Tun == TunNone {
 		return nil, fmt.Errorf("%w: this host never creates a TUN", ErrUnsupported)
 	}
+	if host.Tun == TunOwned && pinned(host.Pins) {
+		if err := host.Pins.Validate(); err != nil {
+			return nil, fmt.Errorf("%w: %w", ErrUnsupported, err)
+		}
+	}
 	doc, composed, base, err := document(profile, host)
 	if err != nil {
 		return nil, invalidConfig(err)
@@ -134,7 +145,7 @@ func Prepare(profile Profile, host Host) (*Prepared, error) {
 		options.TUN, options.AllowLAN = false, false
 		err = patchNoTUN(doc, options)
 	case TunOwned:
-		err = patchOwnedTUN(doc, options)
+		err = patchOwnedTUN(doc, options, host.Pins)
 	case TunFD:
 		// The extension only runs while its tunnel is up, so the TUN is always on.
 		options.TUN = true
