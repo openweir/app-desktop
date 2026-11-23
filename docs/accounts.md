@@ -73,7 +73,7 @@ v1 只做原生登录（D56）：
 - `User-Agent: OpenWeir/<版本> (Windows|macOS)`；下载配置（5.4 节）用订阅下载的
   `OpenWeir/<版本> (Windows|macOS) clash.meta`（D48），服务商因此给出 OpenWeir 模板；
 - `Accept-Language` 按界面语言写 `zh-CN` 或 `en-US`，套餐名、等级名和说明随之本地化；切换界面语言后重新同步；
-- `Accept: application/json`；`/api/auth/*` 的 POST 另带 `Origin: <origin>`；
+- `Accept: application/json`（下载配置和链接时不带，与订阅下载相同）；`/api/auth/*` 的 POST 另带 `Origin: <origin>`；
 - **不跟随重定向**，3xx 报 `provider_bad_response`；令牌只发给 origin 本身；
 - JSON 回答最多读 1 MiB，配置最多读 `MAX_CONFIG_BYTES`（与订阅下载相同）；
 - 错误信息只写状态码和接口返回的错误 `code`，不写 URL、令牌和用户输入的内容。urllib 的 `HTTPError` 带着 URL
