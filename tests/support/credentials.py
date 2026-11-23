@@ -1,9 +1,24 @@
-"""Credential stores in memory, so the tests never touch the system's keychain or
-Credential Manager."""
+"""Credential stores in memory, so the tests never touch the system's keychain, Credential
+Manager or Secret Service."""
 
 from __future__ import annotations
 
-from openweir.models.credentials import CredentialError, ProviderTokens
+from keyring.errors import KeyringError
+
+from openweir.models import credentials
+from openweir.models.credentials import CredentialError, Keyring, ProviderTokens
+
+# The real one, for the tests of it: tests/conftest.py puts refuse_system_keyring in its place
+# for the whole session as it starts, before any test module is imported.
+SYSTEM_KEYRING = credentials.system_keyring
+
+
+def refuse_system_keyring() -> Keyring:
+    """The system's credential store outside a test's keyring fixture, as for a worker a test
+    left running that reads a credential after the test ended: never the real one. On Linux
+    that one may wait forever for a prompt to unlock it, which keeps the test run from
+    exiting."""
+    raise KeyringError("the tests never use the system's credential store")
 
 
 class MemoryKeyring:

@@ -18,7 +18,12 @@ from openweir.models.credentials import (
     ProviderTokens,
     WarpAccounts,
 )
-from tests.support.credentials import MemoryCredentials, MemoryKeyring, MemoryProviderTokens
+from tests.support.credentials import (
+    SYSTEM_KEYRING,
+    MemoryCredentials,
+    MemoryKeyring,
+    MemoryProviderTokens,
+)
 
 ACCOUNT = WarpAccount(
     device_id="a1b2c3d4-0000-4000-8000-000000000000",
@@ -187,8 +192,8 @@ def test_a_locked_system_keyring_is_unavailable(keyring: MemoryKeyring) -> None:
 
 # -- Linux: the Secret Service ---------------------------------------------------------------
 
-# The real one; tests/conftest.py puts one in memory in its place for every test.
-REAL_SYSTEM_KEYRING = credentials.system_keyring
+# The real one; tests/conftest.py puts others in its place.
+REAL_SYSTEM_KEYRING = SYSTEM_KEYRING
 
 
 def test_linux_names_the_secret_service(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -298,3 +303,12 @@ def test_other_programming_errors_are_not_hidden() -> None:
     guarded = credentials.secret_service(lambda: FailingBackend(TypeError("a bug")))
     with pytest.raises(TypeError):
         guarded.get_password(SERVICE, "k")
+
+
+def test_outside_a_test_the_system_store_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A worker a test left running that reads a credential once the test is over finds no
+    store, rather than the system's: on Linux that may wait forever for an unlock prompt."""
+    monkeypatch.undo()  # as after this test's keyring fixture is gone
+    with pytest.raises(CredentialError) as raised:
+        KeyringCredentials().read("k")
+    assert raised.value.code == "credentials_unavailable"
