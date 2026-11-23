@@ -430,7 +430,7 @@ exits.md 第 9 节的待实测项。
   subconv 自己的 `testdata/<格式>/input.*`，新版加了格式就照样补一份。subconv 改了警告代码或略去规则的写法时，同步
   `host/base.py` 的 `NODE_LEFT_OUT`、`RULE_LEFT_OUT` 和模拟宿主（`tests/support/simulated_core.py`）。路由模板的主机
   和清单格式归 subconv 的 `rules` 包，升级时读它的 docs/rules.md。
-- **构建工具**：Nuitka 和 dmgbuild 见上一条，锁在 `uv.lock`；CI 和发布的 Windows 构建用 Chocolatey 装固定版本的 NSIS
+- **构建工具**：Nuitka 和 dmgbuild 在 `pyproject.toml` 的 `build` 依赖组里，锁在 `uv.lock`；CI 和发布的 Windows 构建用 Chocolatey 装固定版本的 NSIS
   （`package/windows/install-nsis.ps1` 的 `$Version`，现为 3.13.0，`--allow-downgrade` 盖过 runner 镜像自带的版本），换版本
   就改这里。XcodeGen 是唯一没有固定版本的：Homebrew 只装它当前的版本，CI 的日志里有 `xcodegen --version`；新版本生成的
   工程有问题时 `apple` job 会失败，那时再考虑改为下载固定版本的 release 包并核对 SHA-256。
