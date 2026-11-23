@@ -812,6 +812,8 @@ def check_listing(listing: str) -> None:
 # How much of an error an annotation keeps, as tests/conftest.py's: the start, where it says
 # what failed.
 ANNOTATION_LIMIT = 3000
+# How much of a failed command's error output its annotation keeps: the end, where the error is.
+ERROR_TAIL = 2000
 # GitHub shows ten error annotations of a step; the unknown sonames take at most this many.
 ANNOTATED_SONAMES = 9
 
@@ -852,7 +854,10 @@ def error_annotations(error: BaseException) -> list[str]:
     if isinstance(error, subprocess.CalledProcessError):
         command = error.cmd if isinstance(error.cmd, str) else shlex.join(map(str, error.cmd))
         shown = command if len(command) <= 300 else f"{command[:300]}…"
-        return [_annotation("build_linux", f"{shown} exited with {error.returncode}")]
+        # What the command said is what tells why; its end is where the error is.
+        said = (error.stderr or "").strip() if isinstance(error.stderr, str) else ""
+        detail = f"\n{said[-ERROR_TAIL:]}" if said else ""
+        return [_annotation("build_linux", f"{shown} exited with {error.returncode}{detail}")]
     return [_annotation("build_linux", str(error))]
 
 

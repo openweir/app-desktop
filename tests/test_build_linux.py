@@ -299,6 +299,14 @@ def test_other_failures_are_one_escaped_annotation() -> None:
     assert build_linux.error_annotations(failed) == [
         "::error title=build_linux::python -m nuitka --mode=standalone exited with 1"
     ]
+    said = subprocess.CalledProcessError(
+        1,
+        ["go", "list"],
+        stderr="go: downloading x\n" + "y" * 3000 + "\nerror obtaining VCS status\n",
+    )
+    (line,) = build_linux.error_annotations(said)
+    assert line.startswith("::error title=build_linux::go list exited with 1%0A")
+    assert line.endswith("%0Aerror obtaining VCS status")  # the end of what it said
     long = subprocess.CalledProcessError(2, ["nuitka", *(["--option"] * 100)])
     (line,) = build_linux.error_annotations(long)
     assert line.startswith("::error title=build_linux::nuitka --option --option")
