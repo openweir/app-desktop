@@ -4,8 +4,13 @@ the core, modes and nodes, reloads, reconnecting, and the run options."""
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import os
+import socket
 import subprocess
+import sys
 import time
+from pathlib import Path
 
 import pytest
 
@@ -23,7 +28,9 @@ USAGE = "upload=1073741824; download=4294967296; total=21474836480; expire=19249
 
 
 def listening(pid: int) -> set[str]:
-    """The TCP addresses a process listens on."""
+    """The TCP addresses a process listens on, as ``lsof -nP`` names them."""
+    if sys.platform == "linux":  # not every Linux has lsof; every one has /proc
+        return proc_listening(pid)
     done = subprocess.run(
         ["lsof", "-nP", "-a", "-p", str(pid), "-iTCP", "-sTCP:LISTEN", "-Fn"],
         capture_output=True,
@@ -31,6 +38,35 @@ def listening(pid: int) -> set[str]:
         check=False,
     )
     return {line[1:] for line in done.stdout.splitlines() if line.startswith("n")}
+
+
+def proc_listening(pid: int) -> set[str]:
+    """``listening`` from the process's socket descriptors and its TCP tables in /proc."""
+    inodes = set()
+    for fd in Path(f"/proc/{pid}/fd").iterdir():
+        with contextlib.suppress(OSError):  # closed since the listing
+            if (target := os.readlink(fd)).startswith("socket:["):
+                inodes.add(target.removeprefix("socket:[").removesuffix("]"))
+    found = set()
+    for table, family in (("tcp", socket.AF_INET), ("tcp6", socket.AF_INET6)):
+        for row in Path(f"/proc/{pid}/net/{table}").read_text().splitlines()[1:]:
+            fields = row.split()
+            local, state, inode = fields[1], fields[3], fields[9]
+            if state != "0A" or inode not in inodes:  # 0A: TCP_LISTEN
+                continue
+            address, port = local.split(":")
+            # Each 32-bit word of the address is printed as a number in host byte order.
+            packed = b"".join(
+                int(address[i : i + 8], 16).to_bytes(4, sys.byteorder)
+                for i in range(0, len(address), 8)
+            )
+            host = socket.inet_ntop(family, packed)
+            if host in {"0.0.0.0", "::"}:
+                host = "*"
+            elif family == socket.AF_INET6:
+                host = f"[{host}]"
+            found.add(f"{host}:{int(port, 16)}")
+    return found
 
 
 def serve_subscription(app: App, text: str) -> str:
