@@ -52,6 +52,30 @@ def test_ci_is_read_only_and_its_checks_keep_no_credentials() -> None:
     assert checkouts >= 9
 
 
+def test_the_linux_test_jobs_install_qts_system_libraries_first() -> None:
+    """PySide6's Qt loads libEGL, libxkbcommon, fontconfig and a few more from the system,
+    which a runner image need not have: each job that runs pytest on Linux too installs them,
+    the same way, before the tests, which draw offscreen."""
+    jobs = _load(ROOT / ".github" / "workflows" / "ci.yml")["jobs"]
+    installs = set()
+    for name in ("python", "e2e"):
+        job = jobs[name]
+        matrix = job["strategy"]["matrix"]
+        systems = matrix.get("os") or [entry["os"] for entry in matrix["include"]]
+        assert any(system.startswith("ubuntu-") for system in systems), name
+        steps = job["steps"]
+        names = [step.get("name") for step in steps]
+        assert names.count("Qt system libraries") == 1, name
+        install = names.index("Qt system libraries")
+        assert steps[install]["if"] == "runner.os == 'Linux'"
+        installs.add(steps[install]["run"])
+        tests = [i for i, step in enumerate(steps) if "pytest" in step.get("run", "")]
+        assert tests, name
+        assert install < min(tests), name
+        assert {steps[i]["env"]["QT_QPA_PLATFORM"] for i in tests} == {"offscreen"}, name
+    assert len(installs) == 1
+
+
 def test_every_job_has_a_timeout() -> None:
     for path in WORKFLOWS:
         for name, job in _load(path)["jobs"].items():

@@ -142,6 +142,10 @@ jobs:
             python_arch: x86_64
           - os: windows-11-arm
             python_arch: aarch64
+          - os: ubuntu-24.04
+            python_arch: x86_64
+          - os: ubuntu-24.04-arm
+            python_arch: aarch64
     env:
       UV_PYTHON_ARCH: ${{ matrix.python_arch }}
       CGO_ENABLED: ${{ matrix.os == 'windows-11-arm' && '0' || '1' }}
@@ -149,6 +153,22 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
+      # What PySide6's Qt loads from the system (readelf -d: libQt6Gui, the offscreen platform,
+      # QtDBus); the fonts are the app's own (src/openweir/ui/fonts), so none are installed.
+      # A mirror that fails is retried, and the whole install twice more.
+      - name: Qt system libraries
+        if: runner.os == 'Linux'
+        run: |
+          packages=(libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3 libglib2.0-0t64 libx11-6)
+          for attempt in 1 2 3; do
+            if sudo apt-get -q -o Acquire::Retries=3 update &&
+              sudo apt-get -q -y -o Acquire::Retries=3 install --no-install-recommends "${packages[@]}"; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then sleep $((attempt * 30)); fi
+          done
+          echo "::error::apt-get could not install Qt's system libraries"
+          exit 1
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
         with:
           enable-cache: true
@@ -197,11 +217,25 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-26, macos-26-intel]
+        os: [macos-26, macos-26-intel, ubuntu-24.04]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
+      # As in the python job.
+      - name: Qt system libraries
+        if: runner.os == 'Linux'
+        run: |
+          packages=(libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3 libglib2.0-0t64 libx11-6)
+          for attempt in 1 2 3; do
+            if sudo apt-get -q -o Acquire::Retries=3 update &&
+              sudo apt-get -q -y -o Acquire::Retries=3 install --no-install-recommends "${packages[@]}"; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then sleep $((attempt * 30)); fi
+          done
+          echo "::error::apt-get could not install Qt's system libraries"
+          exit 1
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
         with:
           enable-cache: true
