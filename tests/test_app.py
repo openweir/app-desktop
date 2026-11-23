@@ -1,4 +1,5 @@
 import asyncio
+import signal
 import subprocess
 import sys
 from functools import partial
@@ -7,17 +8,27 @@ from typing import Any, cast
 
 import pytest
 from PySide6.QtCore import QCoreApplication, Qt, QUrl
-from PySide6.QtGui import QColor, QFont
+from PySide6.QtGui import QColor, QFont, QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine, QQmlComponent
 from PySide6.QtQuick import QQuickItem
 from PySide6.QtTest import QTest
 from pytestqt.qtbot import QtBot
 from shiboken6 import getCppPointer
 
-from openweir.app import MAIN_QML, open_store, switch_language, update_result
+from openweir.app import (
+    DEV_SOCKET_ENV,
+    MAIN_QML,
+    default_host,
+    missing_socket_opener,
+    open_store,
+    switch_language,
+    update_result,
+)
 from openweir.desktop.dock import ACCESSORY, REGULAR
 from openweir.desktop.instance import LOCK_NAME
 from openweir.host.base import TAKEOVER_NONE, TAKEOVER_SETTINGS, TAKEOVER_TUN, HostError, Rule
+from openweir.host.service import ServiceHost
+from openweir.host.transport import Opener
 from openweir.i18n import Translations
 from openweir.models.settings import DatabaseSettingsStore
 from openweir.models.store import ProfileStore
@@ -745,6 +756,8 @@ def test_quit_command_closes_the_running_ui(tmp_path: Path) -> None:
         ("win32", True, None, True),  # earlier installations keep both on
         ("win32", True, True, True),
         ("win32", True, False, False),
+        ("linux", False, None, False),  # new on Linux too (D63)
+        ("linux", True, True, True),
         ("darwin", False, None, True),  # the extension always uses TUN; nothing to seed
     ],
 )
@@ -768,6 +781,141 @@ def test_a_new_windows_installation_takes_over_with_tun_only(
         assert DatabaseSettingsStore(reopened.database).current.system_proxy == expected
     finally:
         reopened.close()
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows sends a GUI process no SIGTERM")
+@pytest.mark.parametrize("number", [signal.SIGTERM, signal.SIGINT])
+def test_a_signal_leaves_without_disconnecting(tmp_path: Path, number: signal.Signals) -> None:
+    """The session's end on Linux and systemd send SIGTERM, a terminal SIGINT: the UI leaves at
+    once, as at the session's end elsewhere, and the tunnel stays with the service (D41)."""
+    ui = subprocess.Popen(
+        [sys.executable, "-c", RUNNING_UI, str(tmp_path)],
+        stdout=subprocess.PIPE,
+        text=True,
+        cwd=ROOT,
+    )
+    try:
+        assert ui.stdout is not None
+        assert ui.stdout.readline() == "loaded\n"
+        ui.send_signal(number)
+        assert ui.wait(timeout=30) == 0
+        said = ui.stdout.read().split()
+    finally:
+        ui.kill()
+        ui.wait()
+    assert said == ["closed"]  # let go of the host, never stopped the tunnel
+    assert not (tmp_path / LOCK_NAME).exists()
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="the shortcut is Linux's")
+def test_ctrl_q_quits_and_disconnects_first(qtbot: QtBot, loaded: Loaded) -> None:
+    desktop, overview = loaded.view_models.desktop, loaded.view_models.overview
+    qtbot.waitUntil(lambda: overview.property("connected"))
+    loaded.window.requestActivate()
+    qtbot.waitUntil(lambda: QGuiApplication.focusWindow() is loaded.window)
+    with qtbot.waitSignal(desktop.quitRequested):
+        QTest.keyClick(loaded.window, Qt.Key.Key_Q, Qt.KeyboardModifier.ControlModifier)
+    assert not running(simulated(loaded))
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows always has its service's pipe")
+def test_the_development_socket_wins(tmp_path: Path) -> None:
+    path = str(tmp_path / "dev.sock")
+    host = default_host({DEV_SOCKET_ENV: path}, mark_package(tmp_path))
+    assert isinstance(host, ServiceHost)
+    assert host.takeover == TAKEOVER_NONE
+    connections: list[object] = []
+
+    async def accept(_reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        connections.append(writer)
+        await hang_up(_reader, writer)
+
+    async def ask() -> None:
+        server = await asyncio.start_unix_server(accept, path)
+        try:
+            with pytest.raises(HostError):  # it hangs up without a word
+                await host.get_info()
+        finally:
+            server.close()
+            await server.wait_closed()
+            await host.close()
+
+    asyncio.run(ask())
+    assert connections
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="the Linux package's service")
+def test_an_installed_package_talks_to_the_release_service(tmp_path: Path) -> None:
+    host = default_host({}, mark_package(tmp_path))
+    assert isinstance(host, ServiceHost)
+    assert host.takeover == TAKEOVER_SETTINGS  # both switches, as on Windows (D63)
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="the Linux package's service")
+def test_a_run_from_source_has_no_service_to_talk_to(tmp_path: Path) -> None:
+    executable = tmp_path / "python3"
+    executable.touch()
+    host = default_host({}, str(executable))
+    assert isinstance(host, ServiceHost)
+    assert host.takeover == TAKEOVER_NONE
+    with pytest.raises(HostError) as raised:
+        asyncio.run(host.get_info())
+    assert raised.value.code == "service_unavailable"
+    assert DEV_SOCKET_ENV in raised.value.message
+
+
+async def hang_up(_reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+    """A server that closes every connection at once."""
+    writer.close()
+    await writer.wait_closed()
+
+
+def mark_package(directory: Path) -> str:
+    """An executable in ``directory`` beside the Linux package's format marker (D61)."""
+    (directory / "package-format").write_text("deb\n", "ascii")
+    executable = directory / "openweir"
+    executable.touch()
+    return str(executable)
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="the release service's Unix socket")
+def test_a_missing_socket_names_the_unit(tmp_path: Path) -> None:
+    from openweir.host.transport import unix_opener
+
+    path = str(tmp_path / "control.sock")
+    opener = missing_socket_opener(unix_opener(path), path)
+    with pytest.raises(HostError) as raised:
+        asyncio.run(opener())
+    assert raised.value.code == "service_unavailable"
+    assert raised.value.retryable
+    assert "openweir.socket" in raised.value.message
+
+    async def served() -> bool:
+        server = await asyncio.start_unix_server(hang_up, path)
+        try:
+            _, writer = await opener()
+            writer.close()
+            await writer.wait_closed()
+            return True
+        finally:
+            server.close()
+            await server.wait_closed()
+
+    assert asyncio.run(served())
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="the release service's Unix socket")
+def test_other_failures_to_connect_pass_through(tmp_path: Path) -> None:
+    refused = HostError("service_unavailable", "connection refused")
+    refused.__cause__ = ConnectionRefusedError()
+
+    async def failing() -> Any:
+        raise refused
+
+    opener: Opener = failing
+    with pytest.raises(HostError) as raised:
+        asyncio.run(missing_socket_opener(opener, str(tmp_path / "control.sock"))())
+    assert raised.value is refused
 
 
 def test_quitting_leaves_even_when_the_window_hides_instead() -> None:

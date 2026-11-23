@@ -262,8 +262,10 @@ def new_install_settings(platform: str) -> dict[str, Any]:
     """What a new installation stores as it first starts, where it starts other than the
     defaults that earlier installations keep (D46). On Windows only TUN takes over: the system
     proxy, on loopback, shuts out Microsoft Store and the other packaged apps, which may not
-    reach loopback, while TUN carries their traffic anyway."""
-    return {"system_proxy": False} if platform == "win32" else {}
+    reach loopback, while TUN carries their traffic anyway. Linux has no earlier installations
+    and starts the same way (D63): the TUN carries every program's traffic, and the system
+    proxy exists only on GNOME and KDE."""
+    return {"system_proxy": False} if platform in ("win32", "linux") else {}
 
 
 def seed_new_install(database: Database, platform: str) -> None:

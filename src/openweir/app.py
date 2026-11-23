@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 import os
+import signal
+import socket
 import sys
-from collections.abc import Callable, Coroutine, Sequence
+from collections.abc import Callable, Coroutine, Mapping, Sequence
 from functools import partial
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import QCoreApplication, QEvent, Qt, QUrl
+from PySide6.QtCore import QCoreApplication, QEvent, QSocketNotifier, Qt, QUrl
 from PySide6.QtGui import QGuiApplication, QIcon
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuick import QQuickWindow
@@ -34,8 +36,9 @@ from openweir.models.database import DATABASE_NAME
 from openweir.models.settings import DatabaseSettingsStore, SettingsStore, seed_new_install
 from openweir.models.store import ProfileStore, default_data_dir
 from openweir.models.subscription import Fetcher, UrlFetcher
-from openweir.product import DISPLAY_NAME, PIPE_NAME
+from openweir.product import DISPLAY_NAME, LINUX_DESKTOP_ID, LINUX_SOCKET, LINUX_UNIT, PIPE_NAME
 from openweir.update.linux import UPDATE_RESULT_ARG
+from openweir.update.releases import installed_package_format
 from openweir.update.updater import Updater
 from openweir.viewmodels.appearance import Appearance, resolve_mode
 from openweir.viewmodels.composition import ViewModels, compose
@@ -48,7 +51,7 @@ MAIN_QML = Path(__file__).resolve().parent / "ui" / "Main.qml"
 DEV_SOCKET_ENV = "OPENWEIR_DEV_SOCKET"
 # The command line, which the installers and the system use (none of it is for people):
 # - BACKGROUND_ARG (desktop/login.py): started at login; opens in the tray where there is one,
-#   or shows the window. Windows' scheduled task passes it, and Linux's autostart entry is to.
+#   or shows the window. Windows' scheduled task and Linux's autostart entry pass it.
 # - QUIT_ARG: ask the UI already running to quit and wait for it, as the Windows installer does
 #   before it replaces the files (docs/ui.md §8) and the Linux package is to before an upgrade
 #   (D61); exits 0 once no UI runs. The tunnel stays as it is.
@@ -56,6 +59,9 @@ DEV_SOCKET_ENV = "OPENWEIR_DEV_SOCKET"
 #   the UI ran through pkexec, from the shell that starts the UI again after it (D62,
 #   update/linux.py); the settings page's version row says what it means.
 QUIT_ARG = "--quit"
+# The signals that end the UI from outside: SIGTERM as the session ends or systemd stops it,
+# SIGINT from a terminal. They leave as the system's quit does (Application.leave_on_signals).
+EXIT_SIGNALS = (signal.SIGTERM, signal.SIGINT)
 
 
 def update_result(arguments: Sequence[str]) -> int | None:
@@ -81,6 +87,7 @@ class Application(QGuiApplication):
     def __init__(self, argv: list[str]) -> None:
         super().__init__(argv)
         self.user_quit: Callable[[], None] | None = None
+        self._wakeup: tuple[socket.socket, socket.socket, QSocketNotifier] | None = None
 
     def event(self, event: QEvent) -> bool:
         if event.type() == QEvent.Type.Quit:
@@ -91,37 +98,93 @@ class Application(QGuiApplication):
             return True
         return super().event(event)
 
+    def leave_on_signals(self, signals: Sequence[signal.Signals] = EXIT_SIGNALS) -> None:
+        """Leave the event loop on ``signals`` as on the system's quit: at once, the tunnel
+        left to the service (D5, D41). Linux's session manager and systemd end a session's
+        programs with SIGTERM rather than a Quit event. Python runs a handler only between
+        its own instructions, which Qt's event loop does not reach while it waits; the
+        signal's number written to the wakeup socket wakes the loop instead. Windows sends
+        a GUI process no such signals."""
+        if sys.platform == "win32" or self._wakeup is not None:
+            return
+        reader, writer = socket.socketpair()
+        reader.setblocking(False)
+        writer.setblocking(False)
+        signal.set_wakeup_fd(writer.fileno(), warn_on_full_buffer=False)
+        for number in signals:
+            signal.signal(number, lambda *_: None)  # the wakeup socket does the work
+        notifier = QSocketNotifier(reader.fileno(), QSocketNotifier.Type.Read, self)
 
-def default_opener() -> Opener:
-    """The installed service on Windows; elsewhere the development socket, if one is set."""
-    if sys.platform == "win32":
-        from openweir.host.transport import pipe_opener
+        def woken() -> None:
+            try:
+                received = reader.recv(64)
+            except OSError:
+                return
+            if any(number in received for number in signals):
+                self.exit(0)
 
-        return pipe_opener(PIPE_NAME)
-    from openweir.host.transport import unix_opener
+        notifier.activated.connect(woken)
+        self._wakeup = reader, writer, notifier
 
-    socket = os.environ.get(DEV_SOCKET_ENV)
-    if socket:
-        return unix_opener(socket)
+
+def unavailable_opener(message: str) -> Opener:
+    """No service to connect to; every connection fails with ``message``."""
 
     async def unavailable() -> Streams:
-        raise HostError("service_unavailable", f"set {DEV_SOCKET_ENV} to a development socket")
+        raise HostError("service_unavailable", message)
 
     return unavailable
 
 
-def default_host() -> TunnelHost:
-    """The system extension in a packaged OpenWeir.app on macOS, unless a development socket is
-    set (docs/architecture.md §6); otherwise the service over default_opener. Off Windows
-    that is the development service, which takes over nothing (§11)."""
-    if sys.platform == "darwin" and not os.environ.get(DEV_SOCKET_ENV):
+def missing_socket_opener(connect: Opener, path: str) -> Opener:
+    """``connect`` to the Linux release service's socket (D60), which systemd's
+    ``openweir.socket`` holds open even while the service is stopped. When that socket is not
+    there, the error names the unit that should be listening, rather than only saying that a
+    file is missing."""
+
+    async def open_release() -> Streams:
+        try:
+            return await connect()
+        except HostError as error:
+            if not isinstance(error.__cause__, FileNotFoundError):
+                raise
+            message = (
+                f"{path} does not exist: the {LINUX_UNIT}.socket unit is not running "
+                f"(systemctl enable --now {LINUX_UNIT}.socket)"
+            )
+            raise HostError("service_unavailable", message, retryable=True) from error
+
+    return open_release
+
+
+def default_host(
+    environ: Mapping[str, str] = os.environ, executable: str = sys.executable
+) -> TunnelHost:
+    """The installed service on Windows. With a development socket set elsewhere, the
+    development service, which takes over nothing (docs/architecture.md §11). Otherwise on
+    macOS the system extension of a packaged OpenWeir.app (§6), and on Linux the release
+    service of an installed package (D60, D61), which a package-format marker beside the
+    executable tells from a run from source. Anything else has no service to talk to."""
+    if sys.platform == "win32":
+        from openweir.host.transport import pipe_opener
+
+        return ServiceHost(pipe_opener(PIPE_NAME), takeover=TAKEOVER_SETTINGS)
+    from openweir.host.transport import unix_opener
+
+    development = environ.get(DEV_SOCKET_ENV)
+    if development:
+        return ServiceHost(unix_opener(development), takeover=TAKEOVER_NONE)
+    if sys.platform == "darwin":
         from openweir.host.extension import bundled_host
 
         host = bundled_host()
         if host is not None:
             return host
-    takeover = TAKEOVER_SETTINGS if sys.platform == "win32" else TAKEOVER_NONE
-    return ServiceHost(default_opener(), takeover=takeover)
+    elif sys.platform == "linux" and installed_package_format(executable) is not None:
+        opener = missing_socket_opener(unix_opener(LINUX_SOCKET), LINUX_SOCKET)
+        return ServiceHost(opener, takeover=TAKEOVER_SETTINGS)
+    message = f"no installed service; set {DEV_SOCKET_ENV} to a development service's socket"
+    return ServiceHost(unavailable_opener(message), takeover=TAKEOVER_NONE)
 
 
 def default_take_over(host: TunnelHost) -> Callable[[], Coroutine[Any, Any, None]] | None:
@@ -197,8 +260,12 @@ def main(
     if start_hidden:
         open_in_menu_bar()
     app = Application(sys.argv)
+    app.leave_on_signals()
     app.setApplicationName(DISPLAY_NAME)
     app.setApplicationVersion(__version__)
+    # Names the window's .desktop file, which gives it its icon and name on Linux: Wayland's
+    # app id, X11's _KDE_NET_WM_DESKTOP_FILE. The package installs the file (D61).
+    app.setDesktopFileName(LINUX_DESKTOP_ID)
     # The bundle's icon covers the packaged macOS app; this one covers Windows' taskbar and
     # runs from source (scripts/gen_icons.py).
     brand = Path(__file__).resolve().parent / "ui" / "brand"
@@ -229,7 +296,8 @@ def main(
         login_item=login_item or default_login_item(),
         tray_available=tray_supported(app.platformName()),
         start_hidden=start_hidden,
-        connect_at_login=sys.platform == "win32" and start_hidden,
+        # Opened at login by Windows' scheduled task or Linux's autostart entry.
+        connect_at_login=sys.platform in ("win32", "linux") and start_hidden,
         updater=updater,
         icloud=bundled_provider(),
         google=google or configured_provider(KeyringCredentials()),

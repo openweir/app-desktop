@@ -195,6 +195,14 @@ ApplicationWindow {
         desktop: window.desktopViewModel
     }
 
+    // Linux: Ctrl+Q quits OpenWeir as the tray's 退出 OpenWeir does, disconnecting first
+    // (D41). macOS has ⌘Q in its application menu, which Application.event hears.
+    Shortcut {
+        sequence: "Ctrl+Q"
+        enabled: Qt.platform.os === "linux"
+        onActivated: window.desktopViewModel.quit()
+    }
+
     ExtensionSetupDialog {
         id: extensionSetupDialog
 
