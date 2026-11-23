@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls.Basic
 import QtQuick.Layouts
+import QtQuick.Templates as T
 import OpenWeir
 import "components"
 import "pages"
@@ -23,6 +24,7 @@ ApplicationWindow {
     required property AboutViewModel aboutViewModel
     required property BackupViewModel backupViewModel
     required property SystemExtensionViewModel systemExtensionViewModel
+    required property ProviderSignInViewModel providerSignInViewModel
 
     // Whether the window holds its pages: while it shows, and for a moment after it hides.
     // Hidden in the tray or the menu bar, it lets them go and gives back the memory they and
@@ -199,6 +201,39 @@ ApplicationWindow {
         id: extensionSetupDialog
 
         overview: window.overviewViewModel
+    }
+
+    ProviderSignInDialog {
+        id: providerSignInDialog
+
+        signIn: window.providerSignInViewModel
+        // 从链接导入: the subscriptions page opens its link form once the dialog has gone, for
+        // the link the user copies from the provider's user center.
+        onClosed: {
+            if (!importAfterClose)
+                return
+            importAfterClose = false
+            window.shellViewModel.setPage("profiles")
+            window.profilesViewModel.prefillImport("", "")
+        }
+    }
+
+    // Signing in to a provider: from the subscriptions page's 添加 menu, the account page or
+    // an openweir://provider link. The control it was asked from gets the focus back; a
+    // menu's item hands it to the menu's trigger.
+    Connections {
+        target: window.providerSignInViewModel
+
+        function onOpenRequested() {
+            if (!window.visible)
+                window.present()
+            const focused = window.activeFocusItem
+            const menu = (focused as T.MenuItem)?.menu as AppMenu
+            if (menu?.trigger)
+                providerSignInDialog.start(menu.trigger, menu.triggerFocusReason)
+            else
+                providerSignInDialog.start(focused, Focus.reasonAfter(focused))
+        }
     }
 
     Connections {

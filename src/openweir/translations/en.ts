@@ -827,6 +827,13 @@
     </message>
 </context>
 <context>
+    <name>ExternalButton</name>
+    <message>
+        <source>%1（在浏览器中打开）</source>
+        <translation>%1 (opens in browser)</translation>
+    </message>
+</context>
+<context>
     <name>Feedback</name>
     <message>
         <source>该功能尚未实现</source>
@@ -2978,6 +2985,240 @@ prepend-rules:
     <message>
         <source>{origin} · {ago}更新</source>
         <translation>{origin} · Updated {ago}</translation>
+    </message>
+    <message>
+        <source>{date} 到期</source>
+        <translation>Expires {date}</translation>
+    </message>
+</context>
+<context>
+    <name>ProviderSignInDialog</name>
+    <message>
+        <source>服务商地址</source>
+        <translation>Provider address</translation>
+    </message>
+    <message>
+        <source>登录方式</source>
+        <translation>Sign-in method</translation>
+    </message>
+    <message>
+        <source>密码</source>
+        <translation>Password</translation>
+    </message>
+    <message>
+        <source>邮箱</source>
+        <translation>Email</translation>
+    </message>
+    <message>
+        <source>验证码</source>
+        <translation>Code</translation>
+    </message>
+    <message>
+        <source>订阅</source>
+        <translation>Subscriptions</translation>
+    </message>
+    <message>
+        <source>续费</source>
+        <translation>Renew</translation>
+    </message>
+    <message>
+        <source>续费 %1</source>
+        <translation>Renew %1</translation>
+    </message>
+    <message>
+        <source>上一步</source>
+        <translation>Back</translation>
+    </message>
+    <message>
+        <source>取消</source>
+        <translation>Cancel</translation>
+    </message>
+    <message>
+        <source>稍后</source>
+        <translation>Later</translation>
+    </message>
+    <message>
+        <source>选购套餐</source>
+        <translation>Browse plans</translation>
+    </message>
+    <message>
+        <source>正在检查…</source>
+        <translation>Checking…</translation>
+    </message>
+    <message>
+        <source>继续</source>
+        <translation>Continue</translation>
+    </message>
+    <message>
+        <source>正在登录…</source>
+        <translation>Signing in…</translation>
+    </message>
+    <message>
+        <source>登录</source>
+        <translation>Sign in</translation>
+    </message>
+    <message>
+        <source>从链接导入</source>
+        <translation>Import from URL</translation>
+    </message>
+    <message>
+        <source>正在验证…</source>
+        <translation>Verifying…</translation>
+    </message>
+    <message>
+        <source>验证</source>
+        <translation>Verify</translation>
+    </message>
+    <message>
+        <source>正在替换…</source>
+        <translation>Replacing…</translation>
+    </message>
+    <message>
+        <source>替换</source>
+        <translation>Replace</translation>
+    </message>
+    <message>
+        <source>正在应用…</source>
+        <translation>Applying…</translation>
+    </message>
+    <message>
+        <source>使用</source>
+        <translation>Use</translation>
+    </message>
+    <message>
+        <source>完成</source>
+        <translation>Done</translation>
+    </message>
+</context>
+<context>
+    <name>ProviderSignInViewModel</name>
+    <message>
+        <source>登录「{site}」</source>
+        <translation>Sign in to “{site}”</translation>
+    </message>
+    <message>
+        <source>两步验证</source>
+        <translation>Two-factor authentication</translation>
+    </message>
+    <message>
+        <source>替换「{account}」？</source>
+        <translation>Replace “{account}”?</translation>
+    </message>
+    <message>
+        <source>选择要使用的订阅</source>
+        <translation>Choose a subscription to use</translation>
+    </message>
+    <message>
+        <source>这个账户还没有订阅</source>
+        <translation>This account has no subscriptions yet</translation>
+    </message>
+    <message>
+        <source>登录服务商</source>
+        <translation>Sign in to provider</translation>
+    </message>
+    <message>
+        <source>输入身份验证器中的验证码。</source>
+        <translation>Enter the code from your authenticator app.</translation>
+    </message>
+    <message>
+        <source>在服务商的网页上选购套餐后，订阅会出现在订阅页。</source>
+        <translation>Once you buy a plan on the provider’s website, its subscription shows on the Subscriptions page.</translation>
+    </message>
+    <message numerus="yes">
+        <source>将移除它的 %n 份订阅，改用「{successor}」的规则。</source>
+        <translation>
+            <numerusform>Its %n subscription will be removed, and the rules of “{successor}” used instead.</numerusform>
+            <numerusform>Its %n subscriptions will be removed, and the rules of “{successor}” used instead.</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>将移除它的 %n 份订阅，改用我的方案。</source>
+        <translation>
+            <numerusform>Its %n subscription will be removed, and my plan used instead.</numerusform>
+            <numerusform>Its %n subscriptions will be removed, and my plan used instead.</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>将移除它的 %n 份订阅。</source>
+        <translation>
+            <numerusform>Its %n subscription will be removed.</numerusform>
+            <numerusform>Its %n subscriptions will be removed.</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>密码</source>
+        <translation>Password</translation>
+    </message>
+    <message>
+        <source>邮箱验证码</source>
+        <translation>Email code</translation>
+    </message>
+    <message>
+        <source>邮箱或用户名</source>
+        <translation>Email or user name</translation>
+    </message>
+    <message>
+        <source>邮箱</source>
+        <translation>Email</translation>
+    </message>
+    <message>
+        <source>正在发送…</source>
+        <translation>Sending…</translation>
+    </message>
+    <message>
+        <source>重新发送（{seconds}）</source>
+        <translation>Resend ({seconds})</translation>
+    </message>
+    <message>
+        <source>重新发送</source>
+        <translation>Resend</translation>
+    </message>
+    <message>
+        <source>发送验证码</source>
+        <translation>Send code</translation>
+    </message>
+    <message>
+        <source>试用 · {status}</source>
+        <translation>Trial · {status}</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n 天后到期</source>
+        <translation>
+            <numerusform>Expires in %n day</numerusform>
+            <numerusform>Expires in %n days</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>流量已用 {percent}%</source>
+        <translation>{percent}% of traffic used</translation>
+    </message>
+    <message>
+        <source>有效</source>
+        <translation>Active</translation>
+    </message>
+    <message>
+        <source>已到期</source>
+        <translation>Expired</translation>
+    </message>
+    <message>
+        <source>流量已用完</source>
+        <translation>Traffic used up</translation>
+    </message>
+    <message>
+        <source>未开始</source>
+        <translation>Not started</translation>
+    </message>
+    <message>
+        <source>已停用</source>
+        <translation>Disabled</translation>
+    </message>
+    <message>
+        <source>暂不可用</source>
+        <translation>Unavailable</translation>
+    </message>
+    <message>
+        <source>已用 {usage}</source>
+        <translation>{usage} used</translation>
     </message>
     <message>
         <source>{date} 到期</source>
