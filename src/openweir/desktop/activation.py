@@ -23,6 +23,7 @@ import ctypes
 import logging
 import os
 import re
+import sys
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from typing import Any, Protocol
@@ -256,6 +257,8 @@ class Xcb:
 
 def qt_x11() -> X11 | None:
     """X11 through the xcb connection of Qt's xcb platform; None without one."""
+    if sys.platform != "linux":  # also tells the type checker: PySide's X11 types are Linux's
+        return None
     app = QGuiApplication.instance()
     interface = app.nativeInterface() if isinstance(app, QGuiApplication) else None
     if not isinstance(interface, QNativeInterface.QX11Application):

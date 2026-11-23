@@ -568,8 +568,10 @@ def test_vpngate_settings_go_with_the_plan(qtbot: QtBot, planned: ViewModels) ->
         exit_.toggleCountry("FR")
     with qtbot.waitSignal(routing.applied):
         exit_.toggleCountry("KR")
-    # No server in France: the exit has none, and its rules reject.
-    assert (prop(exit_, "status"), prop(exit_, "statusTone")) == ("不可用", "warning")
+    # No server in France: the exit has none, and its rules reject. The servers it picks
+    # follow the list, which reads the applied plan after it is applied.
+    qtbot.waitUntil(lambda: prop(exit_, "status") == "不可用")
+    assert prop(exit_, "statusTone") == "warning"
     assert prop(exit_, "serversDetail").startswith("所选国家暂无可用的服务器 · ")
     assert entry_target(host, routing, "OpenAI") == "REJECT"
     plan = routing.plan()
