@@ -271,8 +271,11 @@ service_checks() {
 	done
 }
 
+# Read whole first: with pipefail, grep -q leaving early would fail the pipeline it matched in.
 journal_has() {
-	as_root journalctl -b --no-pager -o cat -u openweir.service | grep -Fq -- "$1"
+	local journal
+	journal=$(as_root journalctl -b --no-pager -o cat -u openweir.service) &&
+		grep -Fq -- "$1" <<<"$journal"
 }
 
 invocation() {
