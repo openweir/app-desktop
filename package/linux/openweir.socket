@@ -9,6 +9,8 @@ Documentation=https://github.com/openweir/app-desktop
 ListenStream=/run/openweir/control.sock
 SocketMode=0666
 DirectoryMode=0755
+# Stopping the socket (a removal) takes the socket file away too.
+RemoveOnStop=yes
 
 [Install]
 WantedBy=sockets.target

@@ -711,6 +711,7 @@ def test_the_socket_is_the_products() -> None:
     assert socket["Socket"]["ListenStream"] == product.LINUX_SOCKET
     assert socket["Socket"]["SocketMode"] == "0666"
     assert socket["Socket"]["DirectoryMode"] == "0755"
+    assert socket["Socket"]["RemoveOnStop"] == "yes"
     assert socket["Install"]["WantedBy"] == "sockets.target"
     assert product.LINUX_UNIT == "openweir"
 

@@ -798,7 +798,7 @@ Linux 版（决策 D60–D67）是一个以 root 运行的 systemd 系统服务�
   - `-install-update <包> <SHA256SUMS> <SHA256SUMS.sig>`：经 pkexec 运行的安装辅助进程（D62，见"更新"）。
   - `-socket <路径>`：开发服务（第 11 节），拒绝以 root 运行，与 macOS 上相同。
 - **单元**（`package/linux/`）：`openweir.socket` 监听 `/run/openweir/control.sock`，套接字 0666、目录 0755：每个本地
-  用户都能连接，访问控制是服务自己的对端校验。`openweir.service` 是 `Type=notify`，`Requires=openweir.socket`，排在
+  用户都能连接，访问控制是服务自己的对端校验；`RemoveOnStop=yes`，卸载停掉它时套接字文件一并删除。`openweir.service` 是 `Type=notify`，`Requires=openweir.socket`，排在
   `network.target` 和 `systemd-resolved.service` 之后（关机时它先停，`-cleanup` 还找得到要清的东西），`Restart=always`、
   `RestartSec=2`、`TimeoutStopSec=25`；`WantedBy=multi-user.target` 加 `Also=openweir.socket`，所以开机就启动，按属主
   恢复隧道，与 Windows 服务相同（5.2 节）。
