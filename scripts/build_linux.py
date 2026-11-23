@@ -379,8 +379,9 @@ def prune_unneeded(tree: Path, infos: list[ElfInfo], keep: Iterable[str] = (CRON
     """Removes the shared libraries no file in the tree needs, until there are none, and returns
     their paths. Nuitka carries a library's dependencies with it, so leaving a system library
     out leaves its own dependencies behind (libsystemd for libdbus, say); the distribution
-    provides those with the library. Plugins and extension modules have no soname and stay;
-    Cronet, which the service loads by its path, too."""
+    provides those with the library. Only lib*.so* files with a soname go: Qt's plugins have
+    none, and Python's extension modules, which it loads by their paths, neither have one nor
+    start with lib. Cronet, which the service loads by its path, stays too."""
     kept = set(keep)
     removed: list[str] = []
     while True:
@@ -389,6 +390,7 @@ def prune_unneeded(tree: Path, infos: list[ElfInfo], keep: Iterable[str] = (CRON
             info
             for info in infos
             if info.soname is not None
+            and Path(info.path).name.startswith("lib")
             and Path(info.path).name not in kept
             and info.soname not in needed
             and Path(info.path).name not in needed
