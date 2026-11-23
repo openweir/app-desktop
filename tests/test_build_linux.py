@@ -459,8 +459,9 @@ def test_nothing_the_window_needs_is_left_out() -> None:
         assert not [pattern for pattern in patterns if fnmatch.fnmatch(path, pattern)], path
 
 
-@pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="no FIFOs")
+@POSIX
 def test_the_tree_holds_only_files_directories_and_links(tmp_path: Path) -> None:
+    assert sys.platform != "win32"  # for the type checker: Windows has no FIFOs
     tree = _tree(tmp_path)
     build_linux.normalize_modes(tree)
     os.mkfifo(tree / "pipe", 0o644)

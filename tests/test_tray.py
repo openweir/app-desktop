@@ -39,7 +39,7 @@ class FakeBus:
         self.asked: list[tuple[str, str, tuple[Any, ...]]] = []
 
     def send_and_get_reply(self, message: Any, *, timeout: float | None = None) -> Any:
-        from jeepney import HeaderFields, new_error, new_method_return
+        from jeepney import HeaderFields, new_error, new_method_return  # pyright: ignore[reportMissingImports]  # Linux only
 
         assert timeout is not None, "a bus that does not answer must not hold up the UI"
         fields = message.header.fields

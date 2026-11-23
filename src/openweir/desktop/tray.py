@@ -77,7 +77,7 @@ def session_bus_address(environ: Mapping[str, str] = os.environ) -> str | None:
 
 
 def _open_session_bus() -> AbstractContextManager[Bus]:
-    from jeepney.io.blocking import open_dbus_connection
+    from jeepney.io.blocking import open_dbus_connection  # pyright: ignore[reportMissingImports]  # Linux only
 
     address = session_bus_address()
     if address is None:
@@ -87,7 +87,7 @@ def _open_session_bus() -> AbstractContextManager[Bus]:
 
 def _call(bus: Bus, message: Any) -> tuple[Any, ...]:
     """The reply's body; an error reply raises OSError."""
-    from jeepney import MessageType
+    from jeepney import MessageType  # pyright: ignore[reportMissingImports]  # Linux only
 
     reply = bus.send_and_get_reply(message, timeout=DBUS_TIMEOUT_S)
     if reply.header.message_type == MessageType.error:
@@ -108,8 +108,8 @@ def status_notifier_host(open_bus: OpenBus | None = None) -> bool:
     it, as Qt's D-Bus tray asks. Asking first whether it runs keeps the bus from starting one
     for the question. No bus, no jeepney or no answer counts as no host."""
     try:
-        from jeepney import DBusAddress, Properties
-        from jeepney.bus_messages import message_bus
+        from jeepney import DBusAddress, Properties  # pyright: ignore[reportMissingImports]  # Linux only
+        from jeepney.bus_messages import message_bus  # pyright: ignore[reportMissingImports]  # Linux only
     except ImportError:
         return False
     watcher = DBusAddress(WATCHER_PATH, bus_name=WATCHER, interface=WATCHER)
@@ -128,7 +128,7 @@ def system_prefers_light(open_bus: OpenBus | None = None) -> bool:
     """Whether the desktop portal says the system prefers a light style; not when it has no
     preference or does not answer."""
     try:
-        from jeepney import DBusAddress, new_method_call
+        from jeepney import DBusAddress, new_method_call  # pyright: ignore[reportMissingImports]  # Linux only
     except ImportError:
         return False
     settings = DBusAddress(PORTAL_PATH, bus_name=PORTAL, interface=PORTAL_SETTINGS)
