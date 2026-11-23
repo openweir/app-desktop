@@ -14,6 +14,32 @@ const (
 	PipeName = `\\.\pipe\ProtectedPrefix\Administrators\openweir`
 )
 
+// The Linux package's identifiers (docs/architecture.md "Linux (in progress)", D60 to D67). The
+// service, LinuxServicePath, runs as the systemd units <LinuxUnit>.service and
+// <LinuxUnit>.socket, which listens on LinuxSocket; the only client it accepts is LinuxUIPath.
+const (
+	LinuxInstallDir        = "/opt/openweir"
+	LinuxUIExecutable      = "openweir"
+	LinuxServiceExecutable = "openweir-service"
+	LinuxUIPath            = "/opt/openweir/openweir"
+	LinuxServicePath       = "/opt/openweir/openweir-service"
+	LinuxUnit              = "openweir"
+	LinuxSocket            = "/run/openweir/control.sock"
+	// LinuxStateDir is the service's root, systemd's StateDirectory.
+	LinuxStateDir  = "/var/lib/openweir"
+	LinuxDesktopID = "org.openweir.app"
+
+	// The TUN the Linux service owns, and the policy routing table and rule priorities its
+	// auto-route writes, from LinuxRuleIndex to LinuxRuleIndex+10. The service holds every
+	// profile to them, and its cleanup removes exactly them after a crash (D67), so they
+	// must be no one else's: not mihomo's and sing-box's defaults (table 2022, rules from
+	// 9000), Tailscale's (52, 5210-5270), strongSwan's (220), wg-quick's (51820) or the
+	// kernel's (253-255; rules 0, 32766, 32767).
+	LinuxTunDevice  = "openweir0"
+	LinuxRouteTable = 9347
+	LinuxRuleIndex  = 9347
+)
+
 // WindowsSigner and WindowsSignerEKU name the Authenticode signer that a service linked with
 // SignedRelease requires of the UI (docs/architecture.md §5.3): the display name of the
 // certificate's subject and an extended key usage only OpenWeir's certificate profile has.
@@ -22,3 +48,8 @@ var (
 	WindowsSigner    = ""
 	WindowsSignerEKU = ""
 )
+
+// LinuxUpdateKey is the Ed25519 public key that checks a Linux release's SHA256SUMS.sig (D62):
+// the update helper installs no package without it. product.json leaves it empty, and a build
+// without OPENWEIR_LINUX_UPDATE_KEY offers no installer; a release sets it at link time.
+var LinuxUpdateKey = ""

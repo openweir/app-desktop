@@ -9,9 +9,22 @@
     "uiExecutable": "OpenWeir.exe",
     "serviceExecutable": "openweir-service.exe"
   },
+  "linux": {
+    "installDir": "/opt/openweir",
+    "uiExecutable": "openweir",
+    "serviceExecutable": "openweir-service",
+    "unit": "openweir",
+    "socket": "/run/openweir/control.sock",
+    "stateDir": "/var/lib/openweir",
+    "desktopId": "org.openweir.app",
+    "tunDevice": "openweir0",
+    "routeTable": 9347,
+    "ruleIndex": 9347
+  },
   "signing": {
     "appleTeamId": "",
     "windowsSigner": "",
-    "windowsSignerEku": ""
+    "windowsSignerEku": "",
+    "linuxUpdateKey": ""
   }
 }
