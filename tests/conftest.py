@@ -132,3 +132,36 @@ def screen_reader(qapp: QCoreApplication) -> Iterator[None]:
         yield
     finally:
         QAccessible.setActive(False)
+
+
+# How much of a failure's report an annotation keeps: the end, where the assertion is.
+ANNOTATION_TAIL = 3000
+
+
+def pytest_terminal_summary(terminalreporter: pytest.TerminalReporter) -> None:
+    """On GitHub Actions each failure also becomes an error annotation, which the run's page
+    shows to anyone, without the logs that need a signed-in account."""
+    if os.environ.get("GITHUB_ACTIONS") != "true":
+        return
+    for report in [
+        *terminalreporter.stats.get("failed", []),
+        *terminalreporter.stats.get("error", []),
+    ]:
+        nodeid = str(getattr(report, "nodeid", ""))
+        location = getattr(report, "location", None)
+        path, line = (
+            (location[0], (location[1] or 0) + 1) if location else (nodeid.split("::")[0], 1)
+        )
+        text = str(getattr(report, "longreprtext", ""))[-ANNOTATION_TAIL:]
+        terminalreporter.write_line(
+            f"::error file={_annotation_property(path)},line={line},"
+            f"title={_annotation_property(nodeid)}::{_annotation_data(text)}"
+        )
+
+
+def _annotation_data(text: str) -> str:
+    return text.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+
+
+def _annotation_property(text: str) -> str:
+    return _annotation_data(text).replace(":", "%3A").replace(",", "%2C")
