@@ -2204,6 +2204,17 @@ prepend-rules:
     </message>
 </context>
 <context>
+    <name>PickList</name>
+    <message>
+        <source>已勾选</source>
+        <translation>checked</translation>
+    </message>
+    <message>
+        <source>未勾选</source>
+        <translation>not checked</translation>
+    </message>
+</context>
+<context>
     <name>PlanDialog</name>
     <message>
         <source>重命名「%1」</source>
@@ -3750,6 +3761,14 @@ prepend-rules:
     <message>
         <source>按目标筛选</source>
         <translation>Filter by target</translation>
+    </message>
+</context>
+<context>
+    <name>ScreenReader</name>
+    <message>
+        <source>，</source>
+        <comment>separates the parts of what a screen reader reads</comment>
+        <translation>, </translation>
     </message>
 </context>
 <context>

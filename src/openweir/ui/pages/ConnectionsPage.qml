@@ -34,9 +34,15 @@ Item {
         return x < table.contentX + table.width && x + w > table.contentX && y < table.contentY + table.height && y + h > table.contentY
     }
 
+    // The focus stays on the table while the keys move the selection, so screen readers are
+    // told the row it moves to, as they would read the row itself.
     function moveSelection(index: int) {
+        const before = table.currentIndex
         page.connections.selectIndex(index)
         table.positionViewAtIndex(table.currentIndex, ListView.Contain)
+        const row = table.currentItem as ConnectionRow
+        if (row && table.currentIndex !== before)
+            ScreenReader.announce(tableBox, ScreenReader.join([row.Accessible.name, row.Accessible.description]))
     }
 
     function openDetail(row: ConnectionRow, fromKeyboard: bool) {

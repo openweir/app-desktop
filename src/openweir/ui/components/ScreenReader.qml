@@ -8,6 +8,12 @@ import QtQuick
 QtObject {
     signal announced(string message)
 
+    // The parts of what a screen reader reads, such as a row's name and its other columns,
+    // in one text; the empty ones are left out.
+    function join(parts: list<string>): string {
+        return parts.filter(part => part !== "").join(qsTr("，", "separates the parts of what a screen reader reads"))
+    }
+
     function announce(item: Item, message: string) {
         if (message === "")
             return

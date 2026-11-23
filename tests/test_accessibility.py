@@ -23,6 +23,7 @@ PAGE_TYPES = {
     "settings": "SettingsPage",
 }
 Role = QAccessible.Role
+COMMA = "，"  # noqa: RUF001  # between the parts of what a screen reader is told
 
 
 def show_page(qtbot: QtBot, loaded: Loaded, page: str) -> QQuickItem:
@@ -427,4 +428,82 @@ def test_lists_keep_the_focus_while_they_update(qtbot: QtBot, loaded: Loaded) ->
     assert loaded.focused() is node
     loaded.key(qtbot, Qt.Key.Key_Down)
     assert loaded.focused().property("name") != "日本 01"  # the arrows move between nodes
+    assert loaded.warnings == []
+
+
+@pytest.mark.usefixtures("screen_reader")
+def test_the_row_the_arrows_select_in_a_table_is_read_out(qtbot: QtBot, loaded: Loaded) -> None:
+    """The table keeps the focus while the arrows move the selection, so the row it moves
+    to is announced as the row itself reads (DESIGN.md "表格", "读屏")."""
+    connections = loaded.view_models.connections
+    page = show_page(qtbot, loaded, "connections")
+    table = find(page, lambda i: accessible(i).role == Role.Table)
+    assert table is not None
+    table.forceActiveFocus(Qt.FocusReason.TabFocusReason)
+    heard = loaded.announcements()
+
+    def selected_row() -> QQuickItem:
+        selected = connections.property("detail")["id"]
+        return loaded.item(lambda i: i.property("connectionId") == selected)
+
+    loaded.key(qtbot, Qt.Key.Key_Down)
+    first = accessible(selected_row())
+    assert connections.property("selectedIndex") == 0
+    loaded.key(qtbot, Qt.Key.Key_Down)
+    second = accessible(selected_row())
+    assert connections.property("selectedIndex") == 1
+    # The rates and the duration in the description change every second.
+    assert [said.split(f"{COMMA}规则 ")[0] for said in heard] == [first.name, second.name]
+    for said, row in zip(heard, (first, second), strict=True):
+        assert said.startswith(f"{row.name}{COMMA}规则 ")
+
+    loaded.key(qtbot, Qt.Key.Key_Home)
+    loaded.key(qtbot, Qt.Key.Key_Home)  # the selection does not move: nothing to say
+    assert len(heard) == 3
+    assert loaded.focused() is table
+    assert loaded.warnings == []
+
+
+@pytest.mark.usefixtures("screen_reader")
+def test_a_searchable_lists_arrows_skip_rows_in_use(qtbot: QtBot, loaded: Loaded) -> None:
+    """The highlight passes over the services the plan has already, and the row it moves to
+    is announced, as Space's change is (DESIGN.md "可搜索列表")."""
+    routing = loaded.view_models.routing
+    show_page(qtbot, loaded, "routing")
+    with qtbot.waitSignal(routing.routingChanged):
+        routing.setMode("plan")
+    editor = routing._editor
+    with qtbot.waitSignal(editor.opened):
+        editor.openAdd()
+    editor.setKind("service")
+    qtbot.wait(100)
+    rows = editor.property("services").rows
+    # The plan has the first few services: 私有网络, 国内常用, 广告, OpenAI and so on.
+    first = next(n for n, row in enumerate(rows) if not row.added)
+    assert first > 0
+    assert not rows[first + 1].added
+
+    (box,) = loaded.overlay_items(lambda i: kind(i) == "PickList" and accessible(i).name == "服务")
+    view = find(box, lambda i: kind(i) == "QQuickListView")
+    assert view is not None
+    search = loaded.overlay_items(lambda i: kind(i) == "SearchField" and i.isVisible())[0]
+    search.forceActiveFocus(Qt.FocusReason.TabFocusReason)
+    heard = loaded.announcements()
+    # ↓ in the search box enters the list, on its first row that can be checked; the row
+    # that takes the focus is read out as such.
+    loaded.key(qtbot, Qt.Key.Key_Down)
+    assert view.property("currentIndex") == first
+    assert loaded.focused().property("name") == rows[first].name
+    assert heard == []
+    # The arrows move the focus among the rows without screen readers hearing of it.
+    loaded.key(qtbot, Qt.Key.Key_Down)
+    assert view.property("currentIndex") == first + 1
+    loaded.key(qtbot, Qt.Key.Key_Up)
+    loaded.key(qtbot, Qt.Key.Key_Up)  # only rows in use above: it stays
+    assert view.property("currentIndex") == first
+    assert heard == [f"{rows[first + 1].name}{COMMA}未勾选", f"{rows[first].name}{COMMA}未勾选"]
+
+    loaded.key(qtbot, Qt.Key.Key_Space)
+    qtbot.waitUntil(lambda: editor.property("services").rows[first].picked)
+    assert heard[-1] == f"{rows[first].name}{COMMA}已勾选"
     assert loaded.warnings == []
