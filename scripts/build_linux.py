@@ -40,6 +40,7 @@ import json
 import os
 import platform
 import re
+import shlex
 import shutil
 import stat
 import subprocess
@@ -335,6 +336,21 @@ class Dependencies:
     rpm: tuple[str, ...]
 
 
+class UnknownLibraryError(BuildError):
+    """Sonames that files need and that neither the tree nor system-libraries.toml has, each
+    with the files that need it."""
+
+    def __init__(self, unknown: Mapping[str, list[str]]) -> None:
+        self.unknown = dict(sorted(unknown.items()))
+        lines = [
+            f"{soname} (needed by {', '.join(users[:3])}{' and more' if len(users) > 3 else ''})"
+            for soname, users in self.unknown.items()
+        ]
+        super().__init__(
+            "neither carried nor in package/linux/system-libraries.toml:\n  " + "\n  ".join(lines)
+        )
+
+
 def dependencies(
     infos: list[ElfInfo], libraries: SystemLibraries, carried: Iterable[str] = ()
 ) -> Dependencies:
@@ -370,13 +386,7 @@ def dependencies(
             else:
                 unknown.setdefault(soname, []).append(info.path)
     if unknown:
-        lines = [
-            f"{soname} (needed by {', '.join(users[:3])}{' and more' if len(users) > 3 else ''})"
-            for soname, users in sorted(unknown.items())
-        ]
-        raise BuildError(
-            "neither carried nor in package/linux/system-libraries.toml:\n  " + "\n  ".join(lines)
-        )
+        raise UnknownLibraryError(unknown)
     deb: list[str] = []
     for library in libraries.libraries:
         if not used.intersection(library.sonames):
@@ -800,6 +810,59 @@ def check_listing(listing: str) -> None:
 
 # -- main -------------------------------------------------------------------------------------
 
+# How much of an error an annotation keeps, as tests/conftest.py's: the start, where it says
+# what failed.
+ANNOTATION_LIMIT = 3000
+# GitHub shows ten error annotations of a step; the unknown sonames take at most this many.
+ANNOTATED_SONAMES = 9
+
+
+def _annotation_data(text: str) -> str:
+    return text.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+
+
+def _annotation_property(text: str) -> str:
+    return _annotation_data(text).replace(":", "%3A").replace(",", "%2C")
+
+
+def _annotation(title: str, message: str) -> str:
+    return (
+        f"::error title={_annotation_property(title)}::"
+        f"{_annotation_data(message[:ANNOTATION_LIMIT])}"
+    )
+
+
+def annotations(error: BaseException) -> list[str]:
+    """The error annotations of a failed build, which a CI run's page shows to anyone, without
+    the logs that need a signed-in account: one for each soname nothing provides, or one for
+    the error."""
+    if isinstance(error, UnknownLibraryError):
+        found = [
+            _annotation(
+                f"build_linux: unknown soname {soname}",
+                f"{soname} is needed by {', '.join(users)}: bundle it, or list it in "
+                "package/linux/system-libraries.toml once the oldest supported distributions "
+                "ship it",
+            )
+            for soname, users in list(error.unknown.items())[:ANNOTATED_SONAMES]
+        ]
+        rest = list(error.unknown)[ANNOTATED_SONAMES:]
+        if rest:
+            found.append(_annotation("build_linux: unknown sonames", f"also {', '.join(rest)}"))
+        return found
+    if isinstance(error, subprocess.CalledProcessError):
+        command = error.cmd if isinstance(error.cmd, str) else shlex.join(map(str, error.cmd))
+        shown = command if len(command) <= 300 else f"{command[:300]}…"
+        return [_annotation("build_linux", f"{shown} exited with {error.returncode}")]
+    return [_annotation("build_linux", str(error))]
+
+
+def report(error: BaseException) -> None:
+    """Writes ``error``'s annotations when GitHub Actions runs the build."""
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        for line in annotations(error):
+            print(line, flush=True)
+
 
 def _check_nuitka() -> None:
     try:
@@ -808,7 +871,7 @@ def _check_nuitka() -> None:
         installed = None
     if installed != build_app.NUITKA_VERSION:
         version = build_app.NUITKA_VERSION
-        sys.exit(f"build_linux: run with uv run --group build (Nuitka {installed}, not {version})")
+        raise BuildError(f"run with uv run --group build (Nuitka {installed}, not {version})")
 
 
 def prepare_tree(tree: Path, arch: str, libraries: SystemLibraries) -> Dependencies:
@@ -876,6 +939,7 @@ def main() -> None:
             megabytes = output.stat().st_size / 2**20
             print(f"build_linux: {output.relative_to(ROOT)}, {megabytes:.1f} MiB")
     except (BuildError, OSError, subprocess.CalledProcessError) as error:
+        report(error)
         sys.exit(f"build_linux: {error}")
 
 

@@ -256,6 +256,84 @@ def test_an_unknown_soname_stops_the_build() -> None:
     assert "system-libraries.toml" in message
     # A link in the tree answers for it, as the loader would find it.
     assert build_linux.dependencies(infos, _libraries(), {"libxcb-util.so.1"}).deb[0] == "libc6"
+    # The error keeps every user of each soname, for its annotations.
+    assert isinstance(raised.value, build_linux.UnknownLibraryError)
+    assert raised.value.unknown == {
+        "libxcb-util.so.1": [
+            "PySide6/Qt/plugins/platforms/libqxcb.so",
+            "PySide6/Qt/lib/libQt6XcbQpa.so.6",
+        ]
+    }
+
+
+def test_each_unknown_soname_is_an_annotation() -> None:
+    # A CI run's logs need a signed-in account; its annotations name the sonames to anyone.
+    error = build_linux.UnknownLibraryError(
+        {"libxcb-util.so.1": ["a, b", "c:d"], "libfoo.so.2": ["openweir-ui"]}
+    )
+    assert isinstance(error, BuildError)
+    assert build_linux.annotations(error) == [
+        "::error title=build_linux%3A unknown soname libfoo.so.2::libfoo.so.2 is needed by "
+        "openweir-ui: bundle it, or list it in package/linux/system-libraries.toml once the "
+        "oldest supported distributions ship it",
+        "::error title=build_linux%3A unknown soname libxcb-util.so.1::libxcb-util.so.1 is "
+        "needed by a, b, c:d: bundle it, or list it in package/linux/system-libraries.toml "
+        "once the oldest supported distributions ship it",
+    ]
+    # GitHub shows ten of a step's error annotations: the tenth names the rest.
+    many = build_linux.UnknownLibraryError({f"lib{i:02}.so.1": ["x"] for i in range(12)})
+    lines = build_linux.annotations(many)
+    assert len(lines) == 10
+    assert lines[-1] == (
+        "::error title=build_linux%3A unknown sonames::also lib09.so.1, lib10.so.1, lib11.so.1"
+    )
+
+
+def test_other_failures_are_one_escaped_annotation() -> None:
+    error = BuildError("newer than the oldest supported distributions:\n  a needs GLIBC_2.38 (1%)")
+    assert build_linux.annotations(error) == [
+        "::error title=build_linux::newer than the oldest supported distributions:%0A  a needs "
+        "GLIBC_2.38 (1%25)"
+    ]
+    failed = subprocess.CalledProcessError(1, ["python", "-m", "nuitka", "--mode=standalone"])
+    assert build_linux.annotations(failed) == [
+        "::error title=build_linux::python -m nuitka --mode=standalone exited with 1"
+    ]
+    long = subprocess.CalledProcessError(2, ["nuitka", *(["--option"] * 100)])
+    (line,) = build_linux.annotations(long)
+    assert line.startswith("::error title=build_linux::nuitka --option --option")
+    assert line.endswith("… exited with 2")
+    assert len(line) < 400
+    assert build_linux.annotations(BuildError("x" * 5000)) == [
+        "::error title=build_linux::" + "x" * build_linux.ANNOTATION_LIMIT
+    ]
+
+
+@pytest.mark.parametrize("actions", ["true", None])
+def test_a_failed_build_writes_annotations_only_on_github_actions(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], actions: str | None
+) -> None:
+    if actions is None:
+        monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+    else:
+        monkeypatch.setenv("GITHUB_ACTIONS", actions)
+    monkeypatch.setattr(sys, "platform", "linux")
+    monkeypatch.setattr(sys, "argv", ["build_linux.py", "--packages-only"])
+    monkeypatch.setattr(build_linux, "native_arch", lambda: "x64")
+    unknown = {"libfoo.so.1": ["openweir-ui"]}
+
+    def prepare_tree(*_: object) -> None:
+        raise build_linux.UnknownLibraryError(unknown)
+
+    monkeypatch.setattr(build_linux, "prepare_tree", prepare_tree)
+    with pytest.raises(SystemExit) as exited:
+        build_linux.main()
+    assert str(exited.value.code).startswith("build_linux: neither carried nor in ")
+    out = capsys.readouterr().out
+    if actions:
+        assert out.splitlines() == build_linux.annotations(build_linux.UnknownLibraryError(unknown))
+    else:
+        assert "::error" not in out
 
 
 def test_a_library_loaded_by_name_is_always_a_dependency() -> None:
