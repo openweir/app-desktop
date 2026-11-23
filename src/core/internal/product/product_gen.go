@@ -19,9 +19,9 @@ const (
 // <LinuxUnit>.socket, which listens on LinuxSocket; the only client it accepts is LinuxUIPath.
 const (
 	LinuxInstallDir        = "/opt/openweir"
-	LinuxUIExecutable      = "openweir"
+	LinuxUIExecutable      = "openweir-ui"
 	LinuxServiceExecutable = "openweir-service"
-	LinuxUIPath            = "/opt/openweir/openweir"
+	LinuxUIPath            = "/opt/openweir/openweir-ui"
 	LinuxServicePath       = "/opt/openweir/openweir-service"
 	LinuxUnit              = "openweir"
 	LinuxSocket            = "/run/openweir/control.sock"

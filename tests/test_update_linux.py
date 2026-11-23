@@ -264,10 +264,10 @@ def test_the_install_runs_the_helper_through_pkexec_then_the_ui() -> None:
     assert script.startswith(
         '/usr/bin/pkexec /opt/openweir/openweir-service -install-update "$1" "$2" "$3"; code=$?;'
     )
-    assert script.endswith('exec /opt/openweir/openweir --update-result="$code"')
+    assert script.endswith('exec /opt/openweir/openweir-ui --update-result="$code"')
     assert 'kill -0 "$4"' in script
     assert product.LINUX_SERVICE_PATH == "/opt/openweir/openweir-service"
-    assert product.LINUX_UI_PATH == "/opt/openweir/openweir"
+    assert product.LINUX_UI_PATH == "/opt/openweir/openweir-ui"
 
 
 def _executable(path: Path, script: str) -> str:

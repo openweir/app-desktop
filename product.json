@@ -11,7 +11,7 @@
   },
   "linux": {
     "installDir": "/opt/openweir",
-    "uiExecutable": "openweir",
+    "uiExecutable": "openweir-ui",
     "serviceExecutable": "openweir-service",
     "unit": "openweir",
     "socket": "/run/openweir/control.sock",

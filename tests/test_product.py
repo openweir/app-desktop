@@ -29,7 +29,7 @@ def test_the_package_reads_product_json() -> None:
 def test_the_package_reads_the_linux_identifiers() -> None:
     linux = json.loads(product.SOURCE.read_text("utf-8"))["linux"]
     assert product.LINUX_INSTALL_DIR == linux["installDir"] == "/opt/openweir"
-    assert product.LINUX_UI_PATH == "/opt/openweir/openweir"
+    assert product.LINUX_UI_PATH == "/opt/openweir/openweir-ui"
     assert product.LINUX_SERVICE_PATH == "/opt/openweir/openweir-service"
     assert product.LINUX_PACKAGE_FORMAT == "/opt/openweir/package-format"
     assert linux["unit"] == product.LINUX_UNIT
