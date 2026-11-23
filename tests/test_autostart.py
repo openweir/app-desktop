@@ -35,11 +35,8 @@ def test_the_entry_starts_the_installed_ui_in_the_background(tmp_path: Path) -> 
     assert item.path == directory / AUTOSTART_NAME == directory / "org.openweir.app.desktop"
     entry = read_entry(item.path)
     assert entry["Type"] == "Application"
-    assert (
-        entry["Exec"]
-        == f"{LINUX_UI_PATH} {BACKGROUND_ARG}"
-        == "/opt/openweir/openweir --background"
-    )
+    # The installed UI by product.json's path, wherever the package puts it.
+    assert entry["Exec"] == f"{LINUX_UI_PATH} {BACKGROUND_ARG}"
     assert entry["TryExec"] == LINUX_UI_PATH  # skipped once the package is gone
     assert entry["Icon"] == LINUX_DESKTOP_ID
     assert entry["X-GNOME-Autostart-enabled"] == "true"
