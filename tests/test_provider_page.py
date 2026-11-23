@@ -300,7 +300,9 @@ def test_signing_out_from_a_row_moves_the_focus_off_the_rows_that_go(
     # Both rows go; the focus goes to the row above them, not to the other that goes.
     qtbot.waitUntil(lambda: len(profiles.property("model").rows) == 3)
     qtbot.waitUntil(lambda: loaded.focused().property("accessibleName") == "本地配置 的更多操作")
-    assert loaded.focused().property("visualFocus")
+    # The ring shows once the window has the focus back from the dialog, a moment later on
+    # Windows.
+    qtbot.waitUntil(lambda: loaded.focused().property("visualFocus"))
     assert loaded.warnings == []
 
 

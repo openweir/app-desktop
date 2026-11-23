@@ -547,7 +547,9 @@ def test_signing_out_of_the_last_account_goes_to_the_subscriptions_page(
     assert prop(shell, "currentPage") == "profiles"
     add = window.item(lambda i: kind(i) == "MenuButton" and i.property("text") == "添加")
     qtbot.waitUntil(lambda: window.focused() is add, timeout=WAIT)
-    assert add.property("visualFocus")
+    # The ring shows once the window has the focus back from the dialog, a moment later on
+    # macOS.
+    qtbot.waitUntil(lambda: add.property("visualFocus"), timeout=WAIT)
     qtbot.waitUntil(lambda: len(prop(profiles, "model").rows) == 3, timeout=WAIT)
     assert prop(profiles, "activeName") == "示例订阅 A"
     assert provider.requests_for("sign_out")

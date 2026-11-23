@@ -75,6 +75,7 @@ def test_an_entry_turned_off_elsewhere_reads_as_off(tmp_path: Path) -> None:
     assert item.set_enabled(True).enabled  # on again
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="XDG paths are POSIX paths")
 def test_failures_are_login_item_errors(tmp_path: Path) -> None:
     blocked = tmp_path / "autostart"
     blocked.write_text("not a directory")
@@ -88,6 +89,7 @@ def test_failures_are_login_item_errors(tmp_path: Path) -> None:
     assert list(tmp_path.iterdir()) == [blocked]
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="XDG paths are POSIX paths")
 def test_where_the_entries_are(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     assert autostart_directory({}) == tmp_path / ".config" / "autostart"

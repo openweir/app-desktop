@@ -2,6 +2,8 @@ import asyncio
 import signal
 import subprocess
 import sys
+import tempfile
+from collections.abc import Iterator
 from functools import partial
 from pathlib import Path
 from typing import Any, cast
@@ -839,10 +841,17 @@ def test_ctrl_q_quits_and_disconnects_first(qtbot: QtBot, loaded: Loaded) -> Non
     assert not running(simulated(loaded))
 
 
+@pytest.fixture
+def socket_dir() -> Iterator[Path]:
+    """A directory short enough for a Unix socket: tmp_path is too long for one on macOS."""
+    with tempfile.TemporaryDirectory(prefix="openweir-") as directory:
+        yield Path(directory)
+
+
 @pytest.mark.skipif(sys.platform == "win32", reason="Windows always has its service's pipe")
-def test_the_development_socket_wins(tmp_path: Path) -> None:
+def test_the_development_socket_wins(tmp_path: Path, socket_dir: Path) -> None:
     assert sys.platform != "win32"  # for the type checker: Unix sockets
-    path = str(tmp_path / "dev.sock")
+    path = str(socket_dir / "dev.sock")
     host = default_host({DEV_SOCKET_ENV: path}, mark_package(tmp_path))
     assert isinstance(host, ServiceHost)
     assert host.takeover == TAKEOVER_NONE
@@ -925,11 +934,11 @@ def mark_package(directory: Path) -> str:
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="the release service's Unix socket")
-def test_a_missing_socket_names_the_unit(tmp_path: Path) -> None:
+def test_a_missing_socket_names_the_unit(socket_dir: Path) -> None:
     assert sys.platform != "win32"  # for the type checker: Unix sockets
     from openweir.host.transport import unix_opener
 
-    path = str(tmp_path / "control.sock")
+    path = str(socket_dir / "control.sock")
     opener = missing_socket_opener(unix_opener(path), path)
     with pytest.raises(HostError) as raised:
         asyncio.run(opener())

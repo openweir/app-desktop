@@ -691,7 +691,9 @@ def test_symbols_split_off_with_a_debug_link(tmp_path: Path) -> None:
     ).stdout
     assert ".gnu_debuglink" in sections
     assert symbols.build_id(binary) == identifier
-    assert f'"true": "{identifier}"' in (tmp_path / "symbols" / "build-ids.json").read_text()
+    assert f'"true": "{identifier}"' in (tmp_path / "symbols" / "build-ids.json").read_text(
+        encoding="utf-8"
+    )
 
 
 # -- what the packages install ----------------------------------------------------------------
@@ -820,7 +822,7 @@ def test_networkmanager_leaves_the_tun_device_alone() -> None:
 def test_the_hicolor_icons_are_generated() -> None:
     for relative, path in gen_icons.hicolor_paths().items():
         if relative.endswith(".svg"):
-            assert path.read_text().startswith("<svg")
+            assert path.read_text(encoding="utf-8").startswith("<svg")
             continue
         size = int(relative.split("x", 1)[0])
         header = path.read_bytes()[:24]
@@ -836,7 +838,7 @@ def _inputs(tmp_path: Path, version: str = "1.2.3", arch: str = "x64") -> dict:
     tree = tmp_path / "openweir"
     tree.mkdir(exist_ok=True)
     config = build_linux.write_package_inputs(tmp_path / "nfpm", tree, version, arch, depends)
-    return yaml.safe_load(config.read_text())
+    return yaml.safe_load(config.read_text(encoding="utf-8"))
 
 
 def test_nfpm_configuration(tmp_path: Path) -> None:
@@ -857,7 +859,7 @@ def test_nfpm_configuration(tmp_path: Path) -> None:
     assert (link["type"], link["src"]) == ("symlink", product.LINUX_UI_PATH)
     for kind in build_linux.FORMATS:
         marker = contents[(product.LINUX_PACKAGE_FORMAT, kind)]
-        assert Path(marker["src"]).read_text() == f"{kind}\n"
+        assert Path(marker["src"]).read_text(encoding="ascii") == f"{kind}\n"
         # The updater reads the marker beside the executable.
         beside = tmp_path / "check" / kind
         beside.mkdir(parents=True)
@@ -876,7 +878,7 @@ def test_nfpm_configuration(tmp_path: Path) -> None:
         assert contents[(destination, None)]["src"] == source
         assert (build_linux.ROOT / source).is_file()
     desktop = contents[(f"/usr/share/applications/{product.LINUX_DESKTOP_ID}.desktop", None)]
-    assert Path(desktop["src"]).read_text() == build_linux.render_desktop_file()
+    assert Path(desktop["src"]).read_text(encoding="utf-8") == build_linux.render_desktop_file()
     icons = {
         item["dst"].removeprefix("/usr/share/icons/hicolor/"): item["src"]
         for item in config["contents"]
@@ -891,7 +893,7 @@ def test_nfpm_configuration(tmp_path: Path) -> None:
             assert item["file_info"]["mode"] == 0o644
     for name in build_linux.SCRIPT_NAMES:
         script = Path(config["scripts"][name])
-        assert script.read_text() == build_linux.render_script(name)
+        assert script.read_text(encoding="utf-8") == build_linux.render_script(name)
         assert os.access(script, os.X_OK) or sys.platform == "win32"
 
 
@@ -921,7 +923,7 @@ def test_the_scripts_are_posix_shell(name: str, tmp_path: Path) -> None:
     path.write_text(build_linux.render_script(name))
     done = subprocess.run(["sh", "-n", path], capture_output=True, text=True)
     assert done.returncode == 0, done.stderr
-    text = path.read_text()
+    text = path.read_text(encoding="utf-8")
     assert text.startswith("#!/bin/sh\n")
     assert "\nset -e\n" in text
     assert "# @functions@" not in text
@@ -996,7 +998,7 @@ class Root:
         )
         assert done.returncode == 0, done.stderr
         self.stderr = done.stderr
-        return self.log.read_text().splitlines()
+        return self.log.read_text(encoding="utf-8").splitlines()
 
     def ui_process(self) -> subprocess.Popen[bytes]:
         """A process that /proc says runs the UI."""

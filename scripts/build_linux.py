@@ -264,9 +264,10 @@ def _readelf(*arguments: str | Path) -> str:
 
 def elf_files(tree: Path) -> list[Path]:
     """Every regular ELF file in ``tree``; links are left to the files they name."""
+    # In the order of their POSIX paths, which Windows' case-blind Path order is not.
     return [
         path
-        for path in sorted(tree.rglob("*"))
+        for path in sorted(tree.rglob("*"), key=lambda path: path.as_posix())
         if not path.is_symlink() and path.is_file() and elf_machine(path) is not None
     ]
 
