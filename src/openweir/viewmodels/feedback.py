@@ -72,6 +72,45 @@ _MESSAGES = {
     "login_item_failed": QT_TRANSLATE_NOOP("Feedback", "无法更改登录时打开"),
     # The database could not be read or written (docs/ui.md §2).
     "storage_failed": QT_TRANSLATE_NOOP("Feedback", "无法读写本地数据"),
+    # The keychain or Credential Manager is locked or refuses (D14).
+    "credentials_unavailable": QT_TRANSLATE_NOOP("Feedback", "无法读写系统的凭据库"),
+    # A provider's subscription takes its name from the account, has no link of its own, and
+    # goes with signing out (docs/accounts.md §5.1).
+    "account_profile": QT_TRANSLATE_NOOP(
+        "Feedback", "服务商的订阅随账户管理，不能改名、改链接或单独删除"
+    ),
+    # Provider accounts (docs/accounts.md §10).
+    "provider_invalid_address": QT_TRANSLATE_NOOP("Feedback", "请输入服务商的 https 地址"),
+    "provider_not_openweir": QT_TRANSLATE_NOOP("Feedback", "这个地址不是 OpenWeir 服务商"),
+    "provider_unreachable": QT_TRANSLATE_NOOP("Feedback", "无法连接服务商"),
+    "provider_rate_limited": QT_TRANSLATE_NOOP("Feedback", "请求过于频繁，请稍后再试"),
+    "provider_bad_response": QT_TRANSLATE_NOOP("Feedback", "服务商的回答无法识别"),
+    "provider_sign_in_failed": QT_TRANSLATE_NOOP("Feedback", "账号或密码错误"),
+    "provider_email_unverified": QT_TRANSLATE_NOOP("Feedback", "请先在用户中心验证邮箱"),
+    "provider_code_invalid": QT_TRANSLATE_NOOP("Feedback", "验证码错误或已过期"),
+    "provider_two_factor_invalid": QT_TRANSLATE_NOOP("Feedback", "两步验证码错误"),
+    "provider_two_factor_expired": QT_TRANSLATE_NOOP("Feedback", "两步验证已超时，请重新登录"),
+    # Both point to the way that works without signing in: the link from the user center.
+    "provider_captcha_required": QT_TRANSLATE_NOOP(
+        "Feedback",
+        "服务商要求在网页上完成人机验证，请在用户中心复制订阅链接，用「从链接导入」添加",
+    ),
+    "provider_sign_in_unsupported": QT_TRANSLATE_NOOP(
+        "Feedback", "这个服务商只能在网页上登录，请在用户中心复制订阅链接，用「从链接导入」添加"
+    ),
+    "provider_account_disabled": QT_TRANSLATE_NOOP("Feedback", "账户已停用"),
+    "provider_account_conflict": QT_TRANSLATE_NOOP("Feedback", "这个服务商已登录另一个账户"),
+    "provider_sign_in_required": QT_TRANSLATE_NOOP("Feedback", "需要重新登录服务商"),
+    "provider_subscription_expired": QT_TRANSLATE_NOOP("Feedback", "订阅已到期"),
+    # Traffic used up, or not started yet; the row says which.
+    "provider_subscription_unusable": QT_TRANSLATE_NOOP("Feedback", "订阅暂不可用"),
+    "provider_subscription_disabled": QT_TRANSLATE_NOOP("Feedback", "订阅已被服务商停用"),
+    "provider_subscription_missing": QT_TRANSLATE_NOOP("Feedback", "订阅已不在账户中"),
+    "provider_link_unavailable": QT_TRANSLATE_NOOP("Feedback", "服务商没有提供订阅链接"),
+    # Never shown in practice: fetching falls back to the link.
+    "provider_app_disabled": QT_TRANSLATE_NOOP("Feedback", "服务商暂不向应用提供配置"),
+    # The provider was signed out of meanwhile.
+    "provider_unknown": QT_TRANSLATE_NOOP("Feedback", "这个服务商已退出登录"),
 }
 # Codes whose message (a parse error, an HTTP status) helps the user fix the problem.
 _WITH_DETAIL = {
@@ -85,6 +124,9 @@ _WITH_DETAIL = {
     "settings_unwritable",
     "login_item_failed",
     "storage_failed",
+    # Why: a timeout, a refused connection, an HTTP status; never a URL (ProviderError).
+    "provider_unreachable",
+    "provider_bad_response",
 }
 
 

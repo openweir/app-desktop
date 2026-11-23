@@ -985,6 +985,102 @@
         <translation>Can’t read or save local data</translation>
     </message>
     <message>
+        <source>无法读写系统的凭据库</source>
+        <translation>Can’t use the system’s credential store</translation>
+    </message>
+    <message>
+        <source>服务商的订阅随账户管理，不能改名、改链接或单独删除</source>
+        <translation>A provider’s subscription follows its account: it can’t be renamed, given a link or deleted on its own</translation>
+    </message>
+    <message>
+        <source>请输入服务商的 https 地址</source>
+        <translation>Enter the provider’s https address</translation>
+    </message>
+    <message>
+        <source>这个地址不是 OpenWeir 服务商</source>
+        <translation>This address isn’t an OpenWeir provider</translation>
+    </message>
+    <message>
+        <source>无法连接服务商</source>
+        <translation>Couldn’t connect to the provider</translation>
+    </message>
+    <message>
+        <source>请求过于频繁，请稍后再试</source>
+        <translation>Too many requests; try again later</translation>
+    </message>
+    <message>
+        <source>服务商的回答无法识别</source>
+        <translation>Couldn’t understand the provider’s answer</translation>
+    </message>
+    <message>
+        <source>账号或密码错误</source>
+        <translation>Wrong account or password</translation>
+    </message>
+    <message>
+        <source>请先在用户中心验证邮箱</source>
+        <translation>Verify your email in the user center first</translation>
+    </message>
+    <message>
+        <source>验证码错误或已过期</source>
+        <translation>The code is wrong or has expired</translation>
+    </message>
+    <message>
+        <source>两步验证码错误</source>
+        <translation>The two-factor code is wrong</translation>
+    </message>
+    <message>
+        <source>两步验证已超时，请重新登录</source>
+        <translation>Two-factor verification timed out; sign in again</translation>
+    </message>
+    <message>
+        <source>服务商要求在网页上完成人机验证，请在用户中心复制订阅链接，用「从链接导入」添加</source>
+        <translation>The provider asks for a captcha on the web. Copy the subscription link in the user center and add it with “Import from URL”</translation>
+    </message>
+    <message>
+        <source>这个服务商只能在网页上登录，请在用户中心复制订阅链接，用「从链接导入」添加</source>
+        <translation>This provider takes sign-ins on the web only. Copy the subscription link in the user center and add it with “Import from URL”</translation>
+    </message>
+    <message>
+        <source>账户已停用</source>
+        <translation>The account is disabled</translation>
+    </message>
+    <message>
+        <source>这个服务商已登录另一个账户</source>
+        <translation>Another account of this provider is signed in</translation>
+    </message>
+    <message>
+        <source>需要重新登录服务商</source>
+        <translation>Sign in to the provider again</translation>
+    </message>
+    <message>
+        <source>订阅已到期</source>
+        <translation>The subscription has expired</translation>
+    </message>
+    <message>
+        <source>订阅暂不可用</source>
+        <translation>The subscription can’t be used right now</translation>
+    </message>
+    <message>
+        <source>订阅已被服务商停用</source>
+        <translation>The provider disabled the subscription</translation>
+    </message>
+    <message>
+        <source>订阅已不在账户中</source>
+        <translation>The subscription is no longer in the account</translation>
+    </message>
+    <message>
+        <source>服务商没有提供订阅链接</source>
+        <translation>The provider gives no subscription link</translation>
+    </message>
+    <message>
+        <source>服务商暂不向应用提供配置</source>
+        <translation>The provider doesn’t serve the config to apps right now</translation>
+    </message>
+    <message>
+        <source>这个服务商已退出登录</source>
+        <translation>This provider was signed out</translation>
+    </message>
+    <message>
         <source>操作失败：{detail}</source>
         <translation>Operation failed: {detail}</translation>
     </message>
