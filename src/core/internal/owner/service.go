@@ -20,17 +20,20 @@ import (
 	"github.com/openweir/app-desktop/src/core/internal/sysproxy"
 )
 
-// Platform is what the service needs from Windows; tests stand in for it.
+// Platform is what the service needs from Windows or Linux; tests stand in for it. On Linux
+// a session is a signed-in user, numbered by their uid (platform_linux.go).
 type Platform interface {
-	// SecureDir creates dir if needed so that SYSTEM alone writes it. reader, a SID, may read
-	// it; with no reader Administrators get full access instead. It refuses a link, and a
-	// directory that someone other than SYSTEM or Administrators created.
+	// SecureDir creates dir if needed so that SYSTEM (root on Linux) alone writes it. reader,
+	// a user ID, may read it; with no reader Administrators get full access instead, while on
+	// Linux others may only pass through it. It refuses a link, and a directory that someone
+	// other than SYSTEM or Administrators (root) created.
 	SecureDir(dir, reader string) error
-	// SessionUser is the SID of the user signed in to session.
+	// SessionUser is the user ID of the user signed in to session.
 	SessionUser(session uint32) (string, error)
-	// SessionLogonTime is the Windows logon FILETIME, stable across service restarts.
+	// SessionLogonTime is when the user signed in to session, stable across service restarts:
+	// the Windows logon FILETIME, or logind's timestamp of the user.
 	SessionLogonTime(session uint32) (int64, error)
-	// SignedIn lists the sessions sid is signed in to.
+	// SignedIn lists the sessions the user sid is signed in to.
 	SignedIn(sid string) []uint32
 	ReadProxy(session uint32) (sysproxy.Settings, error)
 	WriteProxy(session uint32, settings sysproxy.Settings) error
@@ -54,7 +57,7 @@ type Core interface {
 	SuspendContext(context.Context) error
 }
 
-// Service implements control.Host for the Windows service.
+// Service implements control.Host for the Windows and Linux services.
 type Service struct {
 	root     string
 	platform Platform
@@ -237,8 +240,8 @@ func (s *Service) ResumeAllowed() bool {
 // down. Whether that tunnel would come back at the owner's next sign-in does not hold the
 // service: the owner may never sign in again.
 func (s *Service) Claim(caller peer.Identity) error {
-	if !ValidSID(caller.UserID) {
-		return fmt.Errorf("caller %q has no SID", caller.UserID)
+	if !validUserID(caller.UserID) {
+		return fmt.Errorf("caller %q has no user ID", caller.UserID)
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -251,8 +254,8 @@ func (s *Service) Claim(caller peer.Identity) error {
 // next sign-in when the service cannot write them. Then the service restarts for caller, as
 // for any new owner. Anyone else waits for the tunnel, as with Claim.
 func (s *Service) TakeOver(caller peer.Identity, stop func() error) error {
-	if !ValidSID(caller.UserID) {
-		return fmt.Errorf("caller %q has no SID", caller.UserID)
+	if !validUserID(caller.UserID) {
+		return fmt.Errorf("caller %q has no user ID", caller.UserID)
 	}
 	s.mu.Lock()
 	err := s.claimLocked(caller)
@@ -696,7 +699,7 @@ func (s *Service) proxyOffLocked() error {
 // restoreStrayProxy gives back the settings of a former owner, which the service could not
 // restore before someone else claimed it.
 func (s *Service) restoreStrayProxy(sid string, session uint32) {
-	if !ValidSID(sid) {
+	if !validUserID(sid) {
 		return
 	}
 	home := kept{Home(s.root, sid)}

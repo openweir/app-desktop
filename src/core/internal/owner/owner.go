@@ -4,8 +4,9 @@
 //
 // One service process serves one owner. mihomo opens cache.db in its home once per process
 // (§3.2), so a claim by another user records them in owner.json and restarts the service,
-// which opens the engine in their home. The package itself runs anywhere; the Windows parts
-// come in through Platform.
+// which opens the engine in their home. The package itself runs anywhere; the Windows and
+// Linux parts come in through Platform, and users are SIDs on Windows and decimal uids on
+// Linux (validUserID).
 package owner
 
 import (
@@ -13,8 +14,10 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"math"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -25,6 +28,8 @@ const (
 )
 
 // Record is owner.json: the owner's SID and the session they last claimed or signed in from.
+// On Linux SID holds the owner's decimal uid, and their session is that uid too: the service
+// follows logind's users, not their sessions (docs/architecture.md "Linux (in progress)").
 type Record struct {
 	SID     string `json:"sid"`
 	Session uint32 `json:"session"`
@@ -47,6 +52,17 @@ func ValidSID(sid string) bool {
 	return true
 }
 
+// ValidUID accepts a Linux uid in decimal ("1000"), which names the owner's home directory as
+// a SID does on Windows. It refuses what would name another directory for the same uid, such
+// as leading zeros, and (uid_t)-1, which is no one.
+func ValidUID(uid string) bool {
+	if uid == "" || len(uid) > 10 || strings.Trim(uid, "0123456789") != "" || (uid[0] == '0' && uid != "0") {
+		return false
+	}
+	number, err := strconv.ParseUint(uid, 10, 32)
+	return err == nil && number != math.MaxUint32
+}
+
 // Home is the owner's mihomo home under root.
 func Home(root, sid string) string {
 	return filepath.Join(root, usersDir, sid)
@@ -65,8 +81,8 @@ func LoadRecord(root string) (Record, bool, error) {
 	if err := json.Unmarshal(raw, &record); err != nil {
 		return Record{}, false, fmt.Errorf("%s: %w", recordFile, err)
 	}
-	if !ValidSID(record.SID) {
-		return Record{}, false, fmt.Errorf("%s: %q is not a SID", recordFile, record.SID)
+	if !validUserID(record.SID) {
+		return Record{}, false, fmt.Errorf("%s: %q is not a user ID", recordFile, record.SID)
 	}
 	return record, true, nil
 }
@@ -78,6 +94,15 @@ func SaveRecord(root string, record Record) error {
 		return err
 	}
 	return writeFile(filepath.Join(root, recordFile), raw)
+}
+
+// RemoveRecord deletes owner.json, leaving the service with no owner; nothing to delete is no
+// error.
+func RemoveRecord(root string) error {
+	if err := os.Remove(filepath.Join(root, recordFile)); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+	return nil
 }
 
 // writeFile replaces path in one step: a new file that only this process opened, then a

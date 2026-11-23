@@ -21,13 +21,9 @@ import (
 	"github.com/openweir/app-desktop/src/core/internal/sysproxy"
 )
 
-const (
-	alice = "S-1-5-21-1004336348-1177238915-682003330-1001"
-	bob   = "S-1-5-21-1004336348-1177238915-682003330-1002"
-)
-
-// machine stands in for Windows: who is signed in to which session, each user's proxy
-// settings, and the service restarts asked for.
+// machine stands in for Windows or Linux: who is signed in to which session, each user's
+// proxy settings, and the service restarts asked for. The users, alice and bob, are of this
+// system's kind (ids_*_test.go).
 type machine struct {
 	secured  map[string]string
 	sessions map[uint32]string
@@ -233,7 +229,7 @@ func profile(systemProxy bool) *controlpb.StartRequest {
 }
 
 func TestValidSID(t *testing.T) {
-	for _, sid := range []string{alice, "S-1-5-18", "S-1-5-32-544"} {
+	for _, sid := range []string{"S-1-5-21-1004336348-1177238915-682003330-1001", "S-1-5-18", "S-1-5-32-544"} {
 		if !ValidSID(sid) {
 			t.Errorf("ValidSID(%q) = false", sid)
 		}
@@ -241,6 +237,20 @@ func TestValidSID(t *testing.T) {
 	for _, sid := range []string{"", "S-1-", "S-1-5-", "S-1-5--1", `S-1-5-21\..\x`, "S-1-5-21/1", "s-1-5-18", "S-1-5-18 ", "S-1-99999999999"} {
 		if ValidSID(sid) {
 			t.Errorf("ValidSID(%q) = true", sid)
+		}
+	}
+}
+
+func TestValidUID(t *testing.T) {
+	for _, uid := range []string{"0", "1000", "65534", "4294967294"} {
+		if !ValidUID(uid) {
+			t.Errorf("ValidUID(%q) = false", uid)
+		}
+	}
+	for _, uid := range []string{"", "-1", "+1", "01000", "00", "1000 ", " 1000", "1e3", "4294967295", "4294967296",
+		"99999999999", "../0", "S-1-5-18", "１０００"} {
+		if ValidUID(uid) {
+			t.Errorf("ValidUID(%q) = true", uid)
 		}
 	}
 }
@@ -298,8 +308,8 @@ func TestClaimRestartsForANewOwner(t *testing.T) {
 	if record, _, _ := LoadRecord(root); record != (Record{SID: alice, Session: 3}) {
 		t.Fatalf("record = %+v", record)
 	}
-	if err := service.Claim(as("not a SID", 2)); err == nil {
-		t.Fatal("claimed without a SID")
+	if err := service.Claim(as("not a user", 2)); err == nil {
+		t.Fatal("claimed without a user ID")
 	}
 }
 
