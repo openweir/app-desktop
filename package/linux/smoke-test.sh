@@ -198,6 +198,24 @@ alive() {
 	state=$(ps -o stat= -p "$1" 2>/dev/null) && [[ $state != Z* ]]
 }
 
+# desktop-file-utils before 0.27 (Ubuntu 22.04, Debian 12) knows the specification up to 1.4
+# and calls Version=1.5 and its SingleMainWindow errors: there the file is checked as 1.4,
+# without that key.
+validate_desktop_file() {
+	local probe status
+	probe=$(mktemp -d) || return
+	printf '[Desktop Entry]\nType=Application\nVersion=1.5\nName=Probe\nExec=true\n' >"$probe/probe.desktop"
+	if desktop-file-validate "$probe/probe.desktop" >/dev/null 2>&1; then
+		cp "$desktop_file" "$probe/checked.desktop"
+	else
+		sed -e 's/^Version=1\.5$/Version=1.4/' -e '/^SingleMainWindow=/d' "$desktop_file" >"$probe/checked.desktop"
+	fi
+	desktop-file-validate "$probe/checked.desktop"
+	status=$?
+	rm -rf "$probe"
+	return "$status"
+}
+
 # -- what every mode checks once the package is in --------------------------------------------
 
 installed_checks() {
@@ -207,7 +225,7 @@ installed_checks() {
 	expect "/opt/openweir is root's and 0755" "$(stat -c '%U:%G %a' "$install_dir" 2>&1)" "root:root 755"
 	expect "openweir.service enabled" "$(systemctl is-enabled openweir.service 2>&1)" enabled
 	expect "openweir.socket enabled" "$(systemctl is-enabled openweir.socket 2>&1)" enabled
-	check "desktop-file-validate" desktop-file-validate "$desktop_file"
+	check "desktop-file-validate" validate_desktop_file
 	# The UI, and Cronet, which the service loads by its path; the service itself is static.
 	for library in "$ui" "$install_dir/libcronet.so"; do
 		if ! missing=$(ldd "$library" 2>&1); then
