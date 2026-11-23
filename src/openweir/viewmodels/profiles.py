@@ -166,8 +166,9 @@ def _expires_in(seconds: float) -> str:
     return QCoreApplication.translate("ProfilesViewModel", "%n 小时后到期", None, hours)
 
 
-def _condition(subscription: RemoteSubscription, now: float) -> ProviderStatus:
-    """The status billing gives (docs/accounts.md §5.5); none while it is active."""
+def condition_status(subscription: RemoteSubscription, now: float) -> ProviderStatus:
+    """The status billing gives (docs/accounts.md §5.5); none while it is active. The
+    account page words its subscriptions with it too."""
     condition = subscription.condition(now)
     if condition == CONDITION_EXPIRING:
         assert subscription.expire_at is not None
@@ -217,7 +218,7 @@ def provider_status(profile: Profile, summary: AccountSummary, now: float) -> Pr
     if notice == PROVIDER_LINK_UNAVAILABLE:
         return ProviderStatus(QCoreApplication.translate("ProfilesViewModel", "没有订阅链接"))
     subscription = _billing(profile, summary)
-    status = _condition(subscription, now) if subscription is not None else ProviderStatus()
+    status = condition_status(subscription, now) if subscription is not None else ProviderStatus()
     if status.text or not notice:
         return status
     # Billing changed since the update that kept the config; the code still says why.
@@ -274,9 +275,10 @@ def _expiry(usage: Usage | None, now: float) -> tuple[str, bool]:
     return fmt.date(usage.expire), False
 
 
-def _sign_out_text(removal: ProviderRemoval) -> str:
+def sign_out_text(removal: ProviderRemoval) -> str:
     """What signing out of a provider removes, stated in its confirmation (docs/accounts.md
-    §4.4): its subscriptions by name, and whose rules come next."""
+    §4.4): its subscriptions by name, and whose rules come next. The subscriptions page and
+    the account page ask the same."""
     names = [p.name for p in removal.profiles]
     quoted = QCoreApplication.translate("ProfilesViewModel", "「{name}」")
     separator = QCoreApplication.translate("ProfilesViewModel", "、")
@@ -328,6 +330,8 @@ class ProfilesViewModel(QObject):
     # (docs/accounts.md §7.3).
     providerSignInRequested = Signal(str)
     signOutRequested = Signal()  # 退出「示例服务商」 awaits confirmation; the view asks
+    # The overview's 续费: the account page, on this provider (docs/accounts.md §7.5).
+    accountRequested = Signal(str)
 
     def __init__(
         self,
@@ -923,7 +927,7 @@ class ProfilesViewModel(QObject):
 
     @Property(str, notify=changed)
     def signOutText(self) -> str:
-        return _sign_out_text(self._sign_out) if self._sign_out else ""
+        return sign_out_text(self._sign_out) if self._sign_out else ""
 
     @Property("QStringList", notify=changed)  # pyright: ignore[reportArgumentType]
     def signOutProfiles(self) -> list[str]:
@@ -1263,10 +1267,12 @@ class ProfilesViewModel(QObject):
 
     @Slot()
     def renewActive(self) -> None:
-        """续费 on the overview: the renewal page of the subscription in use."""
+        """续费 on the overview: a link to the account page, on the provider of the
+        subscription in use, which shows what renewing it means and opens the user center
+        from there (DESIGN.md "服务商的订阅行"; docs/accounts.md §7.5)."""
         found = self._active_account()
         if found is not None:
-            self.renew(found[0].id)
+            self.accountRequested.emit(found[1].provider.id)
 
     def _suggestion(self) -> Profile | None:
         """Another subscription of the same account to use instead of the one in use, which

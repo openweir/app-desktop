@@ -58,6 +58,7 @@ PAGES = frozenset(
         "RoutingPage",
         "ConnectionsPage",
         "LogsPage",
+        "AccountPage",
         "SettingsPage",
     }
 )

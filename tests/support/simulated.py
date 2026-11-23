@@ -60,6 +60,7 @@ from openweir.host.base import (
     bundled_geo_categories,
     taken_over,
 )
+from openweir.models.credentials import CredentialStore, ProviderToken, ProviderTokens
 from openweir.models.mesh import MeshStore
 from openweir.models.plans import WARP, default_plan
 from openweir.models.profiles import (
@@ -70,6 +71,7 @@ from openweir.models.profiles import (
     ProfileList,
     Usage,
 )
+from openweir.models.provider.store import ProviderStore
 from openweir.models.routing import (
     DEFAULT_INFO_PATTERN,
     MODE_PROFILE,
@@ -80,6 +82,8 @@ from openweir.models.routing import (
 )
 from openweir.models.store import ProfileStore
 from openweir.models.subscription import Download, EntityTag
+from tests.support.provider_server import EMAIL as PROVIDER_EMAIL
+from tests.support.provider_server import FakeProvider
 from tests.support.simulated_core import (
     VPNGATE_NAMES,
     check_config,
@@ -94,6 +98,7 @@ from tests.support.simulated_core import (
 
 GB = 1024**3
 MB = 1024**2
+PROVIDER_USER = "user-1"  # the fake provider's sample user, whose email is PROVIDER_EMAIL
 
 # What the core reports: mihomo pinned to a commit by go.mod replace (D38) has a pseudo-version.
 CORE_VERSION = "openweir-v1.0.1+v1.19.34-0.20261122175947-8d0770267d54"
@@ -1191,6 +1196,22 @@ def seed_profiles(store: ProfileStore, now: float, *, long_names: bool = False) 
     store.save(seeded)
     RoutingStore(store.database).update_state(mode=MODE_PROFILE)
     return seeded
+
+
+def seed_provider(
+    store: ProfileStore, provider: FakeProvider, credentials: CredentialStore, now: float
+) -> str:
+    """Sign in to ``provider`` (tests/support/provider_server.py) as its sample user, as the
+    sign-in dialog would have: the provider's record in the database and its session in
+    ``credentials``, its data dated around ``now``. The app syncs its subscriptions in as
+    profiles once it runs (scripts/preview.py --provider). Returns the provider's id."""
+    provider.move_to(now)
+    record = ProviderStore(store.database).add(
+        provider.base, str(provider.site["name"]), PROVIDER_EMAIL, PROVIDER_USER
+    )
+    session = ProviderToken(provider.session(PROVIDER_USER), PROVIDER_USER)
+    ProviderTokens(credentials).save(record.id, session)
+    return record.id
 
 
 def seed_long_plan(store: ProfileStore) -> Plan:

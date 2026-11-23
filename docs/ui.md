@@ -598,7 +598,7 @@ UI 只保存和传递覆写原文，解析与合并在内核里做；模拟宿�
     （`dock.open_in_menu_bar`），Qt 既不把进程转为前台应用，也不请求激活。Qt 在事件循环开始后还会读它，所以
     整个进程都保留；界面启动的子进程（codesign、schtasks）不是 Qt 程序。
   - **隐藏时释放**：窗口隐藏后界面进程仍常驻，只剩托盘或菜单栏时把只为画窗口占的内存还回去。窗口隐藏 2 秒后
-    （Main.qml 的 `releaseTimer`，窗口马上又显示、或关闭即退出时不做），Main.qml 卸下七个页面，再调用
+    （Main.qml 的 `releaseTimer`，窗口马上又显示、或关闭即退出时不做），Main.qml 卸下八个页面，再调用
     `DesktopViewModel.releaseWindow`，由 `desktop/memory.py` 删除卸下的页面，回收 QML 和 Python 的垃圾，清空
     `QPixmapCache`，临时关掉 `persistentGraphics` 和 `persistentSceneGraph` 调用 `releaseResources()`，放掉
     场景图、字形和纹理缓存、图形设备和 Qt Quick 的图片缓存。之后仍是持久的，2 秒内隐藏又显示不必重建。
@@ -613,7 +613,7 @@ UI 只保存和传递覆写原文，解析与合并在内核里做；模拟宿�
       窗口显示时 Qt 重新创建原生窗口，又按有标题栏的外框创建；`TitleBar` 像第一次那样隐藏标题，并还原窗口原来的
       位置和大小（最大化、全屏由 Qt 还原）。Windows 保留原生窗口，`WindowsFrame` 绑在它上面。
     - 页面各在一个 `PageLoader` 里，`active` 跟随 Main.qml 的 `holdsPages`。`present()` 在显示窗口前同步创建
-      七个页面，第一帧就有内容；登录时隐藏启动的窗口第一次显示时才创建。`PageLoader` 不用 `Loader`：`Loader` 是
+      八个页面，第一帧就有内容；登录时隐藏启动的窗口第一次显示时才创建。`PageLoader` 不用 `Loader`：`Loader` 是
       焦点域，Tab、Shift+Tab 经它进入页面时丢掉焦点原因，代理页靠这个原因决定落到哪一行；它的异步加载也会改变
       页面里对象完成的先后，如策略组菜单用 `Instantiator` 插入的类型项会排到后面。侧栏、托盘、「未能断开连接」
       对话框和授权引导不卸下。

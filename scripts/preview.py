@@ -14,14 +14,18 @@
     uv run python scripts/preview.py --google  # Google Drive backup to a fake Google
     uv run python scripts/preview.py --long-names  # long names in Chinese, English and emoji,
                                                    # and a plan of them that --plan routes with
+    uv run python scripts/preview.py --provider  # signed in to a fake provider: the 账户 page
 
 Profiles live in a temporary directory and links resolve to sample data, so the preview
 touches neither the real profiles nor the network; updates come from a fake GitHub on a
 loopback port, whose installer passes a fake signature check. With --google, Google Drive is a
 fake Google on a loopback port too, whose browser consents at once, and its sign-in stays in
 memory. Without it, OPENWEIR_GOOGLE_CLIENT_ID and OPENWEIR_GOOGLE_CLIENT_SECRET sign in to the real
-Google (docs/maintenance.md §2.8). Source-tree only: the preview's test doubles never ship in
-the package.
+Google (docs/maintenance.md §2.8). With --provider, an OpenWeir provider is a fake one on a
+loopback port (tests/support/provider_server.py), signed in to as user@example.com with the
+password "correct horse battery"; the session stays in memory, not in the system's credential
+store. Its user center's links lead nowhere. Source-tree only: the preview's test doubles
+never ship in the package.
 """
 
 import argparse
@@ -36,20 +40,25 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from openweir.app import main
 from openweir.host.base import TAKEOVER_NONE, TAKEOVER_SETTINGS, TAKEOVER_TUN
+from openweir.models import credentials
+from openweir.models.credentials import KeyringCredentials
 from openweir.models.plans import default_plan
 from openweir.models.routing import MODE_PLAN, RoutingStore
 from openweir.models.store import ProfileStore
 from openweir.update.releases import ReleaseSource
 from openweir.update.updater import Updater
 from openweir.viewmodels.appearance import MODES
-from tests.support.credentials import MemoryCredentials
+from tests.support.credentials import MemoryCredentials, MemoryKeyring
 from tests.support.google import FakeGoogle
+from tests.support.provider_server import FakeProvider
 from tests.support.releases import FakeVerifier, sample_github
 from tests.support.simulated import (
+    SAMPLE_CONFIG,
     SimulatedFetcher,
     SimulatedHost,
     seed_long_plan,
     seed_profiles,
+    seed_provider,
 )
 
 if __name__ == "__main__":
@@ -75,15 +84,25 @@ if __name__ == "__main__":
     parser.add_argument(
         "--long-names", action="store_true", help="name everything at length, to try the layout"
     )
+    parser.add_argument(
+        "--provider", action="store_true", help="sign in to a fake OpenWeir provider"
+    )
     args, qt_args = parser.parse_known_args()
     sys.argv[1:] = qt_args
     google = FakeGoogle() if args.google else None
-    if google is not None:
-        os.environ["no_proxy"] = "127.0.0.1"  # the fake is on a loopback port
+    provider = FakeProvider() if args.provider else None
+    if google is not None or provider is not None:
+        os.environ["no_proxy"] = "127.0.0.1"  # the fakes are on loopback ports
+    if provider is not None:
+        provider.config = SAMPLE_CONFIG.encode()  # rules of its own, so it can be used
+        # The session goes to the system's credential store, which stays out of a preview.
+        keyring = MemoryKeyring()
+        credentials.system_keyring = lambda: keyring
     with (
         tempfile.TemporaryDirectory(prefix="openweir-preview-") as directory,
         sample_github(newer=args.update) as github,
         contextlib.closing(google) if google else contextlib.nullcontext(),
+        contextlib.closing(provider) if provider else contextlib.nullcontext(),
     ):
         store = ProfileStore(Path(directory))
         seed_profiles(store, time.time(), long_names=args.long_names)
@@ -95,6 +114,8 @@ if __name__ == "__main__":
                 plan = default_plan()
                 routing.put_plan(plan)
             routing.update_state(mode=MODE_PLAN, plan_id=plan.id)
+        if provider is not None:
+            seed_provider(store, provider, KeyringCredentials(), time.time())
         host = SimulatedHost(
             health_check_s=0.8,
             crowd=args.crowd,

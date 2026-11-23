@@ -428,10 +428,10 @@ def test_becoming_active_is_told_on_every_platform(
     app.applicationStateChanged.emit(Qt.ApplicationState.ApplicationInactive)
     app.applicationStateChanged.emit(Qt.ApplicationState.ApplicationActive)
     assert heard == (["activated", "reopened"] if platform == "darwin" else ["activated"])
-    # The subscriptions page takes it up, where the accounts sync.
+    # The subscriptions page and the account page take it up, where the accounts sync.
     store = ProfileStore(tmp_path / "composed")
     composed = compose(SimulatedHost(), store, SimulatedFetcher())
-    assert composed.desktop.receivers(SIGNAL("activated()")) == 1
+    assert composed.desktop.receivers(SIGNAL("activated()")) == 2
 
 
 @pytest.mark.parametrize(("platform", "tray"), [("win32", True), ("darwin", False)])

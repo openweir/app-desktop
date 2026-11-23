@@ -25,6 +25,7 @@ ApplicationWindow {
     required property BackupViewModel backupViewModel
     required property SystemExtensionViewModel systemExtensionViewModel
     required property ProviderSignInViewModel providerSignInViewModel
+    required property AccountViewModel accountViewModel
 
     // Whether the window holds its pages: while it shows, and for a moment after it hides.
     // Hidden in the tray or the menu bar, it lets them go and gives back the memory they and
@@ -268,15 +269,29 @@ ApplicationWindow {
         }
     }
 
-    // The tunnel stopped under a page that needs it, which gives way to the overview: focus
-    // on the page moves to the overview's tab, with its ring if the keyboard had put it there.
+    // A page goes from the sidebar under the window and gives way to `next`. The tunnel
+    // stopped under a page that needs it, which gives way to the overview: focus on the page
+    // moves to the overview's tab, with its ring if the keyboard had put it there. The last
+    // provider account signed out under the account page, which gives way to the
+    // subscriptions page: focus on the page or its tab moves to 添加 there, which signs in
+    // again (DESIGN.md "侧栏导航"), once that page shows.
     Connections {
         target: window.shellViewModel
 
-        function onLeavingPage() {
+        function onLeavingPage(next: string) {
             const focused = window.activeFocusItem
-            if (focused && Focus.within(focused, pages.children[window.shellViewModel.pageIndex]))
-                sidebar.tab("overview")?.forceActiveFocus(Focus.reasonAfter(focused))
+            const leaving = pages.children[window.shellViewModel.pageIndex]
+            const reason = Focus.reasonAfter(focused)
+            if (next !== "profiles") {
+                if (focused && Focus.within(focused, leaving))
+                    sidebar.tab(next)?.forceActiveFocus(reason)
+                return
+            }
+            const add = (profilesLoader.item as ProfilesPage)?.addButton ?? null
+            if (!add || (accountLoader.item as AccountPage)?.handFocus(add))
+                return
+            if (focused && (Focus.within(focused, leaving) || focused === sidebar.tab("account")))
+                Qt.callLater(() => add.forceActiveFocus(reason))
         }
     }
 
@@ -357,6 +372,16 @@ ApplicationWindow {
 
                 sourceComponent: LogsPage {
                     logs: window.logsViewModel
+                }
+            }
+
+            PageLoader {
+                id: accountLoader
+
+                active: window.holdsPages
+
+                sourceComponent: AccountPage {
+                    account: window.accountViewModel
                 }
             }
 

@@ -14,14 +14,16 @@ from openweir.models.backup import Backups
 from openweir.models.backup_auto import BackupTargets, Changes
 from openweir.models.backup_google import GoogleDriveProvider
 from openweir.models.backup_icloud import ICloudProvider
-from openweir.models.credentials import CredentialStore
+from openweir.models.credentials import CredentialStore, KeyringCredentials, ProviderTokens
 from openweir.models.geodata import GeoDownloader, GeoUpdates
 from openweir.models.library import ProfileLibrary
+from openweir.models.provider.store import ProviderStore
 from openweir.models.settings import DatabaseSettingsStore, Settings, SettingsStore
 from openweir.models.store import ProfileStore
 from openweir.models.subscription import Fetcher
 from openweir.update.updater import Updater
 from openweir.viewmodels.about import AboutViewModel
+from openweir.viewmodels.account import AccountViewModel
 from openweir.viewmodels.appearance import Appearance
 from openweir.viewmodels.backup import BackupViewModel
 from openweir.viewmodels.common.async_runner import AsyncRunner
@@ -58,6 +60,7 @@ class ViewModels:
     backup: BackupViewModel
     system_extension: SystemExtensionViewModel
     provider_sign_in: ProviderSignInViewModel
+    account: AccountViewModel
     geo_updates: GeoUpdates
 
     def initial_properties(self) -> dict[str, object]:
@@ -77,6 +80,7 @@ class ViewModels:
             "backupViewModel": self.backup,
             "systemExtensionViewModel": self.system_extension,
             "providerSignInViewModel": self.provider_sign_in,
+            "accountViewModel": self.account,
         }
 
     def start(self) -> None:
@@ -92,6 +96,7 @@ class ViewModels:
         self.desktop.start()
         self.about.start()
         self.backup.start()
+        self.account.start()
 
     def retranslate(self) -> None:
         """Re-read every text the ViewModels make, after the UI language changed."""
@@ -107,6 +112,7 @@ class ViewModels:
         self.backup.retranslate()
         self.system_extension.retranslate()
         self.provider_sign_in.retranslate()
+        self.account.retranslate()
 
     def open_link(self, link: str) -> None:
         """An install link arrived (docs/release.md §7): show the window and the import form
@@ -134,6 +140,7 @@ class ViewModels:
         self.about.stop()
         self.backup.stop()
         self.provider_sign_in.stop()
+        self.account.stop()
         self.runner.shutdown(finalize=self.host.close)
 
 
@@ -169,6 +176,9 @@ def compose(
     it: the window opens on the settings page, whose version row says how it went."""
     runner = AsyncRunner()
     settings_store = settings or DatabaseSettingsStore(store.database)
+    # The library keeps the provider accounts' sessions in it; diagnostics tell whether there
+    # is one (docs/accounts.md §8).
+    credentials = credentials or KeyringCredentials()
     library = ProfileLibrary(
         store,
         host,
@@ -201,6 +211,7 @@ def compose(
     proxies = ProxiesViewModel(host, runner, settings_store)
     profiles = ProfilesViewModel(library, runner, clock)
     provider_sign_in = ProviderSignInViewModel(library, runner, clock)
+    account = AccountViewModel(library, runner, clock)
     routing = RoutingViewModel(library, runner, settings_store)
     connections = ConnectionsViewModel(host, runner)
     logs = LogsViewModel(host, runner)
@@ -222,6 +233,8 @@ def compose(
         logs.held,
         crash_directory=store.directory / "crashes",
         update_result=update_result,
+        providers=ProviderStore(store.database),
+        provider_tokens=ProviderTokens(credentials),
     )
     if update_result is not None:
         shell.setPage("settings")
@@ -262,6 +275,8 @@ def compose(
             settings_page.refreshLoginItem()
             backup.refreshCloud()
         connections.setActive(desktop.window_shown and shell.currentPage == "connections")
+        # The account page syncs as it shows, and reads the wallet, plans and orders.
+        account.set_shown(shell.currentPage == "account")
 
     def window_shown() -> None:
         # While the window hides, only the tray's status is polled at full rate (ui.md §8).
@@ -278,6 +293,7 @@ def compose(
     desktop.windowShownChanged.connect(window_shown)
     # Back from a provider's user center in the browser, its account syncs (D58).
     desktop.activated.connect(profiles.windowActivated)
+    desktop.activated.connect(account.windowActivated)
     window_shown()
     proxies.selectionApplied.connect(overview.refreshGroups)
     profiles.applied.connect(overview.refreshGroups)
@@ -293,6 +309,27 @@ def compose(
     provider_sign_in.applied.connect(overview.refreshGroups)
     provider_sign_in.applied.connect(proxies.refresh)
     provider_sign_in.applied.connect(profiles_applied)
+    # The account page (docs/accounts.md §7.4): the sidebar lists it while there is an
+    # account. It reads the accounts again whenever the profiles change, which a sync, a
+    # sign-in or a sign-out on the subscriptions page does, and its own 使用, 退出登录 and
+    # syncs change the profiles the other pages show.
+    account.accountsChanged.connect(shell.has_accounts)
+    account.signInRequested.connect(provider_sign_in.open)
+    provider_sign_in.signedIn.connect(account.signed_in)
+    provider_sign_in.profilesChanged.connect(account.reload)
+    profiles.changed.connect(account.reload)
+    account.profilesChanged.connect(profiles.reload)
+    account.profilesChanged.connect(routing.reload)
+    account.applied.connect(overview.refreshGroups)
+    account.applied.connect(proxies.refresh)
+    account.applied.connect(profiles_applied)
+
+    def account_requested(provider_id: str) -> None:
+        """The overview's 续费: the account page, on the subscription's provider."""
+        account.selectProvider(provider_id)
+        shell.setPage("account")
+
+    profiles.accountRequested.connect(account_requested)
     # One page's change of the pool or the routing shows on the other (routing.md §4.2).
     profiles.routingChanged.connect(routing.reload)
     profiles.routingRequested.connect(lambda: shell.setPage("routing"))
@@ -304,6 +341,7 @@ def compose(
     backup.restored.connect(routing.reload)
     backup.restored.connect(overview.refreshGroups)
     backup.restored.connect(proxies.refresh)
+    backup.restored.connect(account.reload)
     # The WARP exit registers once the tunnel runs (docs/exits.md §2).
     overview.changed.connect(lambda: routing.tunnel_running(bool(overview.property("connected"))))
     # The proxies page lists the running core's groups: it shows while the connection switch
@@ -346,5 +384,6 @@ def compose(
         backup,
         system_extension,
         provider_sign_in,
+        account,
         GeoUpdates(host, GeoDownloader(store.directory / "geodata-cache")),
     )

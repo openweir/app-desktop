@@ -25,7 +25,9 @@ from openweir import crashes, diagnostics, licenses
 from openweir.host.base import LogEntry, TunnelHost
 from openweir.i18n import QT_TRANSLATE_NOOP, current_language
 from openweir.models import format as fmt
+from openweir.models.credentials import ProviderTokens
 from openweir.models.library import ProfileLibrary
+from openweir.models.provider.store import ProviderStore
 from openweir.models.settings import UPDATE_CHECK_HOURS, Settings, SettingsError, SettingsStore
 from openweir.update import linux
 from openweir.update.releases import UpdateError
@@ -164,11 +166,15 @@ class AboutViewModel(QObject):
         manifest: Path = licenses.MANIFEST,
         notices: Path = licenses.NOTICES,
         crash_directory: Path | None = None,
+        providers: ProviderStore | None = None,
+        provider_tokens: ProviderTokens | None = None,
         parent: QObject | None = None,
     ) -> None:
         """``logs`` returns the core's log lines the logs page holds; it is called on the
         Qt thread. ``update_result`` is the Linux install helper's exit code when the UI was
-        started again after it (app.py's --update-result)."""
+        started again after it (app.py's --update-result). ``providers`` and
+        ``provider_tokens`` tell diagnostics of the provider accounts (docs/accounts.md §8);
+        without them the archive says they were not read."""
         super().__init__(parent)
         self._updater = updater
         self._settings = settings
@@ -185,6 +191,8 @@ class AboutViewModel(QObject):
         self._manifest = manifest
         self._notices = notices
         self._crash_directory = crash_directory
+        self._providers = providers
+        self._provider_tokens = provider_tokens
         self._crash_count = 0
         self._crash_busy = False
         self._crash_notice = ""
@@ -571,8 +579,14 @@ class AboutViewModel(QObject):
         self._exporting = True
         self.changed.emit()
 
+        providers, tokens = self._providers, self._provider_tokens
+
         async def export() -> None:
             info, status = await diagnostics.ask_host(self._host)
+            accounts = None
+            if providers is not None and tokens is not None:
+                # The credential store may block, as a locked keychain asks the user.
+                accounts = await asyncio.to_thread(diagnostics.read_accounts, providers, tokens)
             snapshot = diagnostics.Snapshot(
                 info=info,
                 status=status,
@@ -582,6 +596,7 @@ class AboutViewModel(QObject):
                 logs=logs,
                 language=language,
                 crashes=(await asyncio.to_thread(self._crashes)).summary(),
+                accounts=accounts,
             )
             await asyncio.to_thread(diagnostics.write_archive, path, snapshot, now)
 

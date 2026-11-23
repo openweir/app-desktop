@@ -705,6 +705,8 @@ def _orders(value: object) -> tuple[OrderSummary, ...]:
                 amount=fields.integer("amount"),
                 created_at=fields.time_or("createdAt"),
                 price=fields.integer_or("price"),
+                discount=fields.integer_or("discount"),
+                credit=fields.integer_or("credit"),
                 paid_amount=fields.integer_or("paidAmount"),
                 plan_id=fields.optional_text("planId"),
                 plan_name=fields.text_or("planName"),
