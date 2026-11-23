@@ -13,13 +13,18 @@ profile imported then is stored unread, and the tunnel part reads it at the next
 Switching profiles or updating the one in use reloads it in place, with the TUN and system
 proxy state the host reports, so neither is interrupted. An update that brings the text
 stored already only dates the profile: the tunnel runs that text, so nothing reloads.
+
+A provider's subscription (kind ``provider``, docs/accounts.md §5) updates through the
+account (Accounts.fetch), at its interval while the account can be used and billing lets it.
+It takes its name from the account and has no link, so it cannot be renamed or given one,
+and only signing out removes it, unless the account no longer has it.
 """
 
 from __future__ import annotations
 
 import asyncio
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -35,6 +40,7 @@ from openweir.models.profiles import (
     ProfileError,
     ProfileList,
 )
+from openweir.models.provider.types import KEEPS_CONFIG, ProviderError
 from openweir.models.routing import MODE_PLAN, MODE_PROFILE, Plan
 from openweir.models.subscription import (
     Download,
@@ -47,6 +53,7 @@ from openweir.models.subscription import (
 )
 
 if TYPE_CHECKING:
+    from openweir.models.library.accounts import Accounts
     from openweir.models.library.core import LibraryCore
 
 DEFAULT_AUTO_UPDATE_HOURS = 12
@@ -54,6 +61,8 @@ DEFAULT_AUTO_UPDATE_HOURS = 12
 MAX_AUTO_UPDATE_HOURS = 2_147_483_647
 # After a failed automatic update, wait this long before the next attempt.
 RETRY_AFTER_S = 30 * 60
+# A provider's subscription is the account's: its name, its source and whether it stays.
+ACCOUNT_PROFILE = "account_profile"
 
 
 def _update_interval(enabled: bool, hours: int) -> int:
@@ -65,6 +74,19 @@ def _update_interval(enabled: bool, hours: int) -> int:
     if not valid:
         raise ProfileError("invalid_update_interval", "expected positive whole hours")
     return hours
+
+
+def _keeps_config(error: BaseException) -> bool:
+    """The provider profile kept its last config by design (KEEPS_CONFIG, D57): no failed
+    update, the row says why, and no retry in 30 minutes."""
+    return isinstance(error, ProviderError) and error.code in KEEPS_CONFIG
+
+
+def _first_interval(download: Download) -> int | None:
+    """The interval the first config of a provider profile asks for (Profile-Update-Interval),
+    as an import takes a subscription's."""
+    hours = download.interval
+    return hours if type(hours) is int and 1 <= hours <= MAX_AUTO_UPDATE_HOURS else None
 
 
 @dataclass(frozen=True)
@@ -93,6 +115,8 @@ class Profiles:
         self._core = core
         self._fetcher = fetcher
         self._source_epochs: dict[str, int] = {}
+        # Provider profiles update through them; ProfileLibrary hands them over.
+        self.accounts: Accounts | None = None
 
     # -- import ------------------------------------------------------------------------------
     async def import_url(
@@ -218,17 +242,21 @@ class Profiles:
         core = self._core
         async with core.lock:
             profile = core.list.get(profile_id)
+            if profile.is_provider and (name.strip() != profile.name or url.strip()):
+                raise ProfileError(
+                    ACCOUNT_PROFILE, "a provider's subscription has the account's name, no link"
+                )
             url = check_url(url) if profile.is_subscription else profile.url
             source_changed = url != profile.url
             # Turned off with no interval of its own, it keeps the one it had.
             if interval_hours is None or (not auto_update and not interval_hours):
                 interval_hours = profile.auto_update_interval or DEFAULT_AUTO_UPDATE_HOURS
-            hours = _update_interval(auto_update and profile.is_subscription, interval_hours)
+            hours = _update_interval(auto_update and profile.can_auto_update, interval_hours)
             edited = replace(
                 profile,
                 name=name.strip(),
                 url=url,
-                auto_update_hours=hours if profile.is_subscription else 0,
+                auto_update_hours=hours if profile.can_auto_update else 0,
                 usage=None if source_changed else profile.usage,
                 website="" if source_changed else profile.website,
                 support="" if source_changed else profile.support,
@@ -263,8 +291,9 @@ class Profiles:
 
     # -- update ------------------------------------------------------------------------------
     async def update(self, profile_id: str) -> Updated:
-        """Download a subscription again, or re-read a file, and reload it if it is in use
-        and its text changed."""
+        """Download a subscription again, fetch a provider's through the account, or re-read
+        a file, and reload it if it is in use and its text changed. A provider profile that
+        keeps its last config (KEEPS_CONFIG) raises why, without counting as a failed update."""
         core = self._core
         profile = core.list.get(profile_id)
         if not profile.can_update:
@@ -272,24 +301,28 @@ class Profiles:
         epoch = self._source_epochs.get(profile_id, 0)
         try:
             changed, applied = await self._refresh(profile, epoch)
-        except Exception:
+        except Exception as error:
             core.list.get(profile_id)
             if not self._same_source(profile, epoch):
                 return Updated(core.list, False, False)
-            core.mark_failed(profile_id, core.clock())
+            core.mark_failed(profile_id, None if _keeps_config(error) else core.clock())
             raise
         core.mark_failed(profile_id, None)
         return Updated(core.list, changed, applied)
 
     async def update_due(self) -> Updated:
-        """Update every subscription whose interval has passed. A failure shows in
-        ``ProfileList.update_failed`` and is retried later instead of raised. They wait while
-        no core can read them."""
+        """Sync the provider accounts that are due (Accounts.sync_all), then update every
+        subscription and provider profile whose interval has passed. A failure shows in
+        ``ProfileList.update_failed`` and is retried later instead of raised. The interval
+        updates wait while no core can read them; a sync needs no core."""
         core = self._core
-        if not core.host.core_available:
-            return Updated(core.list, changed=False, applied=False)
-        now = core.clock()
         changed = applied = False
+        if self.accounts is not None:
+            synced = await self.accounts.sync_all()
+            changed, applied = synced.changed, synced.applied
+        if not core.host.core_available:
+            return Updated(core.list, changed, applied)
+        now = core.clock()
         for profile in [p for p in core.list.profiles if self._due(p, now)]:
             # Earlier downloads may have yielded while this profile was edited,
             # refreshed or removed. Schedule from its current metadata.
@@ -308,7 +341,10 @@ class Profiles:
         return Updated(core.list, changed, applied)
 
     def _due(self, profile: Profile, now: float) -> bool:
-        if not profile.is_subscription or profile.auto_update_hours <= 0:
+        if not profile.can_auto_update or profile.auto_update_hours <= 0:
+            return False
+        # A provider profile waits while its account or billing says it would only fail.
+        if profile.is_provider and (self.accounts is None or self.accounts.paused(profile, now)):
             return False
         failed_at = self._core.failed.get(profile.id)
         if failed_at is not None:
@@ -321,6 +357,7 @@ class Profiles:
     ) -> tuple[bool, bool]:
         core = self._core
         download: Download | None = None
+        interval: int | None = None
         if profile.is_subscription:
             tag = None
             if not restoring and not profile.unread and profile.id not in core.failed:
@@ -359,6 +396,13 @@ class Profiles:
             if download is None:
                 download = await self._fetcher.fetch(profile.url)
             text = decode_config(download.body)
+        elif profile.is_provider:
+            if self.accounts is None:
+                raise ProfileError("no_profile_source", "no accounts to update it through")
+            download = await self.accounts.fetch(profile)
+            text = decode_config(download.body)
+            if not restoring and profile.updated_at <= 0:
+                interval = _first_interval(download)
         elif restoring:
             text = await asyncio.to_thread(core.store.read_config, profile.id)
         else:
@@ -369,9 +413,9 @@ class Profiles:
             if not self._same_source(profile, epoch):
                 return False, False
             result = await self._commit_update(
-                profile.id, text, download, inspection, reload=not restoring
+                profile.id, text, download, inspection, reload=not restoring, interval=interval
             )
-            if download is not None:
+            if download is not None and profile.is_subscription:
                 await asyncio.to_thread(
                     core.store.accept_etag, profile.id, profile.url, text, download.etag
                 )
@@ -385,18 +429,25 @@ class Profiles:
         inspection: SourceInspection | None,
         *,
         reload: bool = True,
+        interval: int | None = None,
     ) -> tuple[bool, bool]:
         """Store a profile's new text; None for ``inspection`` stores it unread, keeping the
         text a core read last for when it refuses the new one at connect. Returns whether
         the text changed, and whether the routing in use takes it; a running tunnel reloads
-        with it unless ``reload`` is False. The text stored already only dates the profile."""
+        with it unless ``reload`` is False. The text stored already only dates the profile.
+        ``interval``: the hours a provider profile's first config asks it to update at."""
         core = self._core
         # The profile may have been removed while it downloaded.
         profile = core.list.get(profile_id)
         if download is not None:
+            usage = download.usage
+            if usage is None and profile.is_provider:
+                usage = profile.usage  # billing's, from the last sync
             profile = replace(
-                profile, usage=download.usage, website=download.website, support=download.support
+                profile, usage=usage, website=download.website, support=download.support
             )
+        if interval is not None and profile.auto_update_hours > 0:
+            profile = replace(profile, auto_update_hours=interval)
         if inspection is not None and not await self._changed(profile, text):
             core.inspections[profile_id] = inspection
             dated = replace(
@@ -501,10 +552,10 @@ class Profiles:
             profile = core.list.get(profile_id)
             # On again at the interval it kept while off.
             hours = _update_interval(
-                enabled and profile.is_subscription,
+                enabled and profile.can_auto_update,
                 profile.auto_update_interval or DEFAULT_AUTO_UPDATE_HOURS,
             )
-            profile = replace(profile, auto_update_hours=hours if profile.is_subscription else 0)
+            profile = replace(profile, auto_update_hours=hours if profile.can_auto_update else 0)
             await core.save(core.list.put(profile))
             return core.list
 
@@ -526,43 +577,62 @@ class Profiles:
     async def remove(self, profile_id: str) -> ProfileList:
         """Remove a profile. When its rules are in use, the earliest profile with rules takes
         over, or the user's plan when none has any (routing.md §5.1); a running tunnel
-        reloads first, and keeps the profile when the reload fails."""
+        reloads first, and keeps the profile when the reload fails. A provider's subscription
+        goes with signing out, unless the account no longer has it."""
         core = self._core
         async with core.lock:
             profile = core.list.get(profile_id)
-            await core.inspect_missing()
-            remaining = core.list.without(profile_id)
-            successor = core.first_with_rules(core.list, exclude=profile_id)
-            mode = core.state.mode
-            plan: Plan | None = None
-            report = core.report if not profile.in_pool else None
-            if core.list.active == profile_id:
-                remaining = replace(remaining, active=successor.id if successor else None)
-                if mode == MODE_PROFILE and successor is None:
-                    mode = MODE_PLAN
-                    plan = core.current_plan() or plans.default_plan()
-            if mode == MODE_PROFILE and remaining.active != core.list.active:
-                assert remaining.active is not None
-                text = await asyncio.to_thread(core.store.read_config, remaining.active)
-                config = TunnelConfig(text, await core.overrides(remaining.active))
-                await core.try_config(config)
-            elif mode == MODE_PLAN and (plan is not None or profile.in_pool):
-                composition = await core.composition(
-                    plan or core.current_plan(), remaining, info=core.info_filter()
-                )
-                config = TunnelConfig(
-                    overrides=await core.global_override(), composition=composition
-                )
-                report = await core.check(config)
-                await core.reload_config_if_running(config)
-            await core.save(remaining)
-            core.report = report
+            if profile.is_provider and not (
+                self.accounts is not None and self.accounts.removable(profile)
+            ):
+                raise ProfileError(ACCOUNT_PROFILE, "signing out removes the account's profiles")
+            return await self.discard((profile_id,))
+
+    async def discard(self, profile_ids: Collection[str]) -> ProfileList:
+        """Remove these profiles at once, as ``remove`` does one: the earliest of the others
+        with rules takes over from one in use. For Accounts.sign_out, under the library's
+        lock, which the caller holds."""
+        core = self._core
+        gone = {p.id for p in core.list.profiles if p.id in profile_ids}
+        if not gone:
+            return core.list
+        await core.inspect_missing()
+        remaining = replace(
+            core.list,
+            profiles=tuple(p for p in core.list.profiles if p.id not in gone),
+            update_failed=core.list.update_failed - gone,
+        )
+        successor = core.first_with_rules(remaining)
+        pooled = any(p.in_pool for p in core.list.profiles if p.id in gone)
+        mode = core.state.mode
+        plan: Plan | None = None
+        report = core.report if not pooled else None
+        if core.list.active in gone:
+            remaining = replace(remaining, active=successor.id if successor else None)
+            if mode == MODE_PROFILE and successor is None:
+                mode = MODE_PLAN
+                plan = core.current_plan() or plans.default_plan()
+        if mode == MODE_PROFILE and remaining.active != core.list.active:
+            assert remaining.active is not None
+            text = await asyncio.to_thread(core.store.read_config, remaining.active)
+            config = TunnelConfig(text, await core.overrides(remaining.active))
+            await core.try_config(config)
+        elif mode == MODE_PLAN and (plan is not None or pooled):
+            composition = await core.composition(
+                plan or core.current_plan(), remaining, info=core.info_filter()
+            )
+            config = TunnelConfig(overrides=await core.global_override(), composition=composition)
+            report = await core.check(config)
+            await core.reload_config_if_running(config)
+        await core.save(remaining)
+        core.report = report
+        for profile_id in gone:
             await asyncio.to_thread(core.store.delete_config, profile_id)
             core.inspections.pop(profile_id, None)
             core.mark_failed(profile_id, None)
-            if mode is not None and mode != core.state.mode:
-                await core.store_mode(mode, plan, resume_profile=mode == MODE_PLAN)
-            return core.list
+        if mode is not None and mode != core.state.mode:
+            await core.store_mode(mode, plan, resume_profile=mode == MODE_PLAN)
+        return core.list
 
     # -- overrides: ``None`` is the global override, a profile id that profile's own ----------
     async def read_override(self, profile_id: str | None) -> str:
@@ -605,10 +675,12 @@ class Profiles:
     async def restore(self, write: Callable[[], object]) -> ProfileList:
         """Have ``write`` put a backup into the store, on a worker thread while no change of
         the library can come between, and take it up. Then the host reads every profile as
-        an import does: subscriptions are downloaded again, a local file's config is the one
-        restored. A profile that fails is kept and marked as a failed update. When the
-        profile in use is gone, the earliest with rules takes over. A running tunnel then
-        runs the restored routing; raises when it cannot, with everything else done."""
+        an import does: subscriptions are downloaded again, provider profiles through their
+        accounts (a restored provider needs signing in first), a local file's config is the
+        one restored. A profile that fails is kept and marked as a failed update, unless it
+        kept its config by design (KEEPS_CONFIG). When the profile in use is gone, the
+        earliest with rules takes over. A running tunnel then runs the restored routing;
+        raises when it cannot, with everything else done."""
         core = self._core
         async with core.lock:
             await asyncio.to_thread(write)
@@ -618,6 +690,8 @@ class Profiles:
             core.state = await asyncio.to_thread(core.routing_store.state)
             core.plans = await asyncio.to_thread(core.routing_store.plans)
             await core.networks.take_restored()
+            if self.accounts is not None:
+                await self.accounts.reload()
             core.failed.clear()
             core.inspections.clear()
             core.report = None
@@ -625,8 +699,8 @@ class Profiles:
             epoch = self._source_epochs.get(profile.id, 0)
             try:
                 await self._refresh(profile, epoch, restoring=True)
-            except Exception:
-                if self._same_source(profile, epoch):
+            except Exception as error:
+                if self._same_source(profile, epoch) and not _keeps_config(error):
                     core.mark_failed(profile.id, core.clock())
         async with core.lock:
             if core.state.mode == MODE_PROFILE and core.list.active_profile() is None:
