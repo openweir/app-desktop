@@ -7,6 +7,10 @@ first to quit instead and waits until it has let go of the lock. The lock
 decides, not the server: QLockFile notices a lock left by a process that died, and two UIs
 started at once cannot both take it.
 
+On Linux a later UI also passes on the token its launcher gave it, with which the first may
+bring its window to the front (desktop/activation.py). The line then ends in
+``\t<NAME>=<token>`` fields, which nothing else sends: macOS and Windows have no such tokens.
+
 The server's name is derived from the user, the lock's directory and a random key kept beside
 the lock (``ui.key``, readable by the user alone), so other data directories (the preview) have
 their own and other users cannot work it out ahead of time. A name proves nothing, though:
@@ -28,22 +32,26 @@ import secrets
 import socket as sockets
 import struct
 import sys
+from collections.abc import Callable, Mapping
 from ctypes import wintypes
+from functools import partial
 from pathlib import Path
 
 from PySide6.QtCore import QDeadlineTimer, QLockFile, QObject, QThread, Signal
 from PySide6.QtNetwork import QLocalServer, QLocalSocket
 
-from openweir.desktop import windows_identity
+from openweir.desktop import activation, windows_identity
 from openweir.product import PRODUCT_ID
 
 LOCK_NAME = "ui.lock"
 KEY_NAME = "ui.key"
 _KEY = re.compile(r"[0-9a-f]{32}")
-# One line per connection: show the window, open a link (which shows it too), or quit.
+# One line per connection: show the window, open a link (which shows it too), or quit. The
+# first two may carry the launch's tokens, each after a tab.
 ACTIVATE = b"activate\n"
 OPEN = b"open "
 QUIT = b"quit\n"
+FIELD = b"\t"
 MAX_MESSAGE = 16 * 1024  # a line longer than this is dropped
 CONNECT_TIMEOUT_MS = 500
 # The first UI takes the lock before it listens; give it this long to start listening.
@@ -155,11 +163,28 @@ def _allow_foreground() -> None:
         ctypes.windll.user32.AllowSetForegroundWindow(asfw_any)
 
 
-def message(link: str | None) -> bytes:
-    """What a later UI sends: ``activate``, or ``open <link>``."""
+def message(link: str | None, tokens: Mapping[str, str] | None = None) -> bytes:
+    """What a later UI sends: ``activate``, or ``open <link>``, with the ``tokens`` it was
+    launched with (activation.launch_tokens) as ``\t<NAME>=<token>`` fields."""
     if link is None:
-        return ACTIVATE
-    return OPEN + link.replace("\n", "").replace("\r", "").encode() + b"\n"
+        line = ACTIVATE.removesuffix(b"\n")
+    else:
+        # A link has no line breaks or tabs; were it given some, they go.
+        line = OPEN + re.sub(r"[\r\n\t]", "", link).encode()
+    for name, token in (tokens or {}).items():
+        if name in activation.TOKEN_NAMES and activation.valid(token):
+            line += FIELD + f"{name}={token}".encode("ascii")
+    return line + b"\n"
+
+
+def _tokens(fields: list[bytes]) -> dict[str, str]:
+    """The tokens in a line's ``NAME=token`` fields; others are left out."""
+    tokens: dict[str, str] = {}
+    for field in fields:
+        name, _, token = field.decode("ascii", "replace").partition("=")
+        if name in activation.TOKEN_NAMES and activation.valid(token):
+            tokens[name] = token
+    return tokens
 
 
 def ask_to_quit(directory: Path, timeout_ms: int = QUIT_TIMEOUT_MS) -> bool:
@@ -243,7 +268,7 @@ class SingleInstance(QObject):
         if self._lock.tryLock(0):
             self._listen()
             return True
-        self._notify(message(link))
+        self._notify(message(link, activation.launch_tokens()))
         return False
 
     def release(self) -> None:
@@ -285,12 +310,20 @@ class SingleInstance(QObject):
                 socket.abort()
             return  # the rest of the line is on its way
         line = bytes(socket.readLine(MAX_MESSAGE + 1).data())
-        if line == ACTIVATE:
-            self.activated.emit()
-        elif line == QUIT:
+        if line == QUIT:
             self.quit_requested.emit()
-        elif line.startswith(OPEN) and line.endswith(b"\n") and len(line) <= MAX_MESSAGE:
-            self.received.emit(line[len(OPEN) : -1].decode("utf-8", "replace"))
+        elif line.endswith(b"\n") and len(line) <= MAX_MESSAGE:
+            command, *fields = line.removesuffix(b"\n").split(FIELD)
+            show: Callable[[], None] | None = None
+            if command == ACTIVATE.removesuffix(b"\n"):
+                show = self.activated.emit
+            elif command.startswith(OPEN):
+                link = command[len(OPEN) :].decode("utf-8", "replace")
+                show = partial(self.received.emit, link)
+            if show is not None:
+                # Shown with the launch's token, the window may come to the front.
+                with activation.launched(_tokens(fields)):
+                    show()
         socket.disconnectFromServer()
 
     def _notify(self, line: bytes) -> None:
