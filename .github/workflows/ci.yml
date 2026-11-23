@@ -163,7 +163,9 @@ jobs:
         # call has a deadline.
         timeout-minutes: 15
         run: |
-          packages=(libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3 libglib2.0-0t64 libx11-6)
+          # fonts-noto-color-emoji: Linux draws emoji with the system's colour font
+          # (test_fonts), which the x86_64 image lacks.
+          packages=(libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3 libglib2.0-0t64 libx11-6 fonts-noto-color-emoji)
           missing=()
           for package in "${packages[@]}"; do
             dpkg-query -W -f='${Status}\n' "$package" 2>/dev/null | grep -qx 'install ok installed' ||
@@ -243,7 +245,9 @@ jobs:
         # call has a deadline.
         timeout-minutes: 15
         run: |
-          packages=(libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3 libglib2.0-0t64 libx11-6)
+          # fonts-noto-color-emoji: Linux draws emoji with the system's colour font
+          # (test_fonts), which the x86_64 image lacks.
+          packages=(libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3 libglib2.0-0t64 libx11-6 fonts-noto-color-emoji)
           missing=()
           for package in "${packages[@]}"; do
             dpkg-query -W -f='${Status}\n' "$package" 2>/dev/null | grep -qx 'install ok installed' ||
