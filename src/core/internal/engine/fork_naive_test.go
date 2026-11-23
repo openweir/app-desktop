@@ -27,8 +27,19 @@ func TestForkNaiveNativeRuntimeAndAdmission(t *testing.T) {
 				t.Fatal("optional QUIC cannot be treated as always-TCP")
 			}
 			_ = proxy.Close()
+			// A subscription's Naive node without UoT reaches the fork through subconv (D54),
+			// which drops its UDP; the fork itself refuses one that an override brings in.
 			node["udp-over-tcp"], node["udp"] = false, true
-			if _, err := admitProfile(forkProfile(t, node, composed), noTUN); err == nil {
+			admitted, err = admitProfile(forkProfile(t, node, composed), noTUN)
+			if err != nil {
+				t.Fatal(err)
+			}
+			proxy = forkNode(admitted.cfg)
+			if proxy == nil || proxy.SupportUDP() {
+				t.Fatal("UDP without UoT was kept")
+			}
+			_ = proxy.Close()
+			if !forkRefuses(t, node, composed) {
 				t.Fatal("accepted UDP without UoT")
 			}
 		}
