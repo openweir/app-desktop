@@ -108,7 +108,8 @@ def test_while_the_window_hides_only_the_status_is_polled(
     view_models.desktop.setWindowShown(False)
     assert not connections._timer.isActive()
     assert logs._timer.interval() == HIDDEN_POLL_MS
-    qtbot.waitUntil(lambda: not overview._refreshing)  # one that started before
+    # The refreshes that started before, which the hosts below must not count.
+    qtbot.waitUntil(lambda: not overview._refreshing and not connections._refreshing)
     calls: list[str] = []
 
     def counting(name: str) -> Any:
