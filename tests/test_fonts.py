@@ -136,7 +136,11 @@ def test_emoji_renders_in_color(text: str) -> None:
         for x in range(100)
         for color in (image.pixelColor(x, y),)
     }
-    assert sum(a > 0 and max(r, g, b) - min(r, g, b) > 40 for r, g, b, a in colors) > 20
+    # What drew it, for a runner whose images differ from the machines this was written on.
+    drawn = sorted({run.rawFont().familyName() for run in shaped(text).glyphRuns()})
+    emoji = [family for family in QFontDatabase.families() if "emoji" in family.lower()]
+    colorful = sum(a > 0 and max(r, g, b) - min(r, g, b) > 40 for r, g, b, a in colors)
+    assert colorful > 20, f"drawn with {drawn}; emoji families: {emoji}; pixels: {len(colors)}"
 
 
 def test_missing_resources_are_diagnosed_in_a_fresh_application(tmp_path: Path) -> None:
