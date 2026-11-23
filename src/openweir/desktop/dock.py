@@ -7,7 +7,7 @@ a regular app again and activates it; the window alone would come up with the me
 the app's in front.
 
 Qt has no call for the activation policy, so it goes through the Objective-C runtime with
-desktop/titlebar.py's ObjC, which works the same in a development run and in OpenWeir.app.
+desktop/objc.py's ObjC, which works the same in a development run and in OpenWeir.app.
 DesktopViewModel decides when, from the window's visibility; other Qt platforms, such as the
 tests' offscreen one, make no calls.
 """
@@ -20,7 +20,7 @@ import sys
 from collections.abc import MutableMapping
 from typing import Protocol
 
-from openweir.desktop.titlebar import ObjC
+from openweir.desktop.objc import ObjC
 
 # Qt's cocoa plugin, when set, neither makes the process a regular app as the application is
 # created nor activates it as it finishes launching. Qt reads it again after the event loop

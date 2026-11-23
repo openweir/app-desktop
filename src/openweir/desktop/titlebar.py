@@ -23,11 +23,11 @@ from __future__ import annotations
 
 import ctypes
 import sys
-from collections.abc import Iterator
-from contextlib import contextmanager
 from typing import Any, Protocol
 
 from PySide6.QtCore import QAbstractNativeEventFilter, QCoreApplication, QPointF, QRectF, Qt
+
+from openweir.desktop.objc import ObjC
 
 MAC = "mac"
 WINDOWS = "windows"
@@ -63,39 +63,6 @@ def double_click_action(preference: str | None) -> str:
 
 # -- macOS -----------------------------------------------------------------------------------
 NS_WINDOW_TITLE_HIDDEN = 1
-
-
-class ObjC:
-    """objc_msgSend through ctypes, as desktop/login.py does, without PyObjC."""
-
-    def __init__(self) -> None:
-        self._objc = ctypes.CDLL("/usr/lib/libobjc.A.dylib")
-        for name in ("objc_getClass", "sel_registerName"):
-            function = getattr(self._objc, name)
-            function.restype, function.argtypes = ctypes.c_void_p, [ctypes.c_char_p]
-        self._objc.objc_autoreleasePoolPush.restype = ctypes.c_void_p
-        self._objc.objc_autoreleasePoolPop.argtypes = [ctypes.c_void_p]
-        self._send_address = ctypes.cast(self._objc.objc_msgSend, ctypes.c_void_p).value or 0
-
-    def send(
-        self, restype: Any, receiver: int | None, selector: bytes, *args: Any, argtypes: tuple = ()
-    ) -> Any:
-        """objc_msgSend, cast to the method's own signature (arm64 needs the exact one)."""
-        function = ctypes.CFUNCTYPE(restype, ctypes.c_void_p, ctypes.c_void_p, *argtypes)(
-            self._send_address
-        )
-        return function(receiver, self._objc.sel_registerName(selector), *args)
-
-    def cls(self, name: bytes) -> int:
-        return self._objc.objc_getClass(name)
-
-    @contextmanager
-    def pool(self) -> Iterator[None]:
-        pool = self._objc.objc_autoreleasePoolPush()
-        try:
-            yield
-        finally:
-            self._objc.objc_autoreleasePoolPop(pool)
 
 
 def hide_mac_title(view: int) -> None:

@@ -325,6 +325,8 @@ def test_service_host_carries_the_vpngate_servers() -> None:
     servers = asyncio.run(scenario())
     assert servers == [server]
     assert received[0].list_vpn_gate == pb.ListVpnGateRequest(via="节点选择")
+    # The request's 75 s budget (host/timeouts.py), less the margin kept for the answer.
+    assert 70_000 < received[0].timeout_ms <= 73_000
     sent = received[1].validate.composition.egress.vpn_gate
     assert [s.host_name for s in sent] == [server.host_name]
     assert (sent[0].openvpn.server, list(sent[0].openvpn.data_ciphers)) == (

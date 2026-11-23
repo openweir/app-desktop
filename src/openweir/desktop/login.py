@@ -23,9 +23,10 @@ from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Protocol
 from xml.sax.saxutils import escape
 
+from openweir.desktop.objc import ObjC
 from openweir.models.profiles import ProfileError
 from openweir.product import DISPLAY_NAME
 
@@ -255,38 +256,21 @@ class ObjCMainAppService:
     so the UI needs no PyObjC."""
 
     def __init__(self) -> None:
-        self._objc = ctypes.CDLL("/usr/lib/libobjc.A.dylib")
+        self._objc = ObjC()
         ctypes.CDLL("/System/Library/Frameworks/ServiceManagement.framework/ServiceManagement")
-        for name in ("objc_getClass", "sel_registerName"):
-            function = getattr(self._objc, name)
-            function.restype, function.argtypes = ctypes.c_void_p, [ctypes.c_char_p]
-        self._objc.objc_autoreleasePoolPush.restype = ctypes.c_void_p
-        self._objc.objc_autoreleasePoolPop.argtypes = [ctypes.c_void_p]
-        self._send_address = ctypes.cast(self._objc.objc_msgSend, ctypes.c_void_p).value or 0
-        self._class = self._objc.objc_getClass(b"SMAppService")
+        self._class = self._objc.cls(b"SMAppService")
         if not self._class:
             raise LoginItemError("SMAppService needs macOS 13 or later")
 
-    def _send(
-        self, restype: Any, receiver: int, selector: bytes, *args: Any, argtypes: Sequence[Any] = ()
-    ) -> Any:
-        """objc_msgSend, cast to the method's own signature (arm64 needs the exact one)."""
-        function = ctypes.CFUNCTYPE(restype, ctypes.c_void_p, ctypes.c_void_p, *argtypes)(
-            self._send_address
-        )
-        return function(receiver, self._objc.sel_registerName(selector), *args)
-
     @contextmanager
-    def _pool(self) -> Iterator[int]:
-        pool = self._objc.objc_autoreleasePoolPush()
-        try:
-            yield self._send(ctypes.c_void_p, self._class, b"mainAppService")
-        finally:
-            self._objc.objc_autoreleasePoolPop(pool)
+    def _service(self) -> Iterator[int]:
+        """``mainAppService``, within an autorelease pool."""
+        with self._objc.pool():
+            yield self._objc.send(ctypes.c_void_p, self._class, b"mainAppService")
 
     def status(self) -> int:
-        with self._pool() as service:
-            return int(self._send(ctypes.c_long, service, b"status"))
+        with self._service() as service:
+            return int(self._objc.send(ctypes.c_long, service, b"status"))
 
     def register(self) -> None:
         self._call(b"registerAndReturnError:")
@@ -295,23 +279,23 @@ class ObjCMainAppService:
         self._call(b"unregisterAndReturnError:")
 
     def open_settings(self) -> None:
-        with self._pool():
-            self._send(None, self._class, b"openSystemSettingsLoginItems")
+        with self._objc.pool():
+            self._objc.send(None, self._class, b"openSystemSettingsLoginItems")
 
     def _call(self, selector: bytes) -> None:
-        with self._pool() as service:
+        with self._service() as service:
             error = ctypes.c_void_p()
             pointer = ctypes.POINTER(ctypes.c_void_p)
-            if not self._send(
-                ctypes.c_bool, service, selector, ctypes.byref(error), argtypes=[pointer]
+            if not self._objc.send(
+                ctypes.c_bool, service, selector, ctypes.byref(error), argtypes=(pointer,)
             ):
                 raise LoginItemError(self._describe(error.value))
 
     def _describe(self, error: int | None) -> str:
         if not error:
             return "SMAppService failed"
-        text = self._send(ctypes.c_void_p, error, b"localizedDescription")
-        raw = self._send(ctypes.c_char_p, text, b"UTF8String") if text else None
+        text = self._objc.send(ctypes.c_void_p, error, b"localizedDescription")
+        raw = self._objc.send(ctypes.c_char_p, text, b"UTF8String") if text else None
         return raw.decode("utf-8", "replace") if raw else "SMAppService failed"
 
 

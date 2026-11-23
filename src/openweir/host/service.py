@@ -100,8 +100,6 @@ _READS = frozenset(
 # mean it is on its way back.
 _RESTARTING = frozenset({"service_restarting", "connection_closed", "service_unavailable"})
 CLAIM_TIMEOUT_S = 20.0
-# The core waits up to a minute for VPN Gate's list, which is over a megabyte.
-LIST_VPNGATE_TIMEOUT_S = 75.0
 CLAIM_RETRY_S = 0.5
 IDLE_STATUS = HostStatus("stopped", "rule", 0, 0, 0, False, False)
 
@@ -639,7 +637,7 @@ class ServiceHost:
 
     async def list_vpngate(self, via: str) -> list[VpnGateServer]:
         request = pb.Request(list_vpn_gate=pb.ListVpnGateRequest(via=via))
-        response = await self._call(request, LIST_VPNGATE_TIMEOUT_S)
+        response = await self._call(request)
         return [_vpngate_server_from(server) for server in response.list_vpn_gate.servers]
 
     async def get_mesh_status(self) -> list[MeshStatus]:

@@ -11,7 +11,7 @@ from __future__ import annotations
 import ctypes
 import sys
 
-from openweir.desktop.titlebar import ObjC
+from openweir.desktop.objc import ObjC
 
 KEY_QUIT_REASON = int.from_bytes(b"why?")  # kAEQuitReason, an Apple Event attribute
 

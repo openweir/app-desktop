@@ -44,7 +44,7 @@ from openweir.desktop.login import (
     task_enabled,
     task_xml,
 )
-from openweir.desktop.titlebar import ObjC
+from openweir.desktop.objc import ObjC
 from openweir.desktop.tray import TRAY_DIR, tray_icon, tray_supported
 from openweir.host.base import HostError, HostStatus
 from openweir.host.service import ServiceHost

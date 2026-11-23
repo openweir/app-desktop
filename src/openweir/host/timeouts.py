@@ -32,6 +32,7 @@ _TIMEOUTS = {
     ),
     **dict.fromkeys(("stop", "claim", "set_system_proxy", "login_mesh"), 30.0),
     **dict.fromkeys(("register_warp", "health_check", "test_delay", "update_provider"), 120.0),
+    # The core waits up to a minute for VPN Gate's list, which is over a megabyte.
     "list_vpn_gate": 75.0,
 }
 
