@@ -419,46 +419,48 @@ Item {
         elide: Text.ElideRight
     }
 
-    // Two right-aligned values: download over upload, each after its coloured arrow.
+    // Two right-aligned values: download over upload, each after its coloured arrow. The
+    // lines stay as the values change every second.
     component RatePair: Column {
         id: pair
 
         property string down
         property string up
 
-        Repeater {
-            model: [
-                {
-                    glyph: "↓",
-                    color: Theme.primary,
-                    value: pair.down
-                },
-                {
-                    glyph: "↑",
-                    color: Theme.chartUpload,
-                    value: pair.up
-                }
-            ]
+        RateLine {
+            glyph: "↓"
+            glyphColor: Theme.primary
+            value: pair.down
+        }
 
-            Row {
-                required property var modelData
+        RateLine {
+            glyph: "↑"
+            glyphColor: Theme.chartUpload
+            value: pair.up
+        }
+    }
 
-                anchors.right: parent.right
-                spacing: Theme.space1
+    component RateLine: Row {
+        id: line
 
-                UiText {
-                    text: parent.modelData.glyph
-                    role: Theme.type.dataSm
-                    color: parent.modelData.color
-                    Accessible.ignored: true
-                }
+        property string glyph
+        property color glyphColor
+        property string value
 
-                UiText {
-                    text: parent.modelData.value
-                    role: Theme.type.dataSm
-                    color: Theme.textSecondary
-                }
-            }
+        anchors.right: parent.right
+        spacing: Theme.space1
+
+        UiText {
+            text: line.glyph
+            role: Theme.type.dataSm
+            color: line.glyphColor
+            Accessible.ignored: true
+        }
+
+        UiText {
+            text: line.value
+            role: Theme.type.dataSm
+            color: Theme.textSecondary
         }
     }
 

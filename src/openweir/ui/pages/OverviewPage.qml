@@ -482,13 +482,17 @@ ScrollView {
                     Layout.fillWidth: true
 
                     Repeater {
+                        id: recentRepeater
+
                         model: page.overview.recent
 
                         GroupRow {
                             id: recentRow
 
-                            required property var modelData
                             required property int index
+                            required property string host
+                            required property string route
+                            required property string rate
 
                             divider: index > 0
                             rowHeight: Theme.rowSingle
@@ -500,14 +504,14 @@ ScrollView {
 
                                 AccessibleText {
                                     Layout.fillWidth: true
-                                    text: recentRow.modelData.host
+                                    text: recentRow.host
                                     role: Theme.type.bodySm
                                     elide: Text.ElideRight
                                 }
 
                                 AccessibleText {
                                     Layout.fillWidth: true
-                                    text: recentRow.modelData.route
+                                    text: recentRow.route
                                     role: Theme.type.caption
                                     color: Theme.textMuted
                                     elide: Text.ElideRight
@@ -515,7 +519,7 @@ ScrollView {
                             }
 
                             AccessibleText {
-                                text: recentRow.modelData.rate
+                                text: recentRow.rate
                                 role: Theme.type.dataSm
                                 color: Theme.textTertiary
                             }
@@ -523,7 +527,7 @@ ScrollView {
                     }
 
                     GroupRow {
-                        visible: page.overview.recent.length === 0
+                        visible: recentRepeater.count === 0
                         divider: false
                         rowHeight: Theme.rowSingle
 

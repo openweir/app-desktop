@@ -11,6 +11,7 @@ from PySide6.QtQml import QQmlApplicationEngine, QQmlComponent
 from PySide6.QtQuick import QQuickItem
 from PySide6.QtTest import QTest
 from pytestqt.qtbot import QtBot
+from shiboken6 import getCppPointer
 
 from openweir.app import MAIN_QML, open_store, switch_language
 from openweir.desktop.dock import ACCESSORY, REGULAR
@@ -24,7 +25,7 @@ from openweir.viewmodels.composition import ViewModels
 from tests.support.appearance import SystemColorScheme
 from tests.support.dock import ACTIVATE, RecordingApplication
 from tests.support.simulated import CORE_VERSION, SimulatedHost
-from tests.support.window import Loaded, find, find_all, texts
+from tests.support.window import Loaded, every_item, find, find_all, kind, texts
 
 TRAY_QML = MAIN_QML.parent / "components" / "TrayIcon.qml"
 ROOT = Path(__file__).resolve().parents[1]
@@ -295,6 +296,47 @@ def test_connections_table_works_from_the_keyboard(qtbot: QtBot, loaded: Loaded)
     loaded.key(qtbot, Qt.Key.Key_Delete)
     qtbot.waitUntil(lambda: connections.property("detailClosed"))
     assert second not in connection_ids(loaded.view_models)
+    assert loaded.warnings == []
+
+
+def test_values_that_change_every_second_keep_their_items(qtbot: QtBot, loaded: Loaded) -> None:
+    """The overview's busiest connections, a connection's rates and its detail update in
+    place: items are made only for rows that come, also while another page shows."""
+    view_models = loaded.view_models
+    overview, connections = view_models.overview, view_models.connections
+    qtbot.waitUntil(lambda: len(overview.property("recent").rows) > 0)
+    recent = overview.property("recent")
+    page = loaded.item(lambda i: kind(i) == "OverviewPage")
+    (repeater,) = find_all(
+        page, lambda i: kind(i) == "QQuickRepeater" and i.property("model") == recent
+    )
+    made: list[int] = []
+    came: list[int] = []
+    repeater.itemAdded.connect(lambda index, item: made.append(index))
+    recent.rowsInserted.connect(lambda parent, first, last: came.extend(range(first, last + 1)))
+
+    view_models.shell.setPage("connections")
+    qtbot.waitUntil(lambda: connections.property("total") >= 3)
+    first = connections.property("model").rows[0].connectionId
+    row = loaded.item(lambda i: i.property("connectionId") == first)
+    loaded.click(qtbot, row, 40)
+    detail = loaded.item(lambda i: i.property("text") == "关闭连接").parentItem()
+    assert detail is not None
+    duration = find(detail, lambda i: kind(i) == "Field" and i.property("label") == "时长")
+    assert duration is not None
+
+    def items() -> set[int]:
+        return {getCppPointer(i)[0] for part in (row, detail) for i in every_item(part)}
+
+    before, shown = items(), duration.property("value")
+    for _ in range(2):
+        with qtbot.waitSignal(overview.changed, timeout=3000):
+            pass
+    qtbot.waitUntil(lambda: duration.property("value") != shown)
+    assert row.property("connectionId") == first
+    assert items() == before
+    assert made == came
+    loaded.key(qtbot, Qt.Key.Key_Escape)
     assert loaded.warnings == []
 
 
@@ -766,8 +808,8 @@ def test_routing_page_loads_without_qml_warnings(qtbot: QtBot, loaded: Loaded) -
     editor = routing._editor
     with qtbot.waitSignal(editor.opened):
         editor.openAdd()
-    for kind in ("category", "domain", "ip", "service"):
-        editor.setKind(kind)
+    for rule_kind in ("category", "domain", "ip", "service"):
+        editor.setKind(rule_kind)
         qtbot.wait(20)
     loaded.key(qtbot, Qt.Key.Key_Escape)
     with qtbot.waitSignal(routing.routingChanged):

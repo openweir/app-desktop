@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import asyncio
 import time
+from collections import Counter
 from collections.abc import Callable, Coroutine
+from dataclasses import dataclass
 from typing import Any
 
 from PySide6.QtCore import Property, QObject, QTimer, Signal, Slot
@@ -20,6 +22,7 @@ from openweir.models.proxies import main_group, resolve
 from openweir.models.settings import Settings, SettingsError, SettingsStore
 from openweir.models.tunnel import TunnelSession, TunnelSnapshot
 from openweir.viewmodels.common.async_runner import AsyncRunner
+from openweir.viewmodels.common.keyed_list import KeyedListModel
 from openweir.viewmodels.feedback import failure_text
 
 QML_IMPORT_NAME = "OpenWeir"
@@ -42,6 +45,26 @@ STATE_TITLES = {
 
 def _normalized(history: tuple[int, ...], scale: float) -> list[float]:
     return [value / scale for value in history]
+
+
+@dataclass(frozen=True)
+class RecentRow:
+    """One of the busiest connections, by its host: the row stays while it is among them."""
+
+    id: str  # the host, and which of its connections this is, the busiest first
+    host: str
+    route: str
+    rate: str
+
+
+def _recent_rows(snapshot: TunnelSnapshot | None) -> list[RecentRow]:
+    seen: Counter[str] = Counter()
+    rows = []
+    for r in snapshot.recent if snapshot else ():
+        seen[r.host] += 1
+        rate = fmt.rate(r.download_bytes_per_second)
+        rows.append(RecentRow(f"{r.host}\n{seen[r.host]}", r.host, r.route, rate))
+    return rows
 
 
 @QmlElement
@@ -111,6 +134,10 @@ class OverviewViewModel(QObject):
         self._timer = QTimer(self)
         self._timer.setInterval(REFRESH_MS)
         self._timer.timeout.connect(self.refresh)
+        # Updated in place each second, so the overview keeps its rows and a screen reader
+        # its place among them.
+        self._recent = KeyedListModel(["host", "route", "rate"], self)
+        self.changed.connect(self._sync_recent)
 
     def start(self) -> None:
         if self._login_pending and self._login_item is not None:
@@ -695,14 +722,13 @@ class OverviewViewModel(QObject):
         return _normalized(self._snapshot.up_history, self._scale()) if self._snapshot else []
 
     # -- connections -------------------------------------------------------------------------
-    @Property("QVariantList", notify=changed)  # pyright: ignore[reportArgumentType]
-    def recent(self) -> list[dict[str, str]]:
-        if self._snapshot is None:
-            return []
-        return [
-            {"host": r.host, "route": r.route, "rate": fmt.rate(r.download_bytes_per_second)}
-            for r in self._snapshot.recent
-        ]
+    @Property(QObject, constant=True)
+    def recent(self) -> KeyedListModel:
+        """The busiest connections as RecentRow items."""
+        return self._recent
+
+    def _sync_recent(self) -> None:
+        self._recent.sync(_recent_rows(self._snapshot))
 
     @Property(str, notify=changed)
     def connectionsLink(self) -> str:
