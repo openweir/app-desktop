@@ -153,7 +153,8 @@ ApplicationWindow {
     }
 
     // Closing the window leaves the UI in the tray, the tunnel running, or quits OpenWeir,
-    // which disconnects first (D41) and shows the window again if that fails.
+    // which disconnects first (D41) and shows the window again if that fails. Without a tray,
+    // as on GNOME without the AppIndicator extension (D65), it always quits.
     onClosing: close => {
         close.accepted = false
         hide()

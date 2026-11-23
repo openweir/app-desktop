@@ -5,6 +5,7 @@ runs against a stand-in for user32; only a Windows machine shows what the system
 and only a Linux desktop how its title bar looks.
 """
 
+import asyncio
 import ctypes
 import os
 from pathlib import Path
@@ -47,6 +48,7 @@ from openweir.desktop.titlebar import (
 )
 from openweir.viewmodels import titlebar as titlebar_view_model
 from openweir.viewmodels.titlebar import TitleBar
+from tests.support.simulated import SimulatedHost
 from tests.support.window import Loaded, accessible, find_all, kind
 
 # DESIGN.md's spacing tokens.
@@ -398,6 +400,23 @@ def test_the_band_lays_out_as_designed(qtbot: QtBot, style: str, loaded: Loaded)
     assert rule > TITLEBAR_HEIGHT
     bar = loaded.view_models.desktop.title_bar
     assert bar.maximize_area == scene_rect(buttons[1])
+
+
+@pytest.mark.parametrize("style", [LINUX], indirect=True)
+def test_without_a_tray_the_systems_close_button_quits(
+    qtbot: QtBot, style: str, loaded: Loaded
+) -> None:
+    """GNOME without the AppIndicator extension has no tray (D65): closing the window from
+    the system's title bar quits OpenWeir, which disconnects first (D41)."""
+    desktop, overview = loaded.view_models.desktop, loaded.view_models.overview
+    host = loaded.view_models.host
+    assert isinstance(host, SimulatedHost)
+    assert not desktop.property("trayAvailable")
+    assert caption_buttons(loaded) == []
+    qtbot.waitUntil(lambda: overview.property("connected"))
+    with qtbot.waitSignal(desktop.quitRequested):
+        loaded.window.close()  # as the title bar's close button does
+    assert asyncio.run(host.get_status()).state != "running"
 
 
 @pytest.mark.usefixtures("screen_reader")

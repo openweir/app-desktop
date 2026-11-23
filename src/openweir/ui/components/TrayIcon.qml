@@ -13,10 +13,15 @@ Platform.SystemTrayIcon {
     required property OverviewViewModel overview
     signal showWindow
 
+    // Qt's colour scheme, which follows the system's: a Linux panel follows it too, so the icon
+    // is read again as it changes (DESIGN.md "托盘图标"). Windows' taskbar is also polled.
+    readonly property int colorScheme: Application.styleHints.colorScheme
+
     visible: true
     icon.source: overview.connected ? desktop.trayIconOn : desktop.trayIconOff
     icon.mask: desktop.trayIconMask
     tooltip: Qt.application.name + " · " + overview.statusTitle
+    onColorSchemeChanged: desktop.refreshTaskbar()
     onActivated: reason => {
         if (tray.desktop.showOnTrayClick && (reason === Platform.SystemTrayIcon.Trigger || reason === Platform.SystemTrayIcon.DoubleClick))
             tray.showWindow()
