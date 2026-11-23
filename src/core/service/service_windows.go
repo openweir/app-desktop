@@ -25,6 +25,7 @@ import (
 	"github.com/openweir/app-desktop/src/core/internal/control"
 	"github.com/openweir/app-desktop/src/core/internal/crashlog"
 	"github.com/openweir/app-desktop/src/core/internal/engine"
+	"github.com/openweir/app-desktop/src/core/internal/logfile"
 	"github.com/openweir/app-desktop/src/core/internal/operation"
 	"github.com/openweir/app-desktop/src/core/internal/owner"
 	"github.com/openweir/app-desktop/src/core/internal/peer"
@@ -36,7 +37,7 @@ import (
 const (
 	pipeBufferSize = 64 << 10
 	logFile        = "service.log"
-	// logLimit is when service.log moves aside to service.log.1 at start, replacing it.
+	// logLimit is when service.log moves aside to service.log.1, replacing it, at any write.
 	logLimit = 1 << 20
 	// geodataDir, beside the executable, holds the GEO data the installer ships.
 	geodataDir = "geodata"
@@ -218,12 +219,11 @@ func ending(ctx context.Context, err error) error {
 	return err
 }
 
-// openLog appends to service.log, starting it over once it outgrew logLimit.
+// openLog appends to service.log, which moves aside whenever it outgrows logLimit.
 func openLog(path string) (*slog.Logger, func(), error) {
-	if info, err := os.Stat(path); err == nil && info.Size() > logLimit {
-		_ = os.Rename(path, path+".1")
-	}
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+	// The log moves aside whenever it outgrows logLimit, not only at start: the service runs
+	// for months, and a client connecting again and again must not fill the disk.
+	file, err := logfile.Open(path, logLimit)
 	if err != nil {
 		return nil, nil, err
 	}

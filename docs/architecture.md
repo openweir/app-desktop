@@ -526,7 +526,7 @@ C:\Program Files\OpenWeir\            默认位置；可自定义，安装目录
 └── …                                  Python / Qt 运行依赖
 
 C:\ProgramData\OpenWeir\              仅 SYSTEM 与 Administrators 可访问
-├── service.log                        服务日志；启动时超过 1 MiB 就移到 service.log.1
+├── service.log                        服务日志；运行中超过 1 MiB 就移到 service.log.1
 ├── owner.json                         属主的 SID、会话编号和连接所属的 Windows 登录时间
 └── users\<SID>\                       该用户的 mihomo home 目录（IsSafePath 根）：只有 SYSTEM 能写，属主能读
     ├── profile.json                   最近一次 Start / Reload 生效的请求：配置来源、覆写、运行选项（protojson）

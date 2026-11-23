@@ -25,6 +25,8 @@ _TIMEOUTS = {
             "match_rule",
             "convert_to_plan",
             "export_plan",
+            # A GEO chunk can be 256 MiB to read, hash, decode and store (host budget 55 s).
+            "upload_geo",
         ),
         60.0,
     ),
