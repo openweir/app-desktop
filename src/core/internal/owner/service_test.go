@@ -22,14 +22,15 @@ import (
 )
 
 // machine stands in for Windows or Linux: who is signed in to which session, each user's
-// proxy settings, and the service restarts asked for. The users, alice and bob, are of this
-// system's kind (ids_*_test.go).
+// proxy settings, the service restarts asked for, and who may not claim. The users, alice and
+// bob, are of this system's kind (ids_*_test.go).
 type machine struct {
 	secured  map[string]string
 	sessions map[uint32]string
 	proxies  map[string]sysproxy.Settings
 	restarts int
 	logons   map[uint32]int64
+	refused  map[string]error
 }
 
 func newMachine() *machine {
@@ -86,7 +87,7 @@ func (m *machine) Restart() { m.restarts++ }
 
 func (m *machine) NetworkReady() bool { return true }
 
-func (m *machine) MayClaim(peer.Identity) error { return nil }
+func (m *machine) MayClaim(caller peer.Identity) error { return m.refused[caller.UserID] }
 
 // fakeCore is the dispatcher's side: Resume and Suspend report back as the dispatcher does.
 type fakeCore struct {
@@ -252,6 +253,33 @@ func TestValidUID(t *testing.T) {
 		if ValidUID(uid) {
 			t.Errorf("ValidUID(%q) = true", uid)
 		}
+	}
+}
+
+// The platform decides who may become the owner from where they are (D66 on Linux); the owner
+// claiming again is not asked, nor is anyone told no when the service restarts anyway.
+func TestClaimNeedsThePlatformsLeave(t *testing.T) {
+	root, m := t.TempDir(), newMachine()
+	notHere := errors.New("not at this machine")
+	m.refused = map[string]error{bob: notHere}
+	service, _, _ := start(t, root, m)
+	if err := service.Claim(as(bob, 2)); !errors.Is(err, notHere) || m.restarts != 0 {
+		t.Fatalf("a refused claim = %v after %d restarts", err, m.restarts)
+	}
+	if err := service.TakeOver(elevated(bob, 2), func() error { t.Fatal("stopped"); return nil }); !errors.Is(err, notHere) {
+		t.Fatalf("a refused take-over = %v", err)
+	}
+	if _, ok, _ := LoadRecord(root); ok {
+		t.Fatal("recorded a refused owner")
+	}
+	if err := service.Claim(as(alice, 1)); !errors.Is(err, control.ErrRestarting) {
+		t.Fatalf("claim = %v", err)
+	}
+
+	service, _, _ = start(t, root, m)
+	m.refused[alice] = notHere
+	if err := service.Claim(as(alice, 3)); err != nil {
+		t.Fatalf("the owner's claim = %v", err)
 	}
 }
 

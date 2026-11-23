@@ -43,8 +43,8 @@ type Platform interface {
 	NetworkReady() bool
 	// MayClaim refuses a caller who may not own the tunnel from where they are, before a
 	// claim or take-over makes them the owner. Windows lets every caller the pipe verified
-	// claim; Linux is to allow only a user in an active local session (docs/architecture.md
-	// "Linux (in progress)", D66). Not consulted yet.
+	// claim; Linux allows only a user in an active local session (docs/architecture.md
+	// "Linux (in progress)", D66). The owner claiming again is not asked.
 	MayClaim(caller peer.Identity) error
 }
 
@@ -243,6 +243,12 @@ func (s *Service) Claim(caller peer.Identity) error {
 	if !validUserID(caller.UserID) {
 		return fmt.Errorf("caller %q has no user ID", caller.UserID)
 	}
+	if evicts(caller) {
+		return errors.New("root takes the tunnel over for another user and never owns it")
+	}
+	if err := s.mayClaim(caller); err != nil {
+		return err
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.claimLocked(caller)
@@ -252,10 +258,17 @@ func (s *Service) Claim(caller peer.Identity) error {
 // tunnel once they confirmed it through UAC (decision D5b). stop brings that tunnel down; it
 // stays down as after Stop, and its owner gets their proxy settings back now, or at their
 // next sign-in when the service cannot write them. Then the service restarts for caller, as
-// for any new owner. Anyone else waits for the tunnel, as with Claim.
+// for any new owner. Anyone else waits for the tunnel, as with Claim. On Linux root, whom
+// pkexec runs the helper as, ends the owner's claim instead (evict).
 func (s *Service) TakeOver(caller peer.Identity, stop func() error) error {
 	if !validUserID(caller.UserID) {
 		return fmt.Errorf("caller %q has no user ID", caller.UserID)
+	}
+	if evicts(caller) {
+		return s.evict(caller, stop)
+	}
+	if err := s.mayClaim(caller); err != nil {
+		return err
 	}
 	s.mu.Lock()
 	err := s.claimLocked(caller)
@@ -282,6 +295,20 @@ func (s *Service) TakeOver(caller peer.Identity, stop func() error) error {
 	defer s.mu.Unlock()
 	s.log.Info("an administrator took over the tunnel", "from", former, "sid", caller.UserID)
 	return s.claimLocked(caller)
+}
+
+// mayClaim asks the platform whether caller may become the owner from where they are. The
+// owner claiming again, from another session say, is not asked: Admit lets them in anyway.
+// An owner never changes without a restart, which refuses every claim, so the answer holds
+// until claimLocked.
+func (s *Service) mayClaim(caller peer.Identity) error {
+	s.mu.Lock()
+	owns := s.owner != nil && s.owner.SID == caller.UserID
+	s.mu.Unlock()
+	if owns {
+		return nil
+	}
+	return s.platform.MayClaim(caller)
 }
 
 func (s *Service) claimLocked(caller peer.Identity) error {
@@ -311,6 +338,11 @@ func (s *Service) claimLocked(caller peer.Identity) error {
 
 func (s *Service) Applied(start *controlpb.StartRequest, current func() bool) error {
 	s.mu.Lock()
+	if s.owner == nil {
+		// Evicted: the process restarts with no owner.
+		s.mu.Unlock()
+		return context.Canceled
+	}
 	session := s.owner.Session
 	s.mu.Unlock()
 	logon, err := s.platform.SessionLogonTime(session)
@@ -320,7 +352,7 @@ func (s *Service) Applied(start *controlpb.StartRequest, current func() bool) er
 		logon = 0
 	}
 	s.mu.Lock()
-	if s.closed || s.ctx.Err() != nil || !current() {
+	if s.closed || s.ctx.Err() != nil || s.owner == nil || !current() {
 		s.mu.Unlock()
 		return context.Canceled
 	}
