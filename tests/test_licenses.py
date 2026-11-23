@@ -6,19 +6,24 @@ from __future__ import annotations
 import json
 import platform
 import re
-from importlib.metadata import distribution
+from importlib.metadata import PackageNotFoundError, distribution
 from pathlib import Path
+
+from packaging.utils import canonicalize_name
 
 from openweir import licenses
 from openweir.fonts import BUNDLED
 from scripts.gen_licenses import (
     CPYTHON_INPUT,
+    PLATFORM_MARKERS,
     QT_DOCS_ONLY,
     QT_INPUT,
+    WHEELS_INPUT,
     WINTUN_PACKAGE,
     WINTUN_VERSION,
     classify,
     font_version,
+    locked_packages,
     qt_license,
 )
 
@@ -69,6 +74,28 @@ def test_python_components_match_the_environment() -> None:
     assert "PySide6_WebEngine" not in by_name  # never imported, so never shipped
 
 
+def test_python_components_cover_every_platform() -> None:
+    # One manifest ships everywhere: it lists what each platform's build carries, whichever
+    # platform generated it. Packages this machine has must match it, the others uv.lock.
+    locked = locked_packages()
+    packages = [
+        c
+        for c in licenses.load()
+        if c.kind == "python" and " (" not in c.name and c.name != "CPython"
+    ]
+    for component in packages:
+        try:
+            expected = distribution(component.name).version
+        except PackageNotFoundError:
+            expected = locked[canonicalize_name(component.name)]["version"]
+        assert component.version == expected, component.name
+    names = {canonicalize_name(c.name) for c in packages}
+    # keyring's backends: Windows' credential store, Linux's Secret Service; the Linux updater's
+    # signature check.
+    assert {"pywin32-ctypes", "secretstorage", "jeepney", "cryptography"} <= names
+    assert set(PLATFORM_MARKERS) == {"macOS", "Windows", "Linux"}
+
+
 def test_cpython_lists_the_libraries_its_build_bundles() -> None:
     data = json.loads(CPYTHON_INPUT.read_text("utf-8"))
     by_name = {c.name: c for c in licenses.load() if c.kind == "python"}
@@ -79,13 +106,33 @@ def test_cpython_lists_the_libraries_its_build_bundles() -> None:
     for item in data["libraries"]:
         assert item["modules"], item["name"]
         assert item["texts"], item["name"]
-        assert set(item["platforms"]) <= {"macOS", "Windows"}, item["name"]
+        assert set(item["platforms"]) <= set(PLATFORM_MARKERS), item["name"]
         for platform_ in item["platforms"]:
             assert (item["name"], platform_) not in seen  # one version per platform
             seen.add((item["name"], platform_))
-    for name in ("OpenSSL", "SQLite", "libffi", "Expat"):
-        assert {(name, "macOS"), (name, "Windows")} <= seen, name
+    for name in ("OpenSSL", "SQLite", "libffi", "Expat", "bzip2", "mpdecimal", "Zstandard"):
+        assert {(name, platform_) for platform_ in PLATFORM_MARKERS} <= seen, name
+    # zlib: zlib-ng on Windows, the system's on macOS.
+    assert ("zlib-ng", "Windows") in seen
+    assert ("zlib", "Linux") in seen
     assert len([name for name in by_name if " (CPython " in name]) == len(data["libraries"])
+
+
+def test_native_code_in_wheels_matches_the_lock() -> None:
+    # cryptography's Linux wheels link OpenSSL in; PySide6's carry ICU. Upgrading either wheel
+    # means looking at what it carries again.
+    locked = locked_packages()
+    by_name = {c.name: c for c in licenses.load() if c.kind == "python"}
+    items = json.loads(WHEELS_INPUT.read_text("utf-8"))["components"]
+    assert {item["name"] for item in items} >= {"OpenSSL", "ICU"}
+    for item in items:
+        wheel = locked[canonicalize_name(item["distribution"])]
+        assert wheel["version"] == item["distribution_version"], item["name"]
+        assert item["texts"], item["name"]
+        where = f"in {item['distribution']}, {', '.join(item['platforms'])}"
+        component = by_name[f"{item['name']} ({where})"]
+        assert component.version == item["version"]
+        assert component.license == item["license"]
 
 
 def test_go_components_match_go_mod() -> None:
