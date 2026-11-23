@@ -814,6 +814,7 @@ Linux 版正在开发，还没有发布。已定的决策是 D60–D67；完整�
 | --- | --- |
 | 其他本地进程冒充 UI | Windows：连接建立时比较映像与安装的 `OpenWeir.exe` 的文件 ID 并锁住映像，要求用户会话，读取 SID 与会话，签名的发布构建再校验签名者（5.3 节）；macOS：只有本应用能取得 NE session |
 | 抢注服务管道名 | 使用 `ProtectedPrefix\Administrators` 前缀 |
+| 其他用户抢注界面的单实例管道名或 socket，截取后来的界面转交的一键导入链接（其中常有订阅的 token） | 名字含数据目录里只有本用户能读的随机 `ui.key`；后来的界面和 `--quit` 写之前核对对端以本用户身份运行：Windows 比较管道服务端进程的令牌用户 SID，macOS、Linux 比较 socket 对端的 uid（[ui.md](ui.md) 第 8 节"单实例"） |
 | 配置让 SYSTEM 读写任意文件 | 每个 SID 独立的 mihomo home 目录 + `IsSafePath`（不带 `cmfa`，不设 `SKIP_SAFE_PATH_CHECK` / `SAFE_PATHS`），并修正 `ResolveAsRoot` |
 | 用户借链接让 SYSTEM 写到别处 | home 只有 SYSTEM 能写，属主不能在里面放链接；服务不用链接或别人建的目录（5.1 节） |
 | 属主的配置与凭据落在磁盘上 | `profile.json` 和 mihomo 的缓存只有 SYSTEM 和属主能读 |

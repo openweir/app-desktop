@@ -305,12 +305,13 @@ def test_quit_without_a_ui_returns_at_once(tmp_path: Path) -> None:
     assert not (tmp_path / LOCK_NAME).exists()
 
 
-def test_instances_are_per_user_and_directory(tmp_path: Path) -> None:
-    name = server_name(tmp_path / "a", "ember")
+def test_instances_are_per_user_directory_and_key(tmp_path: Path) -> None:
+    name = server_name(tmp_path / "a", "key", "ember")
     assert name.startswith("openweir-")
-    assert name == server_name(tmp_path / "a", "ember")
-    assert name != server_name(tmp_path / "a", "other")
-    assert name != server_name(tmp_path / "b", "ember")
+    assert name == server_name(tmp_path / "a", "key", "ember")
+    assert name != server_name(tmp_path / "a", "key", "other")
+    assert name != server_name(tmp_path / "b", "key", "ember")
+    assert name != server_name(tmp_path / "a", "another key", "ember")
 
 
 def test_tray_icons() -> None:

@@ -5,8 +5,15 @@ A later one finds the lock taken, asks the first to show its window, or hands it
 install link it was started with (docs/release.md §7), and exits. ``--quit`` asks the
 first to quit instead and waits until it has let go of the lock. The lock
 decides, not the server: QLockFile notices a lock left by a process that died, and two UIs
-started at once cannot both take it. The server's name is derived from the user and the
-lock's directory, so other users and other data directories (the preview) have their own.
+started at once cannot both take it.
+
+The server's name is derived from the user, the lock's directory and a random key kept beside
+the lock (``ui.key``, readable by the user alone), so other data directories (the preview) have
+their own and other users cannot work it out ahead of time. A name proves nothing, though:
+Windows lists every pipe to every user, and anyone can take a name while this user's UI is not
+listening on it (on Linux in a shared /tmp too). So a later UI and ``--quit`` write only to a
+server that runs as their own user: on Windows the user in the token of the pipe's server
+process, elsewhere the uid of the socket's peer.
 """
 
 from __future__ import annotations
@@ -14,15 +21,25 @@ from __future__ import annotations
 import ctypes
 import getpass
 import hashlib
+import logging
+import os
+import re
+import secrets
+import socket as sockets
+import struct
 import sys
+from ctypes import wintypes
 from pathlib import Path
 
 from PySide6.QtCore import QDeadlineTimer, QLockFile, QObject, QThread, Signal
 from PySide6.QtNetwork import QLocalServer, QLocalSocket
 
+from openweir.desktop import windows_identity
 from openweir.product import PRODUCT_ID
 
 LOCK_NAME = "ui.lock"
+KEY_NAME = "ui.key"
+_KEY = re.compile(r"[0-9a-f]{32}")
 # One line per connection: show the window, open a link (which shows it too), or quit.
 ACTIVATE = b"activate\n"
 OPEN = b"open "
@@ -39,12 +56,95 @@ DELIVER_TIMEOUT_MS = 5000
 QUIT_TIMEOUT_MS = 10_000
 QUIT_POLL_MS = 100
 
+_log = logging.getLogger(__name__)
 
-def server_name(directory: Path, user: str | None = None) -> str:
-    """Unique per user and data directory; Windows pipe names are visible to every user."""
+
+def server_name(directory: Path, key: str, user: str | None = None) -> str:
+    """Unique per user, data directory and ``key``, the directory's ``ui.key``."""
     user = getpass.getuser() if user is None else user
-    digest = hashlib.sha256(f"{user}\0{directory.resolve()}".encode()).hexdigest()
-    return f"{PRODUCT_ID}-{digest[:16]}"
+    digest = hashlib.sha256(f"{user}\0{directory.resolve()}\0{key}".encode()).hexdigest()
+    return f"{PRODUCT_ID}-{digest[:32]}"
+
+
+def read_key(directory: Path) -> str | None:
+    """The key the first UI's server is named with; None while there is none."""
+    try:
+        key = (directory / KEY_NAME).read_text(encoding="ascii").strip()
+    except OSError, UnicodeError:
+        return None
+    return key if _KEY.fullmatch(key) else None
+
+
+def _own_key(directory: Path) -> str:
+    """The key, made when there is none or it is damaged. Only the UI holding the lock calls
+    this, so nothing else writes it meanwhile; a UI asking reads it again on every attempt.
+    Readable by this user alone: mode 0600, and on Windows the data directory's own ACL in the
+    user's profile."""
+    key = read_key(directory)
+    if key is not None:
+        return key
+    key = secrets.token_hex(16)
+    path = directory / KEY_NAME
+    part = path.with_name(KEY_NAME + ".part")
+    part.unlink(missing_ok=True)
+    descriptor = os.open(part, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(descriptor, "w", encoding="ascii") as file:
+        file.write(key + "\n")
+    os.replace(part, path)
+    return key
+
+
+def _serves_this_user(socket: QLocalSocket) -> bool:
+    """Whether the server ``socket`` is connected to runs as this process's user."""
+    descriptor = socket.socketDescriptor()
+    if descriptor == -1:
+        return False
+    if sys.platform == "win32":
+        return _pipe_server_is_this_user(descriptor)
+    return _peer_uid(descriptor) == os.geteuid()
+
+
+def _pipe_server_is_this_user(handle: int) -> bool:
+    """The kernel names the process serving the pipe, and that process's token its user;
+    another user's process does not let this one read its token, which counts as not."""
+    pid = _pipe_server_pid(handle)
+    user = windows_identity.current_sid()
+    return pid is not None and bool(user) and windows_identity.process_sid(pid) == user
+
+
+def _pipe_server_pid(handle: int) -> int | None:
+    """The process serving the named pipe ``handle``; None when the kernel does not say."""
+    if sys.platform != "win32":
+        return None
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel.GetNamedPipeServerProcessId.argtypes = (wintypes.HANDLE, ctypes.POINTER(wintypes.ULONG))
+    kernel.GetNamedPipeServerProcessId.restype = wintypes.BOOL
+    pid = wintypes.ULONG()
+    if not kernel.GetNamedPipeServerProcessId(handle, ctypes.byref(pid)):
+        return None
+    return pid.value
+
+
+def _peer_uid(descriptor: int) -> int | None:
+    """The uid of the process at the other end of the Unix socket ``descriptor``; the
+    server's as it listened. None when the system does not say."""
+    if sys.platform == "win32":
+        return None
+    try:
+        if sys.platform == "linux":
+            with sockets.fromfd(descriptor, sockets.AF_UNIX, sockets.SOCK_STREAM) as peer:
+                credentials = peer.getsockopt(
+                    sockets.SOL_SOCKET, sockets.SO_PEERCRED, struct.calcsize("3i")
+                )
+            _pid, uid, _gid = struct.unpack("3i", credentials)
+            return uid
+        libc = ctypes.CDLL("/usr/lib/libSystem.B.dylib" if sys.platform == "darwin" else None)
+        peer_uid, peer_gid = ctypes.c_uint32(), ctypes.c_uint32()
+        if libc.getpeereid(descriptor, ctypes.byref(peer_uid), ctypes.byref(peer_gid)) != 0:
+            return None
+        return peer_uid.value
+    except OSError:
+        return None
 
 
 def _allow_foreground() -> None:
@@ -80,7 +180,7 @@ def ask_to_quit(directory: Path, timeout_ms: int = QUIT_TIMEOUT_MS) -> bool:
             # On Windows the write waits for the first UI to read it, which it does only
             # once it is idle; give it all the time there is.
             remaining = max(deadline.remainingTime(), 0)
-            asked = _send(server_name(directory), QUIT, CONNECT_ATTEMPTS, remaining)
+            asked = _send(directory, QUIT, CONNECT_ATTEMPTS, remaining)
     return True
 
 
@@ -95,18 +195,29 @@ def _released(lock: QLockFile, path: Path) -> bool:
     return False
 
 
-def _send(name: str, line: bytes, attempts: int, deliver_ms: int) -> bool:
-    """Connect to the first UI and write ``line``; True once it was written."""
+def _send(directory: Path, line: bytes, attempts: int, deliver_ms: int) -> bool:
+    """Connect to the first UI for ``directory`` and write ``line``; True once it was
+    written. A server that runs as another user gets nothing: the line can carry an install
+    link with a subscription's token."""
     for attempt in range(attempts):
         if attempt:
             QThread.msleep(CONNECT_TIMEOUT_MS)
+        key = read_key(directory)
+        if key is None:
+            continue  # the first UI has the lock and is about to listen
+        name = server_name(directory, key)
         socket = QLocalSocket()
         socket.connectToServer(name)
-        if socket.waitForConnected(CONNECT_TIMEOUT_MS):
-            socket.write(line)
-            written = socket.waitForBytesWritten(deliver_ms)
-            socket.disconnectFromServer()
-            return written
+        if not socket.waitForConnected(CONNECT_TIMEOUT_MS):
+            continue
+        if not _serves_this_user(socket):
+            _log.warning("%s is served by another user's process; nothing sent", name)
+            socket.abort()
+            continue
+        socket.write(line)
+        written = socket.waitForBytesWritten(deliver_ms)
+        socket.disconnectFromServer()
+        return written
     return False
 
 
@@ -118,7 +229,8 @@ class SingleInstance(QObject):
     def __init__(self, directory: Path, parent: QObject | None = None) -> None:
         super().__init__(parent)
         directory.mkdir(parents=True, exist_ok=True)
-        self.name = server_name(directory)
+        self._directory = directory
+        self.name = ""  # the server's, once this UI listens
         self._lock = QLockFile(str(directory / LOCK_NAME))
         # A UI runs for days; only a lock whose process is gone is stale.
         self._lock.setStaleLockTime(0)
@@ -141,6 +253,13 @@ class SingleInstance(QObject):
         self._lock.unlock()
 
     def _listen(self) -> None:
+        try:
+            key = _own_key(self._directory)
+        except OSError as error:
+            # The UI runs on; later ones cannot reach it and exit without showing it.
+            _log.warning("cannot write %s: %s", KEY_NAME, error)
+            return
+        self.name = server_name(self._directory, key)
         server = QLocalServer(self)
         server.setSocketOptions(QLocalServer.SocketOption.UserAccessOption)
         # A UI that crashed leaves its socket file behind on macOS; the lock says it is gone.
@@ -176,4 +295,4 @@ class SingleInstance(QObject):
 
     def _notify(self, line: bytes) -> None:
         _allow_foreground()
-        _send(self.name, line, CONNECT_ATTEMPTS, DELIVER_TIMEOUT_MS)
+        _send(self._directory, line, CONNECT_ATTEMPTS, DELIVER_TIMEOUT_MS)
