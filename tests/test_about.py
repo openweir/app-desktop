@@ -38,6 +38,7 @@ DMG = "OpenWeir-1.1.0-macos-universal.dmg"
 EXE = "OpenWeir-1.1.0-windows-x64-setup.exe"
 SECRET_OVERRIDE = "prepend-rules:\n  - DOMAIN,override-secret.example.net,DIRECT\n"
 SECRET_RULE = "plan-secret.example.net"
+SECRET_HOST = "provider-secret.example.com"
 
 
 def prop(view_model: QObject, name: str) -> Any:
@@ -530,6 +531,7 @@ def test_export_diagnostics(qtbot: QtBot, tmp_path: Path) -> None:
     logs = [
         LogEntry("info", "[TCP] 127.0.0.1:5000 --> www.example.com:443 using Proxy", 1_000),
         LogEntry("warning", "dial failed", 2_000),
+        LogEntry("error", f'pull error: Get "https://{SECRET_HOST}/s?token=abc": EOF', 3_000),
     ]
     about = about_for(built, offline_updater(tmp_path), logs=logs)
     assert prop(about, "diagnosticsName") == "openweir-diagnostics-20261030-090000.zip"
@@ -557,8 +559,10 @@ def test_export_diagnostics(qtbot: QtBot, tmp_path: Path) -> None:
     host = json.loads(files["host.json"])
     assert host["info"]["core_version"] == CORE_VERSION  # the screens show only openweir-v1.0.1
     assert host["status"]["state"] == "running"
-    assert "www.example.com:443" in files["mihomo.log"]
+    assert files["mihomo.log"].startswith(diagnostics.LOG_NOTE)
+    assert "www.example.com" not in files["mihomo.log"]  # info lines stay out
     assert "WARN  dial failed" in files["mihomo.log"]
+    assert 'ERROR pull error: Get "https://<redacted>": EOF' in files["mihomo.log"]
 
     settings = json.loads(files["settings.json"])
     assert settings["settings"]["mixed_port"] == 9347
@@ -580,10 +584,43 @@ def test_export_diagnostics(qtbot: QtBot, tmp_path: Path) -> None:
         "override-secret",
         SECRET_RULE,
         "我的私人方案",
+        SECRET_HOST,
+        "token=abc",
     ):
         assert secret not in everything, secret
     assert not (tmp_path / "out" / "diag.zip.part").exists()
     built.shutdown()
+
+
+def test_the_core_log_keeps_warnings_and_errors_without_urls() -> None:
+    def entry(level: str, message: str) -> LogEntry:
+        return LogEntry(level, message, 1_000)
+
+    text = diagnostics.log(
+        [
+            entry("debug", "[DNS] www.example.com --> 1.2.3.4"),
+            entry("info", "[TCP] 127.0.0.1:5000 --> www.example.com:443 using 香港 01"),
+            entry(
+                "warning",
+                "[Provider] 机场 pull error: Get "
+                '"https://user:pass@sub.example.com/api/v1/client/subscribe?token=abc#frag": '
+                "dial tcp: i/o timeout",
+            ),
+            entry("error", "parse vless://3f2a@node.example.org:443?security=reality#HK failed"),
+            entry("warning", "see https://example.com/a?b=c. Then (http://h.example/p?t=s), ok"),
+            entry("warning", "127.0.0.1:5000 --> blocked.example.net:443 dial failed"),
+        ]
+    )
+    lines = text.splitlines()
+    assert lines[0] == diagnostics.LOG_NOTE.strip()
+    assert [line.split(" ", 2)[2] for line in lines[1:]] == [
+        'WARN  [Provider] 机场 pull error: Get "https://<redacted>": dial tcp: i/o timeout',
+        "ERROR parse vless://<redacted> failed",
+        "WARN  see https://<redacted>. Then (http://<redacted>), ok",
+        "WARN  127.0.0.1:5000 --> blocked.example.net:443 dial failed",
+    ]
+    for secret in ("token=abc", "user:pass", "sub.example.com", "3f2a@", "#HK", "#frag"):
+        assert secret not in text, secret
 
 
 def test_export_without_the_service(qtbot: QtBot, built: ViewModels, tmp_path: Path) -> None:

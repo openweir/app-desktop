@@ -1,10 +1,16 @@
 """A zip of what a bug report needs (docs/release.md §4): versions, the platform, the host's
-GetInfo and GetStatus, the core's recent log lines and the settings without secrets.
+GetInfo and GetStatus, the core's recent warnings and errors and the settings without secrets.
 
 What leaves the machine is chosen by allow lists, never by removing what looks secret: a
 profile contributes counts and flags, not its name, link, path or text; an override only
 whether it exists. Every setting is listed as exported or withheld, and a test fails when
 a new one is neither, so adding a setting means deciding.
+
+The core's log is the exception, free text that cannot be listed field by field, so it is
+cut down instead: no info or debug lines, which name every site visited, and no URLs. A
+provider's failed fetch prints the subscription's URL with its token (Go's url.Error), and
+share links carry a node's credentials; every URL, whatever its scheme, is written as
+``scheme://<redacted>``.
 """
 
 from __future__ import annotations
@@ -13,6 +19,7 @@ import asyncio
 import contextlib
 import json
 import platform
+import re
 import sys
 import zipfile
 from collections.abc import Awaitable, Sequence
@@ -28,7 +35,7 @@ from openweir import __version__
 from openweir.desktop.login import PACKAGED
 from openweir.host.base import HostError, HostInfo, HostStatus, LogEntry, TunnelHost
 from openweir.models.library import Routing
-from openweir.models.logs import export_text
+from openweir.models.logs import export_text, rank
 from openweir.models.profiles import ProfileList
 from openweir.models.settings import Settings
 
@@ -54,6 +61,12 @@ SETTINGS_EXPORTED = frozenset(
 SETTINGS_WITHHELD: frozenset[str] = frozenset()
 
 HOST_TIMEOUT_S = 5.0
+
+LOG_LEVEL = "warning"  # the lowest level of the core's lines in mihomo.log
+# A scheme, then everything up to a space, a quote or an angle bracket, less the punctuation
+# that ends a sentence or a Go error ("Get \"https://…\": EOF").
+_URL = re.compile(r"\b([A-Za-z][A-Za-z0-9+.-]*)://[^\s\"'<>]*[^\s\"'<>.,:;!?)\]}]")
+LOG_NOTE = "# Warnings and errors only; every URL is written as scheme://<redacted>.\n"
 
 
 @dataclass(frozen=True)
@@ -161,6 +174,20 @@ def _routing(routing: Routing) -> dict[str, Any]:
     }
 
 
+def redact_urls(text: str) -> str:
+    return _URL.sub(r"\1://<redacted>", text)
+
+
+def log(entries: Sequence[LogEntry]) -> str:
+    """mihomo.log: the warnings and errors among ``entries``, their URLs redacted."""
+    kept = [
+        LogEntry(entry.level, redact_urls(entry.message), entry.time_unix_ms)
+        for entry in entries
+        if rank(entry.level) >= rank(LOG_LEVEL)
+    ]
+    return LOG_NOTE + export_text(kept)
+
+
 def _json(data: dict[str, Any]) -> str:
     return json.dumps(data, ensure_ascii=False, indent=2) + "\n"
 
@@ -173,7 +200,7 @@ def write_archive(path: Path, snapshot: Snapshot, now: float) -> None:
             archive.writestr("about.json", _json(about(snapshot.language, now)))
             archive.writestr("host.json", _json(host(snapshot)))
             archive.writestr("settings.json", _json(settings(snapshot)))
-            archive.writestr("mihomo.log", export_text(snapshot.logs))
+            archive.writestr("mihomo.log", log(snapshot.logs))
             archive.writestr("crashes.json", _json(snapshot.crashes))
         partial.replace(path)
     except BaseException:
