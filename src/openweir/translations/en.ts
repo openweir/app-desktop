@@ -2043,6 +2043,18 @@ prepend-rules:
         <translation>In use</translation>
     </message>
     <message>
+        <source> · </source>
+        <translation> · </translation>
+    </message>
+    <message>
+        <source>续费</source>
+        <translation>Renew</translation>
+    </message>
+    <message>
+        <source>改用「%1」</source>
+        <translation>Use “%1” instead</translation>
+    </message>
+    <message>
         <source>改用我的方案</source>
         <translation>Use my plan instead</translation>
     </message>
@@ -2104,6 +2116,10 @@ prepend-rules:
     <message>
         <source>尚未导入订阅</source>
         <translation>No subscriptions yet</translation>
+    </message>
+    <message>
+        <source>登录服务商</source>
+        <translation>Sign in to provider</translation>
     </message>
     <message>
         <source>接管其他用户的隧道？</source>
@@ -2780,10 +2796,6 @@ prepend-rules:
         <translation>Subscriptions</translation>
     </message>
     <message>
-        <source>导入文件</source>
-        <translation>Import file</translation>
-    </message>
-    <message>
         <source>从链接导入</source>
         <translation>Import from URL</translation>
     </message>
@@ -2824,6 +2836,10 @@ prepend-rules:
         <translation>Usage</translation>
     </message>
     <message>
+        <source>添加</source>
+        <translation>Add</translation>
+    </message>
+    <message>
         <source>到期</source>
         <translation>Expires</translation>
     </message>
@@ -2832,16 +2848,16 @@ prepend-rules:
         <translation>Updated</translation>
     </message>
     <message>
+        <source> · </source>
+        <translation> · </translation>
+    </message>
+    <message>
         <source>%1 的更多操作</source>
         <translation>More actions for %1</translation>
     </message>
     <message>
         <source>覆写</source>
         <translation>Overrides</translation>
-    </message>
-    <message>
-        <source>导入节点</source>
-        <translation>Import nodes</translation>
     </message>
     <message>
         <source>全局覆写</source>
@@ -2860,12 +2876,24 @@ prepend-rules:
         <translation>%1. Usage %2, expires %3, updated %4</translation>
     </message>
     <message>
-        <source>%1 · %2</source>
-        <translation>%1 · %2</translation>
-    </message>
-    <message>
         <source> · %1</source>
         <translation> · %1</translation>
+    </message>
+    <message>
+        <source>从链接导入…</source>
+        <translation>Import from URL…</translation>
+    </message>
+    <message>
+        <source>导入文件…</source>
+        <translation>Import file…</translation>
+    </message>
+    <message>
+        <source>导入节点…</source>
+        <translation>Import nodes…</translation>
+    </message>
+    <message>
+        <source>登录服务商…</source>
+        <translation>Sign in to provider…</translation>
     </message>
     <message>
         <source>编辑信息…</source>
@@ -2892,8 +2920,24 @@ prepend-rules:
         <translation>Add to node pool</translation>
     </message>
     <message>
+        <source>在网页上续费</source>
+        <translation>Renew on the web</translation>
+    </message>
+    <message>
+        <source>重新登录…</source>
+        <translation>Sign in again…</translation>
+    </message>
+    <message>
         <source>删除</source>
         <translation>Delete</translation>
+    </message>
+    <message>
+        <source>退出「%1」</source>
+        <translation>Sign out of “%1”</translation>
+    </message>
+    <message>
+        <source>退出登录</source>
+        <translation>Sign out</translation>
     </message>
     <message>
         <source>导入订阅文件</source>
@@ -3005,6 +3049,107 @@ prepend-rules:
             <numerusform>Update every %n hours</numerusform>
         </translation>
     </message>
+    <message numerus="yes">
+        <source>%n 天后到期</source>
+        <translation>
+            <numerusform>Expires in %n day</numerusform>
+            <numerusform>Expires in %n days</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n 小时后到期</source>
+        <translation>
+            <numerusform>Expires in %n hour</numerusform>
+            <numerusform>Expires in %n hours</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>流量已用 {percent}%</source>
+        <translation>{percent}% of traffic used</translation>
+    </message>
+    <message>
+        <source>流量已用完</source>
+        <translation>Traffic used up</translation>
+    </message>
+    <message>
+        <source>未开始</source>
+        <translation>Not started</translation>
+    </message>
+    <message>
+        <source>已到期</source>
+        <translation>Expired</translation>
+    </message>
+    <message>
+        <source>已停用</source>
+        <translation>Disabled</translation>
+    </message>
+    <message>
+        <source>暂不可用</source>
+        <translation>Unavailable for now</translation>
+    </message>
+    <message>
+        <source>需要重新登录</source>
+        <translation>Sign-in required</translation>
+    </message>
+    <message>
+        <source>账户已停用</source>
+        <translation>Account disabled</translation>
+    </message>
+    <message>
+        <source>已不在账户中</source>
+        <translation>No longer in the account</translation>
+    </message>
+    <message>
+        <source>没有订阅链接</source>
+        <translation>No subscription link</translation>
+    </message>
+    <message>
+        <source>「{name}」</source>
+        <translation>“{name}”</translation>
+    </message>
+    <message>
+        <source>、</source>
+        <translation>, </translation>
+    </message>
+    <message numerus="yes">
+        <source>{names}等 %n 份订阅</source>
+        <translation>
+            <numerusform>%n subscription including {names}</numerusform>
+            <numerusform>%n subscriptions including {names}</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>这个账户在本机没有订阅。</source>
+        <translation>This account has no subscriptions on this computer.</translation>
+    </message>
+    <message>
+        <source>{listed}和它们的覆写会从本机删除。</source>
+        <translation>{listed} and their overrides will be deleted from this computer.</translation>
+    </message>
+    <message>
+        <source>{listed}会从本机删除。</source>
+        <translation>{listed} will be deleted from this computer.</translation>
+    </message>
+    <message>
+        <source>{removed}之后改用「{successor}」的规则，服务商那边的订阅不受影响。</source>
+        <translation>{removed} The rules of “{successor}” take over. The subscriptions stay with the provider.</translation>
+    </message>
+    <message>
+        <source>{removed}之后改用我的方案，服务商那边的订阅不受影响。</source>
+        <translation>{removed} My plan takes over. The subscriptions stay with the provider.</translation>
+    </message>
+    <message>
+        <source>{removed}服务商那边的订阅不受影响。</source>
+        <translation>{removed} The subscriptions stay with the provider.</translation>
+    </message>
+    <message>
+        <source>试用</source>
+        <translation>Trial</translation>
+    </message>
+    <message>
+        <source>服务商</source>
+        <translation>Provider</translation>
+    </message>
     <message>
         <source>路由模板使用中</source>
         <translation>Routing template in use</translation>
@@ -3034,6 +3179,10 @@ prepend-rules:
     <message>
         <source>删除「{name}」？</source>
         <translation>Delete “{name}”?</translation>
+    </message>
+    <message>
+        <source>退出「{name}」？</source>
+        <translation>Sign out of “{name}”?</translation>
     </message>
     <message>
         <source>两种分流方式都生效 · 已设置</source>

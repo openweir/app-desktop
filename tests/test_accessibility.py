@@ -305,18 +305,20 @@ def test_keyboard_alone_imports_uses_and_deletes_a_profile(qtbot: QtBot, loaded:
     loaded.key(qtbot, Qt.Key.Key_Space)
     assert view_models.shell.property("currentPage") == "profiles"
 
-    # Import from a link: the form opens on the link, Enter imports, and the focus goes back
-    # to the button that opened the form, with its ring.
-    link_button = tab_to("从链接导入")
+    # Import from a link: 添加 opens its menu, whose 从链接导入… opens the form on the link;
+    # Enter imports, and the focus goes back to 添加, with its ring.
+    add_button = tab_to("添加")
     loaded.key(qtbot, Qt.Key.Key_Space)
+    focus_menu_item(qtbot, loaded, "从链接导入…")
+    loaded.key(qtbot, Qt.Key.Key_Return)
     assert kind(loaded.focused()) == "AppTextField"
     loaded.type(qtbot, "https://new.example.com/sub")
     loaded.key(qtbot, Qt.Key.Key_Tab)
     loaded.type(qtbot, "键盘订阅")
     with qtbot.waitSignal(profiles.imported):
         loaded.key(qtbot, Qt.Key.Key_Return, wait=0)
-    qtbot.waitUntil(lambda: loaded.focused() is link_button)
-    assert link_button.property("visualFocus")
+    qtbot.waitUntil(lambda: loaded.focused() is add_button)
+    assert add_button.property("visualFocus")
 
     # Into the list: each row's menu button is a stop, and the arrows move between them.
     loaded.key(qtbot, Qt.Key.Key_Tab)

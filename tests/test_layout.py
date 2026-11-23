@@ -141,7 +141,9 @@ def header_faults(page: QQuickItem, *, room: bool = True) -> list[str]:
     status = find(header, lambda i: kind(i) == "AccessibleText")
     assert title is not None
     assert status is not None
-    controls = find_all(header, lambda i: kind(i) in ("AppButton", "SegmentedControl"))
+    controls = find_all(
+        header, lambda i: kind(i) in ("AppButton", "MenuButton", "SegmentedControl")
+    )
     found = [f"{label(c)} is cut short" for c in [title, *controls] if not whole(c)]
     found += [
         f"{label(text)} is cut short"

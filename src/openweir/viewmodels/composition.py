@@ -238,6 +238,8 @@ def compose(
             proxies.refresh()
         elif shell.currentPage == "routing":
             routing.refresh()
+        elif shell.currentPage == "profiles":
+            profiles.pageShown()
         elif shell.currentPage == "settings":
             settings_page.refreshInfo()
             settings_page.refreshLoginItem()
@@ -257,6 +259,8 @@ def compose(
 
     shell.currentPageChanged.connect(page_shown)
     desktop.windowShownChanged.connect(window_shown)
+    # Back from a provider's user center in the browser, its account syncs (D58).
+    desktop.activated.connect(profiles.windowActivated)
     window_shown()
     proxies.selectionApplied.connect(overview.refreshGroups)
     profiles.applied.connect(overview.refreshGroups)

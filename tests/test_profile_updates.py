@@ -123,10 +123,12 @@ def test_node_link_dialog_imports_a_batch_without_downloading(qtbot: QtBot, load
     models = loaded.view_models
     models.shell.setPage("profiles")
     qtbot.waitUntil(lambda: models.shell.currentPage == "profiles")
-    button = loaded.item(
-        lambda item: kind(item) == "AppButton" and item.property("text") == "导入节点"
+    add = loaded.item(lambda item: kind(item) == "MenuButton" and item.property("text") == "添加")
+    loaded.click(qtbot, add)
+    (item,) = loaded.overlay_items(
+        lambda item: kind(item) == "AppMenuItem" and item.property("text") == "导入节点…"
     )
-    loaded.click(qtbot, button)
+    loaded.click(qtbot, item)
     editors = loaded.overlay_items(lambda item: kind(item) == "CodeEditor" and item.isVisible())
     assert len(editors) == 1
     editors[0].setProperty(

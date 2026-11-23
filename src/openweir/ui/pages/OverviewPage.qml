@@ -13,6 +13,8 @@ ScrollView {
     required property RoutingViewModel routing
     required property ShellViewModel shell
     readonly property alias connectionControl: connectionSwitch
+    // What opened the provider sign-in dialog (登录服务商), which gets focus back when it closes.
+    property Item signInTrigger
 
     contentWidth: availableWidth
     clip: true
@@ -132,12 +134,74 @@ ScrollView {
 
                     // What routes the traffic (docs/routing.md §4.6): a plan, or a profile's own
                     // rules; the routing page is where it changes. The label and the link keep
-                    // their width; a long name shortens the button (DESIGN.md "长名称").
+                    // their width; a long name shortens the button (DESIGN.md "长名称"). A
+                    // provider's subscription in use adds what its account says of it on a
+                    // second line, and how to go on, never acting by itself (D57).
                     GroupRow {
-                        UiText {
+                        ColumnLayout {
                             Layout.fillWidth: true
-                            Layout.minimumWidth: implicitWidth
-                            text: qsTr("当前使用")
+                            Layout.minimumWidth: usingLabel.implicitWidth
+                            spacing: 0
+
+                            UiText {
+                                id: usingLabel
+
+                                Layout.fillWidth: true
+                                text: qsTr("当前使用")
+                            }
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                visible: page.profiles.activeNotice !== ""
+                                spacing: 0
+
+                                AccessibleText {
+                                    text: page.profiles.activeNotice
+                                    role: Theme.type.caption
+                                    color: page.profiles.activeNoticeDanger ? Theme.danger : Theme.warning
+                                }
+
+                                UiText {
+                                    visible: renewLink.visible
+                                    text: qsTr(" · ")
+                                    role: Theme.type.caption
+                                    color: Theme.textMuted
+                                }
+
+                                LinkButton {
+                                    id: renewLink
+
+                                    visible: page.profiles.canRenewActive
+                                    text: qsTr("续费")
+                                    role: Theme.type.caption
+                                    onClicked: page.profiles.renewActive()
+                                }
+
+                                UiText {
+                                    visible: switchLink.visible
+                                    text: qsTr(" · ")
+                                    role: Theme.type.caption
+                                    color: Theme.textMuted
+                                }
+
+                                // The name gives way first, keeping 改用「 and 」.
+                                LinkButton {
+                                    id: switchLink
+
+                                    Layout.fillWidth: true
+                                    Layout.maximumWidth: implicitWidth
+                                    visible: page.profiles.suggestedName !== ""
+                                    text: qsTr("改用「%1」").arg(page.profiles.suggestedName)
+                                    role: Theme.type.caption
+                                    elide: Text.ElideMiddle
+                                    onClicked: page.profiles.useSuggested()
+                                }
+
+                                Item {
+                                    Layout.fillWidth: true
+                                    Layout.preferredWidth: 0
+                                }
+                            }
                         }
 
                         LinkButton {
@@ -454,6 +518,16 @@ ScrollView {
                         LinkButton {
                             text: qsTr("导入")
                             onClicked: page.shell.setPage("profiles")
+                        }
+
+                        LinkButton {
+                            id: signInLink
+
+                            text: qsTr("登录服务商")
+                            onClicked: {
+                                page.signInTrigger = signInLink
+                                page.profiles.requestProviderSignIn("")
+                            }
                         }
                     }
                 }
