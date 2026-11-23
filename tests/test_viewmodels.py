@@ -511,10 +511,10 @@ def test_import_failures(qtbot: QtBot, view_models: ViewModels, tmp_path: Path) 
     assert prop(profiles, "summary") == "3 份订阅"  # link failures stay in the form
 
     bad = tmp_path / "bad.yaml"
-    bad.write_text("rules: ['MATCH,NOWHERE']\n", encoding="utf-8")
+    bad.write_text("mode: rule\n", encoding="utf-8")
     profiles.importFile(bad.as_uri())
     qtbot.waitUntil(lambda: prop(profiles, "hasError"))
-    expected = "配置无效：rules[0] [MATCH,NOWHERE] error: proxy [NOWHERE] not found"  # noqa: RUF001
+    expected = "配置无效：a message, not a subscription: mode: rule"  # noqa: RUF001
     assert prop(profiles, "summary") == expected
     profiles.clearImportError()
     assert prop(profiles, "importError") == ""

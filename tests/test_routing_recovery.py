@@ -217,7 +217,7 @@ def test_invalid_deferred_import_keeps_waiting_for_valid_rules(tmp_path: Path) -
         await fall_back(scene)
         await scene.host.stop()
         scene.host.core_needs_tunnel = True
-        scene.fetcher.body = b"rules: [this-is-not-a-rule]\n"
+        scene.fetcher.body = b"Your subscription has expired\n"  # a message, which the core refuses
         await scene.library.profiles.import_url("https://example.invalid/bad", "Bad")
         # The invalid new subscription cannot take over; the fallback can still run.
         await scene.library.tunnel.start()
