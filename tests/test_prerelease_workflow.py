@@ -55,6 +55,11 @@ def run_step(
     gh = bin_dir / "gh"
     gh.write_text(GH, encoding="utf-8")
     gh.chmod(0o755)
+    # The PATH below keeps the machine's own tools out, but the step needs sha256sum, which
+    # macOS has only from Homebrew's coreutils.
+    sha256sum = shutil.which("sha256sum")
+    assert sha256sum is not None
+    (bin_dir / "sha256sum").symlink_to(sha256sum)
     output, summary = tmp_path / "output", tmp_path / "summary"
     output.touch()
     summary.touch()
