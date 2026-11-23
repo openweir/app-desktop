@@ -17,20 +17,24 @@ import (
 	"github.com/openweir/app-desktop/src/core/internal/engine"
 	"github.com/openweir/app-desktop/src/core/internal/geodata"
 	"github.com/openweir/app-desktop/src/core/internal/peer"
+	"github.com/openweir/app-desktop/src/core/internal/power"
 	"github.com/openweir/app-desktop/src/core/internal/sysproxy"
 )
 
-// Platform is what the service needs from Windows; tests stand in for it.
+// Platform is what the service needs from Windows or Linux; tests stand in for it. On Linux
+// a session is a signed-in user, numbered by their uid (platform_linux.go).
 type Platform interface {
-	// SecureDir creates dir if needed so that SYSTEM alone writes it. reader, a SID, may read
-	// it; with no reader Administrators get full access instead. It refuses a link, and a
-	// directory that someone other than SYSTEM or Administrators created.
+	// SecureDir creates dir if needed so that SYSTEM (root on Linux) alone writes it. reader,
+	// a user ID, may read it; with no reader Administrators get full access instead, while on
+	// Linux others may only pass through it. It refuses a link, and a directory that someone
+	// other than SYSTEM or Administrators (root) created.
 	SecureDir(dir, reader string) error
-	// SessionUser is the SID of the user signed in to session.
+	// SessionUser is the user ID of the user signed in to session.
 	SessionUser(session uint32) (string, error)
-	// SessionLogonTime is the Windows logon FILETIME, stable across service restarts.
+	// SessionLogonTime is when the user signed in to session, stable across service restarts:
+	// the Windows logon FILETIME, or logind's timestamp of the user.
 	SessionLogonTime(session uint32) (int64, error)
-	// SignedIn lists the sessions sid is signed in to.
+	// SignedIn lists the sessions the user sid is signed in to.
 	SignedIn(sid string) []uint32
 	ReadProxy(session uint32) (sysproxy.Settings, error)
 	WriteProxy(session uint32, settings sysproxy.Settings) error
@@ -40,8 +44,8 @@ type Platform interface {
 	NetworkReady() bool
 	// MayClaim refuses a caller who may not own the tunnel from where they are, before a
 	// claim or take-over makes them the owner. Windows lets every caller the pipe verified
-	// claim; Linux is to allow only a user in an active local session (docs/architecture.md
-	// "Linux (in progress)", D66). Not consulted yet.
+	// claim; Linux allows only a user in an active local session (docs/architecture.md
+	// "Linux (in progress)", D66). The owner claiming again is not asked.
 	MayClaim(caller peer.Identity) error
 }
 
@@ -54,7 +58,7 @@ type Core interface {
 	SuspendContext(context.Context) error
 }
 
-// Service implements control.Host for the Windows service.
+// Service implements control.Host for the Windows and Linux services.
 type Service struct {
 	root     string
 	platform Platform
@@ -97,6 +101,12 @@ type Service struct {
 	// proxyPort is the mixed port the owner's system proxy points at; 0 while it is theirs.
 	// It changes under both proxyMu and mu.
 	proxyPort uint16
+
+	// sleeps numbers the sleep cycles that Sleep hears of, from one goroutine; sleepWait
+	// bounds how long going to sleep waits for the tunnel to be down: less than logind's
+	// default InhibitDelayMaxSec of 5 seconds, after which the machine sleeps anyway.
+	sleeps    *power.Queue
+	sleepWait time.Duration
 }
 
 var _ control.Host = (*Service)(nil)
@@ -120,6 +130,7 @@ func Open(ctx context.Context, root, geodataDir string, platform Platform, log *
 	}()
 	s := &Service{root: root, platform: platform, log: log, ctx: ctx, cancel: cancel,
 		powerDelays: []time.Duration{0, time.Second, 2 * time.Second, 5 * time.Second, 10 * time.Second},
+		sleeps:      power.NewQueue(), sleepWait: 4 * time.Second,
 		sessionJobs: make(map[uint32]sessionJob)}
 	record, ok, err := LoadRecord(root)
 	if err != nil {
@@ -237,8 +248,14 @@ func (s *Service) ResumeAllowed() bool {
 // down. Whether that tunnel would come back at the owner's next sign-in does not hold the
 // service: the owner may never sign in again.
 func (s *Service) Claim(caller peer.Identity) error {
-	if !ValidSID(caller.UserID) {
-		return fmt.Errorf("caller %q has no SID", caller.UserID)
+	if !validUserID(caller.UserID) {
+		return fmt.Errorf("caller %q has no user ID", caller.UserID)
+	}
+	if evicts(caller) {
+		return errors.New("root takes the tunnel over for another user and never owns it")
+	}
+	if err := s.mayClaim(caller); err != nil {
+		return err
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -249,10 +266,17 @@ func (s *Service) Claim(caller peer.Identity) error {
 // tunnel once they confirmed it through UAC (decision D5b). stop brings that tunnel down; it
 // stays down as after Stop, and its owner gets their proxy settings back now, or at their
 // next sign-in when the service cannot write them. Then the service restarts for caller, as
-// for any new owner. Anyone else waits for the tunnel, as with Claim.
+// for any new owner. Anyone else waits for the tunnel, as with Claim. On Linux root, whom
+// pkexec runs the helper as, ends the owner's claim instead (evict).
 func (s *Service) TakeOver(caller peer.Identity, stop func() error) error {
-	if !ValidSID(caller.UserID) {
-		return fmt.Errorf("caller %q has no SID", caller.UserID)
+	if !validUserID(caller.UserID) {
+		return fmt.Errorf("caller %q has no user ID", caller.UserID)
+	}
+	if evicts(caller) {
+		return s.evict(caller, stop)
+	}
+	if err := s.mayClaim(caller); err != nil {
+		return err
 	}
 	s.mu.Lock()
 	err := s.claimLocked(caller)
@@ -279,6 +303,20 @@ func (s *Service) TakeOver(caller peer.Identity, stop func() error) error {
 	defer s.mu.Unlock()
 	s.log.Info("an administrator took over the tunnel", "from", former, "sid", caller.UserID)
 	return s.claimLocked(caller)
+}
+
+// mayClaim asks the platform whether caller may become the owner from where they are. The
+// owner claiming again, from another session say, is not asked: Admit lets them in anyway.
+// An owner never changes without a restart, which refuses every claim, so the answer holds
+// until claimLocked.
+func (s *Service) mayClaim(caller peer.Identity) error {
+	s.mu.Lock()
+	owns := s.owner != nil && s.owner.SID == caller.UserID
+	s.mu.Unlock()
+	if owns {
+		return nil
+	}
+	return s.platform.MayClaim(caller)
 }
 
 func (s *Service) claimLocked(caller peer.Identity) error {
@@ -308,6 +346,11 @@ func (s *Service) claimLocked(caller peer.Identity) error {
 
 func (s *Service) Applied(start *controlpb.StartRequest, current func() bool) error {
 	s.mu.Lock()
+	if s.owner == nil {
+		// Evicted: the process restarts with no owner.
+		s.mu.Unlock()
+		return context.Canceled
+	}
 	session := s.owner.Session
 	s.mu.Unlock()
 	logon, err := s.platform.SessionLogonTime(session)
@@ -317,7 +360,7 @@ func (s *Service) Applied(start *controlpb.StartRequest, current func() bool) er
 		logon = 0
 	}
 	s.mu.Lock()
-	if s.closed || s.ctx.Err() != nil || !current() {
+	if s.closed || s.ctx.Err() != nil || s.owner == nil || !current() {
 		s.mu.Unlock()
 		return context.Canceled
 	}
@@ -696,7 +739,7 @@ func (s *Service) proxyOffLocked() error {
 // restoreStrayProxy gives back the settings of a former owner, which the service could not
 // restore before someone else claimed it.
 func (s *Service) restoreStrayProxy(sid string, session uint32) {
-	if !ValidSID(sid) {
+	if !validUserID(sid) {
 		return
 	}
 	home := kept{Home(s.root, sid)}

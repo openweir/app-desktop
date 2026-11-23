@@ -24,8 +24,12 @@ var nativePattern = regexp.MustCompile(`(?i)^openweir-service\.exe\.[0-9]+\.dmp$
 // Open installs the one runtime crash sink. The caller must only call it once per
 // process and close it on normal shutdown. No header is written, so a zero-length
 // file is a healthy process, not a crash. SetCrashOutput owns a duplicate descriptor.
+//
+// The Linux service's home lets its owner read what is created inside through a default ACL,
+// whose mask the group bits of the mode cut down; group-readable modes let the owner read
+// their crash reports there (owner.SecureDir), and the umask keeps them private elsewhere.
 func Open(directory string) (func(), error) {
-	if err := os.MkdirAll(directory, 0700); err != nil {
+	if err := os.MkdirAll(directory, 0o750); err != nil {
 		return nil, err
 	}
 	info, err := os.Lstat(directory)
@@ -39,7 +43,7 @@ func Open(directory string) (func(), error) {
 		return nil, err
 	}
 	name := filepath.Join(directory, fmt.Sprintf("go-%d-%d.log", time.Now().UnixNano(), os.Getpid()))
-	file, err := os.OpenFile(name, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	file, err := os.OpenFile(name, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o640)
 	if err != nil {
 		return nil, err
 	}

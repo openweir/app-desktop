@@ -80,25 +80,60 @@ func (s *Service) RecoveryStatus() (controlpb.RecoveryState, string) {
 // PowerChanged schedules work and returns. Native/SCM callbacks only update the queue;
 // this method does not wait for network readiness or a library operation either.
 func (s *Service) PowerChanged(event power.Event) {
+	s.powerChanged(event)
+}
+
+// Sleep is logind's onSleep for the Linux service (logind.Watch): the machine going to sleep
+// (true) or waking (false) is a power event, as Windows' suspend and resume notices are.
+// Going to sleep it returns once the tunnel is down, or after sleepWait, since logind.Watch
+// holds the machine back with its delay lock until then; waking it only schedules the
+// recovery. Watch calls it from one goroutine, which numbers the cycles in order.
+func (s *Service) Sleep(sleeping bool) {
+	if sleeping {
+		s.sleeps.Publish(power.Suspend)
+	} else {
+		s.sleeps.Publish(power.ResumeAutomatic)
+	}
+	done := s.powerChanged(s.sleeps.Latest())
+	if !sleeping {
+		return
+	}
+	timer := time.NewTimer(s.sleepWait)
+	defer timer.Stop()
+	select {
+	case <-done:
+	case <-timer.C:
+		s.log.Warn("the tunnel was still going down when the machine went to sleep")
+	}
+}
+
+// powerChanged is PowerChanged; what it returns closes once the work it scheduled for event
+// is over, at once when it scheduled none.
+func (s *Service) powerChanged(event power.Event) <-chan struct{} {
+	done := make(chan struct{})
 	s.mu.Lock()
 	if s.closed || s.ctx.Err() != nil || (s.power.seen && s.power.event == event) {
 		s.mu.Unlock()
-		return
+		close(done)
+		return done
 	}
 	s.cancelPowerLocked()
 	s.power.event, s.power.seen = event, true
 	if !s.bound || s.owner == nil || s.restarting || s.core == nil {
 		s.mu.Unlock()
-		return
+		close(done)
+		return done
 	}
 	if s.resumeBlocked && s.wantRunning {
 		s.power.status, s.power.errorCode = controlpb.RecoveryState_RECOVERY_STATE_FAILED, "core_unresponsive"
 		s.mu.Unlock()
-		return
+		close(done)
+		return done
 	}
 	if !event.Sleeping && !s.resumeAllowedLocked() {
 		s.mu.Unlock()
-		return
+		close(done)
+		return done
 	}
 	ctx, cancel := context.WithTimeout(s.ctx, time.Minute)
 	s.power.cancel = cancel
@@ -113,6 +148,7 @@ func (s *Service) PowerChanged(event power.Event) {
 	delays := append([]time.Duration(nil), s.powerDelays...)
 	s.mu.Unlock()
 	go func() {
+		defer close(done)
 		defer func() {
 			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 				s.finishPower(generation, "recovery_timeout")
@@ -131,6 +167,7 @@ func (s *Service) PowerChanged(event power.Event) {
 		}
 		s.recoverPower(ctx, generation, sid, delays)
 	}()
+	return done
 }
 
 func (s *Service) powerCurrent(ctx context.Context, generation uint64, sid string, resume bool) bool {

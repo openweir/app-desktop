@@ -15,6 +15,7 @@ import (
 	"github.com/openweir/app-desktop/src/core/internal/peer"
 	"github.com/openweir/app-desktop/src/core/internal/porttest"
 	"github.com/openweir/app-desktop/src/core/internal/server"
+	"github.com/openweir/app-desktop/src/core/internal/sysproxy"
 )
 
 // fakeHost owns the service for owner and records what the dispatcher tells it.
@@ -331,6 +332,13 @@ func TestHostFailuresHaveTheirOwnCodes(t *testing.T) {
 	reloaded := callAs(t, dispatcher, ctx, owner, request(2, reloadRequest(profileYAML(port), withProxy)))
 	expectError(t, reloaded, 2, CodeStartedWithoutSystemProxy)
 	expectError(t, callAs(t, dispatcher, ctx, owner, request(3, systemProxyRequest(true))), 3, CodeSystemProxyFailed)
+	// A Linux desktop that keeps its proxy settings nowhere the service can set them.
+	host.proxyErr = fmt.Errorf("read the owner's proxy settings: %w", sysproxy.ErrUnsupportedDesktop)
+	unsupported := callAs(t, dispatcher, ctx, owner, request(3, systemProxyRequest(true)))
+	expectError(t, unsupported, 3, CodeSystemProxyUnavailable)
+	if unsupported.GetError().GetRetryable() {
+		t.Fatal("an unsupported desktop is worth another try")
+	}
 	host.proxyErr = nil
 
 	host.stopErr = errors.New("restore the owner's proxy settings: the owner is not signed in")
