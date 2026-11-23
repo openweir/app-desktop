@@ -591,6 +591,14 @@ EXCLUDED = (
     "*/wayland-graphics-integration-client/lib*-server.so",
     "*/wayland-graphics-integration-server/*",
     "*/platforminputcontexts/libqtvirtualkeyboardplugin.so",
+    # Printing (CUPS): the UI prints nothing.
+    "*/printsupport/*",
+    # Qt Design Studio's QML support, whose library is left out with the others.
+    "*/qml/QtQml/DesignSupport/*",
+    # The native Controls style, which on Linux is built on Fusion: the UI uses the Basic
+    # style and Templates only.
+    "*Qt6QuickControls2Native*",
+    "*/qml/QtQuick/NativeStyle/*",
     "*/networkinformation/*",
     # FFmpeg, for Qt Multimedia.
     "*/libav*",

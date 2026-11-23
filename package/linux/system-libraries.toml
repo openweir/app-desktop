@@ -33,6 +33,7 @@ sonames = [
     "libpthread.so.0",
     "librt.so.1",
     "libutil.so.1",
+    "libresolv.so.2",
     "ld-linux-x86-64.so.2",
     "ld-linux-aarch64.so.1",
 ]
@@ -56,11 +57,16 @@ sonames = ["libzstd.so.1"]
 
 [[library]]
 deb = "libbrotli1"
-sonames = ["libbrotlidec.so.1"]
+sonames = ["libbrotlidec.so.1", "libbrotlicommon.so.1"]
 
 [[library]]
 deb = "libglib2.0-0t64 | libglib2.0-0"
-sonames = ["libglib-2.0.so.0"]
+sonames = ["libglib-2.0.so.0", "libgthread-2.0.so.0"]
+
+# Qt Network's Negotiate (Kerberos) authentication, on the x86_64 wheels.
+[[library]]
+deb = "libgssapi-krb5-2"
+sonames = ["libgssapi_krb5.so.2"]
 
 [[library]]
 deb = "libdbus-1-3"
@@ -117,6 +123,10 @@ loaded_by_name = true
 [[library]]
 deb = "libxcb-cursor0"
 sonames = ["libxcb-cursor.so.0"]
+
+[[library]]
+deb = "libxcb-util1"
+sonames = ["libxcb-util.so.1"]
 
 [[library]]
 deb = "libxcb-glx0"
