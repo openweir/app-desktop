@@ -85,7 +85,7 @@ jobs:
           import subprocess
 
           # Every job below that the selection names; tests/test_ci_changes.py keeps it whole.
-          EVERY = ['apple', 'e2e', 'go', 'installer-ui', 'python', 'tun', 'windows-arm64-upgrade', 'windows-installer']
+          EVERY = ['apple', 'e2e', 'go', 'installer-ui', 'linux-install', 'linux-package', 'python', 'tun', 'windows-arm64-upgrade', 'windows-installer']
           SCRIPT = 'scripts/ci_changes.py'
 
           def commit(value):
@@ -359,11 +359,22 @@ jobs:
       - name: Security and mesh tests with with_gvisor
         if: runner.os == 'Linux'
         run: go test -race -tags with_gvisor -run '^(TestSecurity|TestMesh|TestNetworks)' ./internal/engine
-      - name: Windows service cross-build
+      # The Linux service loads Cronet through purego as the Windows one does, from beside
+      # itself (libcronet.so); the tests find it through LD_LIBRARY_PATH instead.
+      - name: Fork outbounds (Linux native Cronet)
         if: runner.os == 'Linux'
         run: |
-          for arch in amd64 arm64; do
-            GOOS=windows GOARCH="$arch" CGO_ENABLED=0 go build -tags with_gvisor,with_naive,with_purego -o /dev/null ./service
+          native=$(go mod download -json "github.com/sagernet/cronet-go/lib/linux_$(go env GOARCH)" | jq -r .Dir)
+          LD_LIBRARY_PATH="$native" go test -race -tags with_gvisor,with_naive,with_purego -run '^(TestFork|TestNaiveRuntime)' ./internal/engine ./service
+      # Both release services as their packages build them (CGO_ENABLED=0), for both
+      # architectures; linux-package builds and runs the native one.
+      - name: Windows and Linux service cross-builds
+        if: runner.os == 'Linux'
+        run: |
+          for os in windows linux; do
+            for arch in amd64 arm64; do
+              GOOS="$os" GOARCH="$arch" CGO_ENABLED=0 go build -tags with_gvisor,with_naive,with_purego -o /dev/null ./service
+            done
           done
       - name: macOS extension archive
         if: runner.os == 'macOS'
@@ -664,6 +675,255 @@ jobs:
         shell: powershell
         run: ./package/windows/arm64-upgrade-smoke-test.ps1 -X64Installer (Get-Item build/migration/x64/*.exe).FullName -ARM64Installer (Get-Item build/migration/arm64/*.exe).FullName
 
+  # The unsigned Linux packages (package/linux/README.md, D61): the .deb and .rpm of each
+  # architecture, built where their glibc floor is: x64 in an ubuntu:22.04 container (glibc
+  # 2.35), arm64 on the Ubuntu 24.04 runner itself (2.39, PySide6's aarch64 floor). The next
+  # version's .deb, packaged from the same tree, is for linux-install's upgrade. A failed build
+  # names what failed in error annotations (scripts/build_linux.py), as the tests do.
+  linux-package:
+    needs: changes
+    if: contains(fromJSON(needs.changes.outputs.jobs), 'linux-package')
+    runs-on: ${{ matrix.os }}
+    # No image (arm64) runs the job on the runner itself.
+    container: ${{ matrix.container }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            arch: x64
+            container: ubuntu:22.04
+          - os: ubuntu-24.04-arm
+            arch: arm64
+            container: ""
+    env:
+      ARCH: ${{ matrix.arch }}
+      VERSION: ${{ needs.changes.outputs.version }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      # The container has none of them, nor sudo, and runs as root. git before the checkout, so
+      # that it is a repository and Go stamps the service with its commit, as elsewhere.
+      # Nuitka needs a C compiler and patchelf, build_linux.py readelf and objcopy, its tests
+      # desktop-file-validate; ccache keeps Nuitka's C between runs.
+      - name: Build tools
+        timeout-minutes: 15
+        run: |
+          sudo=()
+          [ "$(id -u)" -eq 0 ] || sudo=(sudo)
+          apt=("${sudo[@]}" env DEBIAN_FRONTEND=noninteractive timeout 600 apt-get -q -y -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30)
+          for attempt in 1 2 3; do
+            if "${apt[@]}" update && "${apt[@]}" install --no-install-recommends \
+              git ca-certificates build-essential patchelf binutils desktop-file-utils ccache zstd; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then sleep $((attempt * 30)); fi
+          done
+          echo "::error title=Build tools::apt-get could not install the build tools"
+          exit 1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
+        with:
+          enable-cache: true
+      # The version the changes job computed, into pyproject.toml before anything is built.
+      - name: Version
+        run: uv run --no-project python scripts/next_version.py --set "$VERSION"
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5  # v7.1.0
+        with:
+          go-version-file: src/core/go.mod
+          cache-dependency-path: src/core/go.sum
+      # The libraries the packages take from the distribution (package/linux/
+      # system-libraries.toml), so that Nuitka and readelf's checks find what Qt needs. Of
+      # "a | b" the first this distribution has.
+      - name: System libraries
+        timeout-minutes: 15
+        run: |
+          mapfile -t wanted < <(uv run --no-project python -c 'import tomllib; print("\n".join(library["deb"] for library in tomllib.load(open("package/linux/system-libraries.toml", "rb"))["library"]))')
+          [ "${#wanted[@]}" -gt 0 ] || { echo "::error title=System libraries::system-libraries.toml lists nothing"; exit 1; }
+          packages=()
+          for entry in "${wanted[@]}"; do
+            chosen=
+            IFS='|' read -ra alternatives <<< "$entry"
+            for name in "${alternatives[@]}"; do
+              name=${name// /}
+              policy=$(apt-cache policy "$name" 2>/dev/null)
+              if grep -q 'Candidate: [^(]' <<< "$policy"; then
+                chosen=$name
+                break
+              fi
+            done
+            if [ -z "$chosen" ]; then
+              echo "::error title=System libraries::this distribution has no package of '$entry'"
+              exit 1
+            fi
+            packages+=("$chosen")
+          done
+          sudo=()
+          [ "$(id -u)" -eq 0 ] || sudo=(sudo)
+          apt=("${sudo[@]}" env DEBIAN_FRONTEND=noninteractive timeout 600 apt-get -q -y -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30)
+          for attempt in 1 2 3; do
+            if "${apt[@]}" install --no-install-recommends "${packages[@]}"; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then sleep $((attempt * 30)); fi
+          done
+          echo "::error title=System libraries::apt-get could not install ${packages[*]}"
+          exit 1
+      # With the build tools (Nuitka) from the lock's build group.
+      - name: Install (locked)
+        run: uv sync --frozen --group build
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: build/geodata
+          key: geodata-${{ hashFiles('scripts/fetch_geodata.py') }}
+      # Nuitka's compiled C, through ccache: most of it is the dependencies', which change with
+      # the lock.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: build/nuitka-cache-${{ matrix.arch }}
+          key: nuitka-linux-${{ matrix.arch }}-${{ hashFiles('uv.lock', 'scripts/build_linux.py') }}
+      # Without OPENWEIR_LINUX_UPDATE_KEY: the previews have no update key, so their updater
+      # sends people to the release page (docs/release.md).
+      - name: Build (unsigned)
+        run: |
+          export NUITKA_CACHE_DIR="$GITHUB_WORKSPACE/build/nuitka-cache-$ARCH"
+          export CCACHE_DIR="$NUITKA_CACHE_DIR/ccache"
+          uv run --frozen --group build python scripts/build_linux.py
+      - name: Checksums
+        working-directory: build/linux-${{ matrix.arch }}
+        run: |
+          for kind in deb rpm; do
+            file="OpenWeir-$VERSION-linux-$ARCH.$kind"
+            if [ ! -f "$file" ]; then
+              echo "::error title=Linux packages::scripts/build_linux.py wrote no $file"
+              exit 1
+            fi
+            sha256sum "$file" > "$file.sha256"
+          done
+          ls -l
+      # The same tree as the next patch version, which linux-install upgrades to.
+      - name: The next version's .deb
+        run: |
+          IFS=. read -r major minor patch <<< "$VERSION"
+          next="$major.$minor.$((patch + 1))"
+          uv run --no-project python scripts/next_version.py --set "$next"
+          uv run --frozen --group build python scripts/build_linux.py --packages-only --format deb
+          mkdir -p build/linux-upgrade
+          mv "build/linux-$ARCH/OpenWeir-$next-linux-$ARCH.deb" build/linux-upgrade/
+          uv run --no-project python scripts/next_version.py --set "$VERSION"
+      # Kept as long as the disk image, so that a rerun of the preview job still finds them; the
+      # preview checks them against their .sha256.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: linux-package-${{ matrix.arch }}-${{ github.sha }}
+          path: build/linux-${{ matrix.arch }}/OpenWeir-*
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: linux-upgrade-${{ matrix.arch }}-${{ github.sha }}
+          path: build/linux-upgrade/*.deb
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+      # The DWARF split off openweir-ui and openweir-service, for a preview's crash reports.
+      - name: Retain Linux crash symbols
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: linux-symbols-${{ matrix.arch }}-${{ github.sha }}
+          path: build/linux-${{ matrix.arch }}/symbols/
+          if-no-files-found: error
+          retention-days: 30
+
+  # The packages linux-package built, installed, upgraded and removed by
+  # package/linux/smoke-test.sh: on Ubuntu 24.04 virtual machines, which systemd runs (the service
+  # starts, a SIGKILL's leftovers are cleaned up, an upgrade asks a running UI to quit), and as
+  # root in containers without systemd: the oldest distributions the .deb supports, and Fedora
+  # for the .rpm. Each failed check is an error annotation that names it.
+  linux-install:
+    needs: [changes, linux-package]
+    if: contains(fromJSON(needs.changes.outputs.jobs), 'linux-install')
+    name: linux-install (${{ matrix.mode }}, ${{ matrix.container || matrix.os }}, ${{ matrix.arch }})
+    runs-on: ${{ matrix.os }}
+    container: ${{ matrix.container }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            arch: x64
+            mode: system
+            container: ""
+          - os: ubuntu-24.04-arm
+            arch: arm64
+            mode: system
+            container: ""
+          - os: ubuntu-24.04
+            arch: x64
+            mode: deb
+            container: ubuntu:22.04
+          - os: ubuntu-24.04
+            arch: x64
+            mode: deb
+            container: debian:12
+          - os: ubuntu-24.04-arm
+            arch: arm64
+            mode: deb
+            container: debian:13
+          - os: ubuntu-24.04
+            arch: x64
+            mode: rpm
+            container: fedora:41
+          - os: ubuntu-24.04-arm
+            arch: arm64
+            mode: rpm
+            container: fedora:41
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
+        with:
+          name: linux-package-${{ matrix.arch }}-${{ github.sha }}
+          path: build/install
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
+        if: matrix.mode == 'system'
+        with:
+          name: linux-upgrade-${{ matrix.arch }}-${{ github.sha }}
+          path: build/upgrade
+      - name: Install, upgrade and remove
+        env:
+          MODE: ${{ matrix.mode }}
+          ARCH: ${{ matrix.arch }}
+          VERSION: ${{ needs.changes.outputs.version }}
+        run: |
+          case "$MODE" in
+          system)
+            upgrade=(build/upgrade/OpenWeir-*-linux-"$ARCH".deb)
+            bash package/linux/smoke-test.sh system "build/install/OpenWeir-$VERSION-linux-$ARCH.deb" "${upgrade[0]}"
+            ;;
+          deb) bash package/linux/smoke-test.sh deb "build/install/OpenWeir-$VERSION-linux-$ARCH.deb" ;;
+          rpm) bash package/linux/smoke-test.sh rpm "build/install/OpenWeir-$VERSION-linux-$ARCH.rpm" ;;
+          esac
+      # The journal, apt's or dnf's log and the UI's output.
+      - name: Keep the logs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: linux-install-${{ matrix.mode }}-${{ matrix.arch }}-${{ strategy.job-index }}-${{ github.sha }}
+          path: build/linux-smoke/
+          if-no-files-found: ignore
+          retention-days: 14
+
   # The owned-TUN, fd-mode, pinned-TUN and crash tests create a real TUN, so they run only
   # here, inside network namespaces (docs/architecture.md §11). md-tun holds the engine; md-srv,
   # on the far side of a veth pair, serves the page the test fetches through the TUN and echoes
@@ -795,7 +1055,7 @@ jobs:
   result:
     name: CI result
     if: always()
-    needs: [changes, python, e2e, go, apple, installer-ui, windows-installer, windows-arm64-upgrade, tun]
+    needs: [changes, python, e2e, go, apple, installer-ui, windows-installer, windows-arm64-upgrade, linux-package, linux-install, tun]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

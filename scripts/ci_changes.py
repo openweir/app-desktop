@@ -2,8 +2,8 @@
 
 Unknown inputs and unavailable history select every job. Pushes reuse a successful
 ancestor CI run, not an unchecked previous commit. File paths always come from Git.
-A push to develop that builds one installer builds all three: they go out together as a
-preview (prerelease.yml), which replaces the previous one.
+A push to develop that builds one platform's installers builds every platform's: they go out
+together as a preview (prerelease.yml), which replaces the previous one.
 """
 
 from __future__ import annotations
@@ -30,16 +30,22 @@ JOBS = frozenset(
         "installer-ui",
         "windows-installer",
         "windows-arm64-upgrade",
+        "linux-package",
+        "linux-install",
         "tun",
     }
 )
-CORE = frozenset({"go", "e2e", "apple", "windows-installer", "tun"})
-UI = frozenset({"python", "e2e", "apple", "windows-installer"})
+CORE = frozenset({"go", "e2e", "apple", "windows-installer", "linux-package", "tun"})
+UI = frozenset({"python", "e2e", "apple", "windows-installer", "linux-package"})
 WINDOWS = frozenset({"python", "installer-ui", "windows-installer"})
-BUILD = frozenset({"python", "apple", "windows-installer", "installer-ui"})
-# The jobs that build the preview's installers: the macOS disk image, and the Windows x64 and
-# ARM64 installers, which windows-arm64-upgrade then checks together.
-INSTALLERS = frozenset({"apple", "windows-installer", "windows-arm64-upgrade"})
+LINUX = frozenset({"python", "linux-package"})
+BUILD = frozenset({"python", "apple", "windows-installer", "installer-ui", "linux-package"})
+# The jobs that build the preview's installers: the macOS disk image, the Windows x64 and ARM64
+# installers, which windows-arm64-upgrade then checks together, and the Linux packages, which
+# linux-install installs, upgrades and removes.
+INSTALLERS = frozenset(
+    {"apple", "windows-installer", "windows-arm64-upgrade", "linux-package", "linux-install"}
+)
 PREVIEW_REF = "refs/heads/develop"
 GLOBAL_FILES = frozenset(
     {
@@ -122,6 +128,10 @@ def select(paths: Iterable[str]) -> Plan:
                     jobs.add("tun")
             elif path.endswith("_windows.go"):
                 jobs.update({"go", "windows-installer"})
+            elif path.endswith("_linux.go"):
+                # e2e drives the development service on Linux too, the tun job runs the
+                # engine's Linux TUN and its clean-up, and the packages carry the service.
+                jobs.update({"go", "e2e", "tun", "linux-package"})
             elif path.endswith("_darwin.go"):
                 jobs.update({"go", "apple"})
                 # e2e drives the development service on macOS, which runs every darwin file
@@ -138,6 +148,8 @@ def select(paths: Iterable[str]) -> Plan:
             jobs.update(UI)
         elif path == "tests/test_build_windows.py":
             jobs.update(WINDOWS)
+        elif path == "tests/test_build_linux.py":
+            jobs.update(LINUX)
         elif path.startswith(("tests/e2e/", "tests/support/")) or path == "tests/conftest.py":
             jobs.update({"python", "e2e"})
         elif path.startswith("tests/"):
@@ -154,11 +166,15 @@ def select(paths: Iterable[str]) -> Plan:
             # Only e2e checks the category list against the pinned data (--check) and runs
             # "my plan" on that data.
             jobs.update(BUILD | {"e2e"})
-        elif path in {
-            "scripts/build_windows.py",
-            "scripts/build_installer_ui.py",
-        } or path.startswith("package/windows/"):
+        elif path == "scripts/build_windows.py":
+            # build_linux.py takes the service's tags and the GEO data's place from it.
+            jobs.update(WINDOWS | {"linux-package"})
+        elif path == "scripts/build_installer_ui.py" or path.startswith("package/windows/"):
             jobs.update(WINDOWS)
+        elif path == "scripts/build_linux.py" or path.startswith(
+            ("package/linux/", "package/icons/hicolor/")
+        ):
+            jobs.update(LINUX)
         elif path in {"scripts/build_dmg.py", "scripts/gen_dmg_background.py"} or path.startswith(
             "package/dmg/"
         ):
@@ -169,6 +185,8 @@ def select(paths: Iterable[str]) -> Plan:
             return complete("unclassified path")
     if "windows-installer" in jobs:
         jobs.add("windows-arm64-upgrade")
+    if "linux-package" in jobs:
+        jobs.add("linux-install")
     return Plan(
         frozenset(jobs), protocol, "changed inputs" if jobs else "documentation or empty diff"
     )

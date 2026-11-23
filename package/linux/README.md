@@ -67,4 +67,21 @@ try-restart 只在 `/run/systemd/system` 存在时运行；enable、disable 在�
 
 `tests/test_build_linux.py` 用假的 ELF 头和 readelf 输出测各项检查和依赖，渲染 nfpm 配置并核对每个条目，
 在临时根目录里用假的 `systemctl`、`runuser`、`getent` 运行维护脚本（含一个假装是界面的进程），并在有
-`systemd-analyze` 时校验单元文件。真正安装、启动和升级在 CI 的虚拟机里做。
+`systemd-analyze` 时校验单元文件。真正的安装、启动和升级在 CI 里做：
+
+- `linux-package` job 构建两种架构的安装包（x64 在 `ubuntu:22.04` 容器里，arm64 在 Ubuntu 24.04 runner 上），另用
+  `--packages-only` 把同一棵目录树打成下一个修订号的 `.deb`，供升级测试用。构建失败时 `build_linux.py` 把原因
+  （每个未知的 soname 各一条）写成 GitHub 的错误注释，不登录也看得到。
+- `linux-install` job 运行 `smoke-test.sh`：在 Ubuntu 24.04 虚拟机（x64、arm64，有 systemd）上安装，检查两个单元已启用、
+  套接字在监听、服务在运行且日志里有 `service started`、`/opt/openweir` 和 `/var/lib/openweir` 的属主与模式、
+  `package-format`、两个 polkit 动作、`.desktop` 文件、`ldd` 找得到 `openweir-ui` 和 Cronet 要的每个库；在测试网段上
+  手工造出崩溃的 TUN 留下的 IPv4、IPv6 规则、路由表和设备，`kill -9` 服务后确认 `-cleanup` 恢复原样；以 runner
+  用户起一个 offscreen 界面，确认 `--quit` 能让它退出，再起一个 `--background` 的界面，装下一个版本，确认界面按
+  要求退出（不是等 15 秒后被 SIGTERM 结束）、服务重启、单元仍启用；最后删除时保留 `/var/lib/openweir`，清除时删掉。
+  在 `ubuntu:22.04`、`debian:12`（x64）和 `debian:13`（arm64）容器里装 `.deb`，在 `fedora:41` 容器里装 `.rpm`（`rpm -V`、
+  `rpm -q --requires`），都以 root、没有 systemd 运行。每项检查失败都输出一条写明检查名的 `::error::`。
+- runner 上做不到的：没有本机活动会话就没有属主，所以不跑真正的 TUN；没有 GNOME/KDE 会话，不测系统代理；
+  没有 polkit 代理，不测接管；runner 没有 IPv6 出口。这些在真机上按 [maintenance.md](../../docs/maintenance.md)
+  的 Linux 清单检查。
+- `tests/test_linux_smoke.py` 用替身命令（apt-get、dpkg、dnf、rpm、systemctl、journalctl、ip、pkaction 和一个假的界面）
+  把 `smoke-test.sh` 的三种模式走一遍，并确认失败的检查写出自己的名字。

@@ -32,12 +32,22 @@ WORKFLOW = ci.ROOT / ".github/workflows/ci.yml"
                 "installer-ui",
                 "windows-installer",
                 "windows-arm64-upgrade",
+                "linux-package",
+                "linux-install",
             },
         ),
         (["docs/examples/mihomo-fork/naive-http2.yaml"], {"go"}),
         (
             ["src/openweir/models/library/core.py"],
-            {"python", "e2e", "apple", "windows-installer", "windows-arm64-upgrade"},
+            {
+                "python",
+                "e2e",
+                "apple",
+                "windows-installer",
+                "windows-arm64-upgrade",
+                "linux-package",
+                "linux-install",
+            },
         ),
         (
             ["src/openweir/ui/fonts/inter/Inter-Regular.ttf"],
@@ -48,12 +58,30 @@ WORKFLOW = ci.ROOT / ".github/workflows/ci.yml"
                 "installer-ui",
                 "windows-installer",
                 "windows-arm64-upgrade",
+                "linux-package",
+                "linux-install",
             },
         ),
         (
             ["src/core/internal/engine/engine.go"],
-            {"go", "e2e", "apple", "windows-installer", "windows-arm64-upgrade", "tun"},
+            {
+                "go",
+                "e2e",
+                "apple",
+                "windows-installer",
+                "windows-arm64-upgrade",
+                "linux-package",
+                "linux-install",
+                "tun",
+            },
         ),
+        # A Linux file builds on Linux alone: the development service of e2e, the TUN tests and
+        # the packages.
+        (
+            ["src/core/internal/tunclean/tunclean_linux.go"],
+            {"go", "e2e", "tun", "linux-package", "linux-install"},
+        ),
+        (["src/core/internal/tunclean/tunclean_linux_test.go"], {"go"}),
         (["src/core/internal/engine/engine_test.go"], {"go", "tun"}),
         (["src/core/internal/engine/main_test.go"], {"go", "tun"}),
         (["src/core/internal/engine/tun_fd_linux_test.go"], {"go", "tun"}),
@@ -71,7 +99,35 @@ WORKFLOW = ci.ROOT / ".github/workflows/ci.yml"
         ),
         (
             ["package/licenses/NOTICE.md"],
-            {"python", "apple", "installer-ui", "windows-installer", "windows-arm64-upgrade"},
+            {
+                "python",
+                "apple",
+                "installer-ui",
+                "windows-installer",
+                "windows-arm64-upgrade",
+                "linux-package",
+                "linux-install",
+            },
+        ),
+        (["package/linux/openweir.service"], {"python", "linux-package", "linux-install"}),
+        (["package/linux/scripts/postinstall.sh"], {"python", "linux-package", "linux-install"}),
+        (["scripts/build_linux.py"], {"python", "linux-package", "linux-install"}),
+        (["tests/test_build_linux.py"], {"python", "linux-package", "linux-install"}),
+        (
+            ["package/icons/hicolor/48x48/apps/org.openweir.app.png"],
+            {"python", "linux-package", "linux-install"},
+        ),
+        # The Linux build takes the service's build tags and the GEO data's place from it.
+        (
+            ["scripts/build_windows.py"],
+            {
+                "python",
+                "installer-ui",
+                "windows-installer",
+                "windows-arm64-upgrade",
+                "linux-package",
+                "linux-install",
+            },
         ),
         (
             ["scripts/fetch_geodata.py"],
@@ -82,6 +138,8 @@ WORKFLOW = ci.ROOT / ".github/workflows/ci.yml"
                 "installer-ui",
                 "windows-installer",
                 "windows-arm64-upgrade",
+                "linux-package",
+                "linux-install",
             },
         ),
         (["scripts/gen_i18n.py"], {"python"}),
@@ -96,11 +154,18 @@ def test_selects_consumers_without_unrelated_jobs(paths: list[str], expected: se
 @pytest.mark.parametrize(
     ("paths", "added"),
     [
-        (["apple/Manager/Deadline.swift"], {"windows-installer", "windows-arm64-upgrade"}),
-        (["package/windows/installer.nsi"], {"apple"}),
+        (
+            ["apple/Manager/Deadline.swift"],
+            {"windows-installer", "windows-arm64-upgrade", "linux-package", "linux-install"},
+        ),
+        (["package/windows/installer.nsi"], {"apple", "linux-package", "linux-install"}),
         (
             ["src/core/internal/peer/credentials_darwin.go"],
-            {"windows-installer", "windows-arm64-upgrade"},
+            {"windows-installer", "windows-arm64-upgrade", "linux-package", "linux-install"},
+        ),
+        (
+            ["package/linux/nfpm.yaml"],
+            {"apple", "windows-installer", "windows-arm64-upgrade"},
         ),
     ],
 )
@@ -272,6 +337,7 @@ def test_workflow_wires_every_job_and_preserves_a_full_run_entry() -> None:
         assert "changes" in ([needs] if isinstance(needs, str) else needs)
         assert jobs[name]["if"] == f"contains(fromJSON(needs.changes.outputs.jobs), '{name}')"
     assert "windows-installer" in jobs["windows-arm64-upgrade"]["needs"]
+    assert "linux-package" in jobs["linux-install"]["needs"]
 
 
 @pytest.mark.parametrize(
