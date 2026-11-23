@@ -188,6 +188,7 @@ uv run python scripts/gen_screenshots.py
 | [分流设计](routing.md) | 规则模型、配置拼装与方案格式 |
 | [链式出口设计](exits.md) | WARP、VPN Gate 与 Tor 预留设计 |
 | [组网设计](mesh.md) | Tailscale、ZeroTier、EasyTier 的接入与生命周期 |
+| [服务商账户设计](accounts.md) | 登录服务商、订阅变成配置、账户页与只读的账单 |
 | [发布与更新](release.md) | 安装包、更新校验、诊断和许可证生成 |
 | [macOS 原生开发](../apple/README.md) | 管理库、系统扩展、签名、公证与 iCloud |
 | [视觉规范](../DESIGN.md) | 视觉 token、交互和文案规则 |
