@@ -110,10 +110,15 @@ class ViewModels:
 
     def open_link(self, link: str) -> None:
         """An install link arrived (docs/release.md §7): show the window and the import form
-        with its subscription filled in; the user imports from there."""
+        with its subscription filled in; the user imports from there. A provider's sign-in
+        link (docs/accounts.md §2) opens the sign-in dialog with its address filled in, over
+        the page that shows; the user signs in from there."""
         self.desktop.showWindow()
-        self.shell.setPage("profiles")
         parsed = links.parse(link)
+        if isinstance(parsed, links.ProviderLink):
+            self.provider_sign_in.open(parsed.origin)
+            return
+        self.shell.setPage("profiles")
         if parsed is None:
             self.profiles.rejectLink()
         else:

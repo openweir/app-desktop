@@ -1,10 +1,15 @@
-"""Install links: a provider's 一键导入 button (docs/release.md §7, decision D6).
+"""Install links: a provider's 一键导入 button (docs/release.md §7, decision D6), and an
+OpenWeir provider's sign-in link (docs/accounts.md §2, D55).
 
 ``openweir://install-config?url=<subscription>&name=<name>``, or the same with the schemes
 other clients take: the Clash clients' common ``clash:``, and (D45) ``mihomo:`` (Clash Party)
 and ``clashmeta:`` (Clash Meta for Android, FlClash, Remnawave's subscription page), fills in
 the import form; the user imports from there. Any web page can open such a link, so it never
 imports by itself.
+
+``openweir://provider?url=<origin>``, from an OpenWeir provider's user center, opens the sign-in
+dialog with the provider's address filled in. It takes OpenWeir's own scheme only, and an https
+origin only (no path, query or user name); like an install link it signs in to nothing itself.
 
 A link arrives as a command-line argument on Windows (the installer registers the scheme),
 as an Apple Event on macOS, which Qt turns into a QFileOpenEvent on the application, or
@@ -22,11 +27,15 @@ from PySide6.QtCore import QCoreApplication, QEvent, QObject, Signal
 from PySide6.QtGui import QFileOpenEvent
 
 from openweir.models.profiles import ProfileError
+from openweir.models.provider.api import origin as provider_origin
 from openweir.models.subscription import check_url
 from openweir.product import URL_SCHEMES
 
 SCHEMES = URL_SCHEMES  # product.json; registered by the packaging
+# OpenWeir's own scheme: the other clients' schemes carry install links only.
+OWN_SCHEME = SCHEMES[0]
 ACTION = "install-config"
+PROVIDER_ACTION = "provider"
 MAX_NAME = 100
 MAX_LINK = 8192  # longer is no subscription link
 
@@ -37,18 +46,29 @@ class InstallLink:
     name: str  # may be empty
 
 
+@dataclass(frozen=True)
+class ProviderLink:
+    origin: str  # https://host[:port], as api.origin writes it
+
+
 def is_link(text: str) -> bool:
     """Whether ``text`` uses one of the schemes; whether it is a valid one is ``parse``'s."""
     scheme, separator, _ = text.partition(":")
     return bool(separator) and scheme.lower() in SCHEMES
 
 
-def parse(text: str) -> InstallLink | None:
-    """The subscription a link names; None for anything else."""
+def parse(text: str) -> InstallLink | ProviderLink | None:
+    """The subscription an install link names, or the provider a sign-in link names; None for
+    anything else."""
     if len(text) > MAX_LINK or not is_link(text):
         return None
     parts = urlsplit(text.strip())
-    if parts.netloc.lower() != ACTION or parts.path not in ("", "/"):
+    if parts.path not in ("", "/"):
+        return None
+    action = parts.netloc.lower()
+    if action == PROVIDER_ACTION and parts.scheme.lower() == OWN_SCHEME:
+        return _provider(parts.query)
+    if action != ACTION:
         return None
     query = parse_qs(parts.query)
     urls = query.get("url") or []
@@ -60,6 +80,25 @@ def parse(text: str) -> InstallLink | None:
         return None
     name = "".join(c for c in (query.get("name") or [""])[0] if unicodedata.category(c)[0] != "C")
     return InstallLink(url, name.strip()[:MAX_NAME].strip())
+
+
+def _provider(query: str) -> ProviderLink | None:
+    """The provider of ``openweir://provider?url=<origin>``: an https origin and nothing more,
+    so the link cannot lead the dialog anywhere but the provider's own address."""
+    urls = parse_qs(query).get("url") or []
+    if len(urls) != 1:
+        return None
+    url = urls[0].strip()
+    parts = urlsplit(url)
+    if parts.scheme.lower() != "https" or parts.path not in ("", "/"):
+        return None
+    if parts.query or parts.fragment or "?" in url or "#" in url:
+        return None
+    try:
+        origin = provider_origin(url)
+    except ProfileError:  # ProviderError: no host, a user name, a bad port
+        return None
+    return ProviderLink(origin)
 
 
 def from_arguments(arguments: Sequence[str]) -> str | None:

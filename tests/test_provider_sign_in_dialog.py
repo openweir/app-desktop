@@ -9,6 +9,7 @@ import asyncio
 import threading
 from collections.abc import Iterator
 from typing import Any
+from urllib.parse import quote
 
 import pytest
 from PySide6.QtCore import QObject, Qt, QUrl
@@ -243,6 +244,25 @@ def test_esc_cancels_even_while_waiting(
     assert not vm.property("active")
     assert vm.property("step") == "address"
     assert not box.property("visible")
+    assert loaded.warnings == []
+
+
+@pytest.mark.usefixtures("screen_reader")
+def test_a_provider_link_opens_the_dialog_on_continue(
+    qtbot: QtBot, provider: FakeProvider, loaded: Loaded
+) -> None:
+    url = quote("https://example.com", safe="")
+    loaded.view_models.open_link(f"openweir://provider?url={url}")
+    box = opened(qtbot, loaded)
+    assert loaded.view_models.provider_sign_in.property("address") == "https://example.com"
+    field = next(i for i in shown(loaded, lambda i: kind(i) == "AppTextField"))
+    assert field.property("text") == "https://example.com"
+    focused = loaded.focused()
+    assert focused.property("text") == "继续"
+    assert loaded.focus_ring(focused) is None  # focused as the dialog opened
+    assert box.property("width") == 400
+    assert provider.requests == []  # nothing signs in by itself
+    loaded.key(qtbot, Qt.Key.Key_Escape)
     assert loaded.warnings == []
 
 

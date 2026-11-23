@@ -1,5 +1,6 @@
 """Install links (docs/release.md §7): parsing every scheme, the ways a link arrives, and the
-import form it fills in."""
+import form it fills in; and a provider's sign-in link (docs/accounts.md §2), which opens the
+sign-in dialog with its address."""
 
 from __future__ import annotations
 
@@ -20,6 +21,7 @@ from openweir.desktop.links import (
     SCHEMES,
     InstallLink,
     LinkReceiver,
+    ProviderLink,
     from_arguments,
     is_link,
     parse,
@@ -83,10 +85,61 @@ def test_parse_refuses(link: str) -> None:
     assert parse(link) is None
 
 
+@pytest.mark.parametrize(
+    ("link", "origin"),
+    [
+        ("openweir://provider?url=https%3A%2F%2Fexample.com", "https://example.com"),
+        ("openweir://provider?url=https%3A%2F%2Fexample.com%2F", "https://example.com"),
+        ("openweir://provider/?url=https://example.com", "https://example.com"),
+        ("OpenWeir://Provider?url=HTTPS%3A%2F%2FPanel.Example.COM", "https://panel.example.com"),
+        ("openweir://provider?url=https%3A%2F%2Fexample.com%3A8443", "https://example.com:8443"),
+        ("openweir://provider?url=https%3A%2F%2Fexample.com%3A443", "https://example.com"),
+        ("openweir://provider?url=%20https%3A%2F%2Fexample.com%20", "https://example.com"),
+        (
+            "openweir://provider?url=https%3A%2F%2F%E4%BE%8B%E5%AD%90.%E6%B5%8B%E8%AF%95",
+            "https://xn--fsqu00a.xn--0zwm56d",
+        ),
+        ("openweir://provider?url=https%3A%2F%2Fexample.com&utm_source=x", "https://example.com"),
+    ],
+)
+def test_a_provider_link_names_an_https_origin(link: str, origin: str) -> None:
+    assert is_link(link)
+    assert parse(link) == ProviderLink(origin)
+
+
+@pytest.mark.parametrize(
+    "link",
+    [
+        "openweir://provider?url=http%3A%2F%2Fexample.com",  # https only
+        "openweir://provider?url=http%3A%2F%2F127.0.0.1%3A8080",  # loopback too
+        "openweir://provider?url=example.com",  # no scheme
+        "openweir://provider?url=https%3A%2F%2Fexample.com%2Flogin",  # a path
+        "openweir://provider?url=https%3A%2F%2Fexample.com%2F%3Fnext%3D1",  # a query
+        "openweir://provider?url=https%3A%2F%2Fexample.com%23top",  # a fragment
+        "openweir://provider?url=https%3A%2F%2Fexample.com%3F",
+        "openweir://provider?url=https%3A%2F%2Fuser%40example.com",  # a user name
+        "openweir://provider?url=https%3A%2F%2Fexample.com%3A0",  # a bad port
+        "openweir://provider?url=https%3A%2F%2F",  # no host
+        "openweir://provider?url=javascript%3Aalert(1)",
+        "openweir://provider?url=https%3A%2F%2Fa.com&url=https%3A%2F%2Fb.com",  # two
+        "openweir://provider",
+        "openweir://provider?name=x",
+        "openweir://provider/more?url=https%3A%2F%2Fexample.com",
+        # The other clients' schemes carry install links only.
+        "clash://provider?url=https%3A%2F%2Fexample.com",
+        "mihomo://provider?url=https%3A%2F%2Fexample.com",
+        "clashmeta://provider?url=https%3A%2F%2Fexample.com",
+        f"openweir://provider?url=https%3A%2F%2F{'x' * 9000}.com",  # too long
+    ],
+)
+def test_a_provider_link_refuses_anything_but_an_https_origin(link: str) -> None:
+    assert parse(link) is None
+
+
 def test_unencoded_ampersands_cut_the_link() -> None:
     # As in other clients: the provider must encode the subscription link.
     parsed = parse(f"clash://install-config?url={SUBSCRIPTION}")
-    assert parsed is not None
+    assert isinstance(parsed, InstallLink)
     assert parsed.url == "https://sub.example.com/api/v1/client/subscribe?token=abc"
 
 
@@ -211,6 +264,37 @@ def test_a_link_fills_in_the_import_form(qtbot: QtBot, built: ViewModels, scheme
     assert built.profiles.property("prefillUrl") == SUBSCRIPTION
     assert built.profiles.property("prefillName") == "机场"
     assert not built.profiles.property("hasError")
+
+
+def test_a_provider_link_opens_the_sign_in_dialog_filled_in(
+    qtbot: QtBot, built: ViewModels
+) -> None:
+    shown: list[bool] = []
+    built.desktop.showWindowRequested.connect(lambda: shown.append(True))
+    sign_in = built.provider_sign_in
+    page = built.shell.currentPage
+    with qtbot.waitSignal(sign_in.openRequested):
+        built.open_link("openweir://provider?url=https%3A%2F%2Fexample.com%2F")
+    assert shown == [True]
+    assert sign_in.property("active")
+    assert sign_in.property("step") == "address"
+    assert sign_in.property("address") == "https://example.com"
+    # Over the page that shows; the import form stays as it was.
+    assert built.shell.currentPage == page
+    assert built.profiles.property("prefillUrl") == ""
+    assert not built.profiles.property("hasError")
+
+    # A second link while the dialog waits on its address takes that one.
+    built.open_link("openweir://provider?url=https%3A%2F%2Fother.example.com")
+    assert sign_in.property("address") == "https://other.example.com"
+    sign_in.cancel()
+
+
+def test_a_provider_link_that_is_no_https_origin_says_so(qtbot: QtBot, built: ViewModels) -> None:
+    built.open_link("openweir://provider?url=http%3A%2F%2Fexample.com")
+    assert not built.provider_sign_in.property("active")
+    assert built.shell.currentPage == "profiles"
+    assert built.profiles.property("summary") == "无法识别的导入链接"
 
 
 def test_an_unknown_link_says_so(qtbot: QtBot, built: ViewModels) -> None:
