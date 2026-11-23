@@ -123,8 +123,9 @@ ScrollView {
                             }
                         }
 
-                        // Only the Windows service sets the system proxy; the macOS extension's
-                        // TUN takes all the traffic.
+                        // The Windows and Linux services set the system proxy, the Linux one
+                        // on GNOME and KDE only (D63); the macOS extension's TUN takes all the
+                        // traffic.
                         GroupRow {
                             visible: page.overview.takeover !== "tun"
                             verticalPadding: Theme.space2
@@ -157,13 +158,23 @@ ScrollView {
                                     color: Theme.textMuted
                                     wrapMode: Text.Wrap
                                 }
+
+                                AccessibleText {
+                                    Layout.fillWidth: true
+                                    visible: page.overview.takeover === "settings" && text !== ""
+                                    text: page.settings.systemProxyNote
+                                    role: Theme.type.caption
+                                    color: Theme.textMuted
+                                    wrapMode: Text.Wrap
+                                }
                             }
 
                             AppSwitch {
                                 visible: page.overview.takeover === "settings"
                                 value: page.overview.systemProxyEnabled
-                                enabled: !page.overview.busy
+                                enabled: !page.overview.busy && page.settings.systemProxyAvailable
                                 Accessible.name: qsTr("系统代理")
+                                Accessible.description: page.settings.systemProxyNote
                                 onRequested: on => page.overview.setSystemProxy(on)
                             }
 
@@ -705,11 +716,10 @@ ScrollView {
 
                                 AccessibleText {
                                     Layout.fillWidth: true
-                                    text: page.settings.closeAction === "quit"
-                                        ? qsTr("先断开连接，再退出")
-                                        : qsTr("隧道继续运行")
+                                    text: page.settings.closeActionDetail
                                     role: Theme.type.caption
                                     color: Theme.textMuted
+                                    wrapMode: Text.Wrap
                                 }
                             }
 

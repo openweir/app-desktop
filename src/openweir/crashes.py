@@ -350,7 +350,9 @@ def collect(
     return Inventory(tuple(selected), tuple(unavailable))
 
 
-def default_sources(directory: Path) -> list[tuple[Path, str]]:
+def default_sources(
+    directory: Path, *, linux_state: Path = Path(product.LINUX_STATE_DIR)
+) -> list[tuple[Path, str]]:
     sources = [(directory, "ui")]
     if sys.platform == "darwin":
         # The root extension's container and system-wide reports are intentionally not
@@ -366,6 +368,12 @@ def default_sources(directory: Path) -> list[tuple[Path, str]]:
         if sid:
             root = Path(os.environ.get("PROGRAMDATA", r"C:\ProgramData")) / "OpenWeir"
             sources.append((root / "users" / sid / "crashes", "service"))
+    elif sys.platform == "linux":
+        # The root service writes its crash logs into this user's home while they own it,
+        # 0750 and 0640 with an ACL that lets them read (crashlog.go, D66); it is not there
+        # for a user who never owned the tunnel.
+        home = linux_state / "users" / str(os.getuid())
+        sources.append((home / "crashes", "service"))
     return sources
 
 

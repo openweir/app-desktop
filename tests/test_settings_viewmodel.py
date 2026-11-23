@@ -8,7 +8,13 @@ from PySide6.QtCore import QObject
 from pytestqt.qtbot import QtBot
 
 from openweir.desktop.login import LoginItemError, LoginItemStatus
-from openweir.host.base import RunOptions
+from openweir.host.base import (
+    UNSUPPORTED_DESKTOP,
+    CompositionReport,
+    HostError,
+    RunOptions,
+    TunnelConfig,
+)
 from openweir.models.settings import DatabaseSettingsStore, Settings
 from openweir.models.store import ProfileStore, open_database
 from openweir.viewmodels import settings as settings_view_model
@@ -18,6 +24,8 @@ from tests.support.simulated import SimulatedFetcher, SimulatedHost, seed_profil
 from tests.support.storage import refuse_writes
 
 NOW = datetime(2026, 10, 29, 12).timestamp()
+# The Linux service on a desktop other than GNOME and KDE (D63).
+NO_SYSTEM_PROXY = "这个桌面不支持系统代理，仅 GNOME 和 KDE 可用"  # noqa: RUF001
 
 
 def prop(view_model: QObject, name: str) -> Any:
@@ -331,3 +339,118 @@ def test_include_all_networks_is_only_on_macos(
     assert not store.current.include_all_networks
     store.update(include_all_networks=True)  # e.g. stored on a Mac
     assert all(options_enabled(settings).values())
+
+
+def test_a_desktop_without_a_system_proxy_turns_the_row_off(
+    qtbot: QtBot, view_models: ViewModels, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The Linux service sets GNOME's and KDE's proxy settings only, and says so (D63)."""
+    settings, overview = view_models.settings, view_models.overview
+    store, host = view_models.settings_store, view_models.host
+    assert isinstance(host, SimulatedHost)
+    qtbot.waitUntil(lambda: prop(overview, "connected"))
+    assert prop(settings, "systemProxyAvailable")
+    assert prop(settings, "systemProxyNote") == ""
+    overview.setSystemProxy(False)
+    qtbot.waitUntil(lambda: not prop(overview, "busy"))
+    assert not store.current.system_proxy
+
+    async def unsupported(enabled: bool) -> None:
+        message = f"read the owner's proxy settings: {UNSUPPORTED_DESKTOP}"
+        raise HostError("system_proxy_unavailable", message)
+
+    monkeypatch.setattr(host, "set_system_proxy", unsupported)
+    overview.setSystemProxy(True)
+    qtbot.waitUntil(lambda: not prop(settings, "systemProxyAvailable"))
+    assert prop(settings, "systemProxyNote") == "仅 GNOME 和 KDE 支持系统代理"
+    qtbot.waitUntil(lambda: prop(overview, "switchError") == NO_SYSTEM_PROXY)
+    # Connecting no longer asks for it.
+    assert not store.current.system_proxy
+    assert not prop(overview, "systemProxyEnabled")
+
+
+def test_connecting_on_such_a_desktop_turns_the_row_off(
+    qtbot: QtBot, view_models: ViewModels, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    settings, overview = view_models.settings, view_models.overview
+    store, host = view_models.settings_store, view_models.host
+    assert isinstance(host, SimulatedHost)
+    qtbot.waitUntil(lambda: prop(overview, "connected"))
+    overview.setConnected(False)
+    qtbot.waitUntil(lambda: not prop(overview, "connected") and not prop(overview, "busy"))
+    start = host.start
+
+    async def started_without(config: TunnelConfig) -> CompositionReport | None:
+        await start(config)
+        message = f"set the owner's system proxy: {UNSUPPORTED_DESKTOP}; only GNOME's and KDE's"
+        raise HostError("started_without_system_proxy", message, retryable=True)
+
+    monkeypatch.setattr(host, "start", started_without)
+    store.update(system_proxy=True)
+    overview.setConnected(True)
+    qtbot.waitUntil(lambda: not prop(settings, "systemProxyAvailable"))
+    assert not store.current.system_proxy
+    expected = f"已连接，但{NO_SYSTEM_PROXY}"  # noqa: RUF001
+    qtbot.waitUntil(lambda: prop(overview, "connectionDetail") == expected)
+
+
+def test_other_system_proxy_failures_keep_the_row(
+    qtbot: QtBot, view_models: ViewModels, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    settings, overview = view_models.settings, view_models.overview
+    host = view_models.host
+    assert isinstance(host, SimulatedHost)
+    qtbot.waitUntil(lambda: prop(overview, "connected"))
+
+    async def denied(enabled: bool) -> None:
+        raise HostError("system_proxy_failed", "set the owner's system proxy: Access is denied.")
+
+    monkeypatch.setattr(host, "set_system_proxy", denied)
+    overview.setSystemProxy(False)
+    qtbot.waitUntil(lambda: prop(overview, "switchError") == "无法更改系统代理")
+    assert prop(settings, "systemProxyAvailable")
+
+
+@pytest.mark.parametrize("tray", [True, False])
+def test_closing_without_a_tray_quits(qtbot: QtBot, tmp_path: Path, tray: bool) -> None:
+    """A Linux desktop without a StatusNotifier host has no tray to stay in (D65)."""
+    built = compose(
+        SimulatedHost(), ProfileStore(tmp_path), SimulatedFetcher(), tray_available=tray
+    )
+    try:
+        settings, store = built.settings, built.settings_store
+        assert store.current.close_action == "tray"  # the default
+        options = {o["value"]: o for o in prop(settings, "closeActionOptions")}
+        if tray:
+            assert prop(settings, "closeAction") == "tray"
+            assert prop(settings, "closeActionDetail") == "隧道继续运行"
+            assert options["tray"].get("enabled", True)
+            settings.setCloseAction("quit")
+            assert prop(settings, "closeActionDetail") == "先断开连接，再退出"  # noqa: RUF001
+            assert store.current.close_action == "quit"
+        else:
+            assert prop(settings, "closeAction") == "quit"
+            assert prop(settings, "closeActionDetail") == "没有托盘：先断开连接，再退出"  # noqa: RUF001
+            assert options["tray"]["enabled"] is False
+            assert "AppIndicator" in options["tray"]["note"]
+            settings.setCloseAction("quit")
+            settings.setCloseAction("tray")  # disabled
+            assert store.current.close_action == "quit"
+            assert prop(settings, "closeAction") == "quit"
+    finally:
+        built.shutdown()
+
+
+@pytest.mark.parametrize(("connects", "detail"), [(True, "登录时打开并自动连接"), (False, "")])
+def test_what_opening_at_login_does(
+    qtbot: QtBot,
+    view_models: ViewModels,
+    monkeypatch: pytest.MonkeyPatch,
+    connects: bool,
+    detail: str,
+) -> None:
+    """Windows and Linux connect once opened at login (OverviewViewModel); macOS does not."""
+    monkeypatch.setattr(settings_view_model, "CONNECTS_AT_LOGIN", connects)
+    settings = view_models.settings
+    qtbot.waitUntil(lambda: prop(settings, "launchAtLoginAvailable"))
+    assert prop(settings, "launchAtLoginDetail") == detail

@@ -3,10 +3,12 @@ provider accounts' sessions (docs/accounts.md §4.1)."""
 
 import json
 import logging
+import sys
 
 import pytest
 
 from openweir.host.base import WarpAccount
+from openweir.models import credentials
 from openweir.models.credentials import (
     SERVICE,
     WARP_ACCOUNT,
@@ -16,7 +18,12 @@ from openweir.models.credentials import (
     ProviderTokens,
     WarpAccounts,
 )
-from tests.support.credentials import MemoryCredentials, MemoryKeyring, MemoryProviderTokens
+from tests.support.credentials import (
+    SYSTEM_KEYRING,
+    MemoryCredentials,
+    MemoryKeyring,
+    MemoryProviderTokens,
+)
 
 ACCOUNT = WarpAccount(
     device_id="a1b2c3d4-0000-4000-8000-000000000000",
@@ -181,3 +188,127 @@ def test_a_locked_system_keyring_is_unavailable(keyring: MemoryKeyring) -> None:
         tokens.load("p1")
     assert raised.value.code == "credentials_unavailable"
     assert SESSION.token not in str(raised.value)
+
+
+# -- Linux: the Secret Service ---------------------------------------------------------------
+
+# The real one; tests/conftest.py puts others in its place.
+REAL_SYSTEM_KEYRING = SYSTEM_KEYRING
+
+
+def test_linux_names_the_secret_service(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Not discovered through entry points, which a frozen build may lack."""
+    if sys.platform != "linux":
+        pytest.skip("the Secret Service is Linux's")
+    import keyring
+
+    def discovered() -> None:
+        raise AssertionError("looked for a backend through entry points")
+
+    monkeypatch.setattr(keyring, "get_keyring", discovered)
+    assert isinstance(REAL_SYSTEM_KEYRING(), credentials.GuardedKeyring)
+
+
+def test_no_session_bus_is_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
+    """keyring's own backend lets secretstorage's exception through; it never reaches D-Bus
+    here."""
+    if sys.platform != "linux":
+        pytest.skip("the Secret Service is Linux's")
+    import secretstorage
+    from secretstorage.exceptions import SecretServiceNotAvailableException
+
+    def no_bus() -> None:
+        raise SecretServiceNotAvailableException("DBUS_SESSION_BUS_ADDRESS is unset")
+
+    monkeypatch.setattr(secretstorage, "dbus_init", no_bus)
+    monkeypatch.setattr(credentials, "system_keyring", credentials.secret_service)
+    store = KeyringCredentials()
+    for call in (lambda: store.read("k"), lambda: store.write("k", "secret")):
+        with pytest.raises(CredentialError) as raised:
+            call()
+        assert raised.value.code == "credentials_unavailable"
+        assert "DBUS_SESSION_BUS_ADDRESS" in raised.value.message
+
+
+class FailingBackend:
+    """A Secret Service backend whose every call fails with ``error``."""
+
+    def __init__(self, error: BaseException) -> None:
+        self.error = error
+
+    def get_password(self, service: str, username: str, /) -> str | None:
+        raise self.error
+
+    def set_password(self, service: str, username: str, password: str, /) -> None:
+        raise self.error
+
+    def delete_password(self, service: str, username: str, /) -> None:
+        raise self.error
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        ConnectionResetError("Socket closed at the other end"),  # the bus went away
+        "dbus",  # a D-Bus error answer, such as a daemon that cannot start
+        "locked",  # the user dismissed the prompt to unlock the collection
+    ],
+)
+def test_secret_service_failures_are_unavailable(
+    monkeypatch: pytest.MonkeyPatch, error: BaseException | str
+) -> None:
+    if sys.platform != "linux":
+        pytest.skip("the Secret Service is Linux's")
+    from jeepney.low_level import Endianness, Header, HeaderFields, Message, MessageType
+    from jeepney.wrappers import DBusErrorResponse
+    from keyring.errors import KeyringLocked
+
+    if error == "dbus":
+        fields = {HeaderFields.error_name: "org.freedesktop.DBus.Error.ServiceUnknown"}
+        header = Header(Endianness.little, MessageType.error, 0, 1, 0, 1, fields)
+        error = DBusErrorResponse(Message(header, ("no daemon",)))
+    elif error == "locked":
+        error = KeyringLocked("Failed to unlock the collection!")
+    assert isinstance(error, BaseException)
+    failing = FailingBackend(error)
+    monkeypatch.setattr(
+        credentials, "system_keyring", lambda: credentials.secret_service(lambda: failing)
+    )
+    store = KeyringCredentials()
+    for call in (
+        lambda: store.read("k"),
+        lambda: store.write("k", "hunter2"),
+        lambda: store.delete("k"),
+    ):
+        with pytest.raises(CredentialError) as raised:
+            call()
+        assert raised.value.code == "credentials_unavailable"
+        assert "hunter2" not in raised.value.message
+
+
+def test_a_build_without_secretstorage_is_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
+    if sys.platform != "linux":
+        pytest.skip("the Secret Service is Linux's")
+    monkeypatch.setitem(sys.modules, "secretstorage.exceptions", None)
+    monkeypatch.setattr(credentials, "system_keyring", credentials.secret_service)
+    with pytest.raises(CredentialError) as raised:
+        KeyringCredentials().read("k")
+    assert raised.value.code == "credentials_unavailable"
+    assert "secretstorage" in raised.value.message
+
+
+def test_other_programming_errors_are_not_hidden() -> None:
+    if sys.platform != "linux":
+        pytest.skip("the Secret Service is Linux's")
+    guarded = credentials.secret_service(lambda: FailingBackend(TypeError("a bug")))
+    with pytest.raises(TypeError):
+        guarded.get_password(SERVICE, "k")
+
+
+def test_outside_a_test_the_system_store_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A worker a test left running that reads a credential once the test is over finds no
+    store, rather than the system's: on Linux that may wait forever for an unlock prompt."""
+    monkeypatch.undo()  # as after this test's keyring fixture is gone
+    with pytest.raises(CredentialError) as raised:
+        KeyringCredentials().read("k")
+    assert raised.value.code == "credentials_unavailable"

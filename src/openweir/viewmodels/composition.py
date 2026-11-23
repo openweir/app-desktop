@@ -216,7 +216,12 @@ def compose(
     connections = ConnectionsViewModel(host, runner)
     logs = LogsViewModel(host, runner)
     settings_page = SettingsViewModel(
-        settings_store, library, host, runner, login_item or UnavailableLoginItem()
+        settings_store,
+        library,
+        host,
+        runner,
+        login_item or UnavailableLoginItem(),
+        tray_available=tray_available,
     )
     desktop = DesktopViewModel(
         settings_store,

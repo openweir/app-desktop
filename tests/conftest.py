@@ -18,7 +18,7 @@ from openweir.models.store import ProfileStore
 from openweir.viewmodels.appearance import Appearance
 from openweir.viewmodels.composition import compose
 from tests.support.appearance import SystemColorScheme
-from tests.support.credentials import MemoryKeyring
+from tests.support.credentials import MemoryKeyring, refuse_system_keyring
 from tests.support.i18n import ui_language
 from tests.support.releases import offline_updater
 from tests.support.simulated import (
@@ -34,6 +34,8 @@ collect_ignore = ["e2e"] if sys.platform == "win32" else []
 
 # Qt renders headless in tests; set before PySide6 creates the application.
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+# Between tests too; the keyring fixture puts one in memory for each test.
+credentials.system_keyring = refuse_system_keyring
 
 
 @pytest.fixture(autouse=True)

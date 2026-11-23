@@ -1,5 +1,6 @@
 """Credentials in the system's credential store, not in the database or a backup (decision
-D14): the macOS keychain, the Windows Credential Manager. The first one kept there is the
+D14): the macOS keychain, the Windows Credential Manager, the Secret Service on Linux (GNOME
+Keyring, KWallet, KeePassXC). The first one kept there is the
 WARP exit's account (docs/exits.md §3.2); a new device registers one of its own. The mesh
 networks' secrets follow (docs/mesh.md §10.2), and the provider accounts' sessions
 (docs/accounts.md §4.1).
@@ -13,10 +14,11 @@ from __future__ import annotations
 
 import json
 import sys
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field, fields
 from typing import Protocol
 
-from keyring.backend import KeyringBackend
 from keyring.errors import KeyringError
 
 from openweir.host.base import MESH_SECRETS, WARP_PROTOCOLS, WarpAccount
@@ -55,9 +57,10 @@ class CredentialStore(Protocol):
         ...
 
 
-def system_keyring() -> KeyringBackend:
+def system_keyring() -> Keyring:
     """The platform's own backend, named rather than discovered: keyring looks for backends
-    through package entry points, which a frozen build may not carry."""
+    through package entry points, which a frozen build may not carry. Raises KeyringError
+    when there is none to use."""
     if sys.platform == "darwin":
         from keyring.backends import macOS
 
@@ -66,9 +69,59 @@ def system_keyring() -> KeyringBackend:
         from keyring.backends import Windows
 
         return Windows.WinVaultKeyring()
+    if sys.platform == "linux":
+        return secret_service()
     import keyring
 
     return keyring.get_keyring()
+
+
+class GuardedKeyring:
+    """A backend whose ``failures`` are KeyringError too."""
+
+    def __init__(self, backend: Keyring, failures: tuple[type[BaseException], ...]) -> None:
+        self._backend = backend
+        self._failures = failures
+
+    @contextmanager
+    def _guarded(self) -> Iterator[None]:
+        try:
+            yield
+        except KeyringError:
+            raise
+        except self._failures as error:
+            raise KeyringError(f"the credential store failed: {error}") from error
+
+    def get_password(self, service: str, username: str, /) -> str | None:
+        with self._guarded():
+            return self._backend.get_password(service, username)
+
+    def set_password(self, service: str, username: str, password: str, /) -> None:
+        with self._guarded():
+            self._backend.set_password(service, username, password)
+
+    def delete_password(self, service: str, username: str, /) -> None:
+        with self._guarded():
+            self._backend.delete_password(service, username)
+
+
+if sys.platform == "linux":
+
+    def secret_service(backend: Callable[[], Keyring] | None = None) -> Keyring:
+        """The Secret Service over D-Bus, through keyring's backend for it. That backend
+        raises only some of its failures as KeyringError: without a session bus, or with no
+        daemon to start, secretstorage's own exceptions come through, and D-Bus errors and a
+        closed socket as jeepney's and the system's. Each is KeyringError here, so that
+        KeyringCredentials reports it as credentials_unavailable rather than failing for
+        good. A build that lacks secretstorage has no Secret Service at all."""
+        try:
+            from jeepney.wrappers import DBusErrorResponse
+            from keyring.backends import SecretService
+            from secretstorage.exceptions import SecretStorageException
+        except ImportError as error:
+            raise KeyringError(f"the Secret Service needs {error.name}") from error
+        failures = (SecretStorageException, DBusErrorResponse, OSError)
+        return GuardedKeyring((backend or SecretService.Keyring)(), failures)
 
 
 class KeyringCredentials:

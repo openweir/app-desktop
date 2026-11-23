@@ -1,11 +1,13 @@
 """Open the UI when the user signs in (docs/ui.md §8).
 
 Windows registers a scheduled task with a logon trigger for the current user; macOS
-registers the app as a login item with ``SMAppService.mainAppService``. Both only exist for
-the packaged app: run from source there is no app to register, and registering the Python
-interpreter instead would leave a login item on the developer's machine. So a source run
-gets ``UnavailableLoginItem`` and tests use doubles; the real registration is verified on the
-test machines with the packaged builds.
+registers the app as a login item with ``SMAppService.mainAppService``; Linux writes an XDG
+autostart entry into the user's ``~/.config/autostart``, which GNOME, KDE and the other
+desktops start at sign-in. All only exist for the packaged app: run from source there is no
+app to register, and registering the Python interpreter instead would leave a login item on
+the developer's machine. So a source run gets ``UnavailableLoginItem`` and tests use doubles
+or a scratch directory; the real registration is verified on the test machines with the
+packaged builds.
 
 The methods block (``schtasks`` runs as a child process): call them off the Qt thread.
 """
@@ -19,7 +21,7 @@ import subprocess
 import sys
 import tempfile
 import xml.etree.ElementTree as ET
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -28,7 +30,8 @@ from xml.sax.saxutils import escape
 
 from openweir.desktop.objc import ObjC
 from openweir.models.profiles import ProfileError
-from openweir.product import DISPLAY_NAME
+from openweir.product import DISPLAY_NAME, LINUX_DESKTOP_ID, LINUX_UI_PATH
+from openweir.update.releases import installed_package_format
 
 # Started at login: open in the tray instead of showing the window.
 BACKGROUND_ARG = "--background"
@@ -299,10 +302,104 @@ class ObjCMainAppService:
         return raw.decode("utf-8", "replace") if raw else "SMAppService failed"
 
 
+# -- Linux: an XDG autostart entry ----------------------------------------------------------
+
+AUTOSTART_NAME = f"{LINUX_DESKTOP_ID}.desktop"
+
+
+def autostart_directory(environ: Mapping[str, str] = os.environ) -> Path:
+    """``$XDG_CONFIG_HOME/autostart``; a relative XDG_CONFIG_HOME is to be ignored, as the
+    base directory specification says."""
+    config = environ.get("XDG_CONFIG_HOME", "")
+    base = Path(config) if os.path.isabs(config) else Path.home() / ".config"
+    return base / "autostart"
+
+
+def autostart_entry(executable: str) -> str:
+    """An entry that starts ``executable`` in the tray when the user signs in. TryExec makes
+    desktops skip it once the package is removed; GNOME turns an entry off with
+    X-GNOME-Autostart-enabled=false, KDE and the specification with Hidden=true."""
+    return f"""[Desktop Entry]
+Type=Application
+Name={DISPLAY_NAME}
+Comment=Opens {DISPLAY_NAME} when you sign in.
+Exec={executable} {BACKGROUND_ARG}
+TryExec={executable}
+Icon={LINUX_DESKTOP_ID}
+Terminal=false
+X-GNOME-Autostart-enabled=true
+"""
+
+
+def entry_enabled(text: str) -> bool:
+    """Whether an autostart entry starts anything: the user can turn one off in GNOME
+    Tweaks or KDE's settings without deleting it."""
+    group = ""
+    for raw in text.splitlines():
+        line = raw.strip()
+        if line.startswith("["):
+            group = line
+            continue
+        if group != "[Desktop Entry]" or "=" not in line:
+            continue
+        key, value = (part.strip() for part in line.split("=", 1))
+        if (key, value.lower()) in (("Hidden", "true"), ("X-GNOME-Autostart-enabled", "false")):
+            return False
+    return True
+
+
+class XdgAutostart:
+    available = True
+
+    def __init__(self, directory: Path, executable: str = LINUX_UI_PATH) -> None:
+        """``directory`` is the user's autostart directory (``autostart_directory``)."""
+        self._directory = directory
+        self._executable = executable
+        self.path = directory / AUTOSTART_NAME
+
+    def status(self) -> LoginItemStatus:
+        try:
+            text = self.path.read_text("utf-8", errors="replace")
+        except FileNotFoundError:
+            return LoginItemStatus(enabled=False)
+        except OSError as error:
+            raise LoginItemError(f"cannot read {self.path}: {error.strerror}") from error
+        return LoginItemStatus(enabled=entry_enabled(text))
+
+    def set_enabled(self, enabled: bool) -> LoginItemStatus:
+        try:
+            if enabled:
+                self._write()
+            else:
+                self.path.unlink(missing_ok=True)
+        except OSError as error:
+            raise LoginItemError(f"cannot change {self.path}: {error.strerror}") from error
+        return self.status()
+
+    def _write(self) -> None:
+        """Replace the entry in one step, so that a desktop reading it at sign-in never
+        reads half of it."""
+        self._directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+        fd, temporary = tempfile.mkstemp(prefix=f".{AUTOSTART_NAME}.", dir=self._directory)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as file:
+                file.write(autostart_entry(self._executable))
+            os.replace(temporary, self.path)
+        except BaseException:
+            Path(temporary).unlink(missing_ok=True)
+            raise
+
+    def open_settings(self) -> None:
+        pass
+
+
 def default_login_item() -> LoginItem:
     """The packaged app's login item on this platform; unavailable from source."""
     if PACKAGED and sys.platform == "win32":
         return ScheduledTask(Path(sys.executable), windows_user())
+    # The installed package, which the format marker beside the executable tells (D61).
+    if PACKAGED and sys.platform == "linux" and installed_package_format() is not None:
+        return XdgAutostart(autostart_directory())
     if PACKAGED and sys.platform == "darwin" and ".app/Contents/MacOS/" in sys.executable:
         try:
             return MainAppLoginItem(ObjCMainAppService())
