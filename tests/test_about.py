@@ -22,6 +22,8 @@ from pytestqt.qtbot import QtBot
 
 from openweir import __version__, diagnostics
 from openweir.host.base import HostError, HostInfo, HostStatus, LogEntry
+from openweir.models.credentials import KeyringCredentials, ProviderToken, ProviderTokens
+from openweir.models.provider.store import ProviderStore
 from openweir.models.routing import Plan, PlanRule, RoutingStore
 from openweir.models.settings import Settings
 from openweir.models.store import ProfileStore
@@ -791,6 +793,38 @@ def test_export_diagnostics(qtbot: QtBot, tmp_path: Path) -> None:
         assert secret not in everything, secret
     assert not (tmp_path / "out" / "diag.zip.part").exists()
     built.shutdown()
+
+
+def test_exported_diagnostics_tell_of_provider_accounts(qtbot: QtBot, tmp_path: Path) -> None:
+    """How many providers and whether each is signed in (docs/accounts.md §8), read from
+    the database and the credential store the app uses; never who or where."""
+    store = ProfileStore(tmp_path)
+    seed_profiles(store, NOW)
+    providers = ProviderStore(store.database)
+    signed_in = providers.add("https://panel.example.com", "示例服务商", "user@example.com", "u1")
+    providers.add("https://other.example.com", "另一个服务商", "other@example.com", "u2")
+    ProviderTokens(KeyringCredentials()).save(signed_in.id, ProviderToken("secret-token", "u1"))
+    built = compose(
+        SimulatedHost(), store, SimulatedFetcher(), lambda: NOW, updater=offline_updater(tmp_path)
+    )
+    built.runner.start()
+    try:
+        about = built.about
+        target = tmp_path / "diag.zip"
+        about.exportDiagnostics(target.as_uri())
+        qtbot.waitUntil(lambda: not prop(about, "exporting"), timeout=5000)
+        assert not prop(about, "diagnosticsFailed")
+        files = read_archive(target)
+        settings = json.loads(files["settings.json"])
+        assert settings["accounts"] == {
+            "providers": 2,
+            "states": ["signed_in", "sign_in_required"],
+        }
+        everything = "\n".join(files.values())
+        for secret in ("example.com", "示例服务商", "user@example.com", "u1", "secret-token"):
+            assert secret not in everything, secret
+    finally:
+        built.shutdown()
 
 
 def test_the_core_log_keeps_warnings_and_errors_without_urls() -> None:
