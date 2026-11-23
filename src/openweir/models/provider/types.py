@@ -28,6 +28,7 @@ record`` and so of the database, backups, diagnostics, logs and crash records.
 from __future__ import annotations
 
 import enum
+from collections.abc import Mapping
 from dataclasses import dataclass, field, fields
 from typing import TYPE_CHECKING, Any, Protocol
 
@@ -557,6 +558,12 @@ class AccountSummary:
     synced_at: float | None = None  # the last sync that succeeded, this run; None before one
     error: str = ""  # the code of the last sync's failure; "" once one succeeds
     active: int | None = None  # the remote id whose profile the tunnel uses, if one of these
+    # By remote id, why a profile of this provider keeps its last config: one of KEEPS_CONFIG
+    # but the provider-wide sign-in required and account disabled, which ``state`` tells. It
+    # is what the profile's last update ran into, held until a sync sees its subscription
+    # change, or PROVIDER_SUBSCRIPTION_MISSING for one the last sync did not find. The row
+    # shows the code's text instead of 更新失败.
+    notices: Mapping[int, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -757,9 +764,18 @@ class AccountsService(Protocol):
         Raises its failure; PROVIDER_RATE_LIMITED without a request while a Retry-After runs."""
         ...
 
-    async def sync_all(self) -> Updated:
-        """``sync`` every signed-in provider that is due by the backoff (docs/accounts.md
-        §5.3), for the timers. A provider's failure is recorded, not raised."""
+    async def sync_all(self, *, max_age: float = ...) -> Updated:
+        """``sync`` every signed-in provider that is due (docs/accounts.md §5.3): not synced
+        yet this run, last tried ``max_age`` seconds ago or more (30 minutes by default; 60
+        when a page shows, 0 after a language switch), or watched; one that failed waits out
+        its backoff, and any a Retry-After. A provider's failure is recorded, not raised.
+        ProfileLibrary.profiles.update_due calls it, so the profiles' timer drives it."""
+        ...
+
+    async def watch(self, provider_id: str) -> None:
+        """The user center was just opened in the browser (D58): for the next 10 minutes
+        ``sync_all`` syncs this provider whenever its last try is a minute old, so a call on
+        the window's activation and the profiles' timer pick up what was bought."""
         ...
 
     async def sign_out_removal(self, provider_id: str) -> ProviderRemoval:

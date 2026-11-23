@@ -275,6 +275,7 @@ def test_the_interfaces() -> None:
         "use",
         "sync",
         "sync_all",
+        "watch",
         "sign_out_removal",
         "sign_out",
         "fetch",

@@ -143,9 +143,10 @@ class LibraryCore:
         # None until the first import picks the mode (routing.md §5.1).
         self.state = self.routing_store.state()
         self.plans = self.routing_store.plans()
-        credentials = credentials or KeyringCredentials()
-        self.exits = Exits(self, credentials)
-        self.networks = Networks(self, credentials)
+        # The provider accounts' sessions are kept there too (accounts.py).
+        self.credentials: CredentialStore = credentials or KeyringCredentials()
+        self.exits = Exits(self, self.credentials)
+        self.networks = Networks(self, self.credentials)
 
     def routing(self) -> Routing:
         return Routing(

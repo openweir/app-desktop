@@ -5,6 +5,7 @@ stores, the host, the one lock, and the steps every change goes through) and eac
 responsibility:
 
     profiles   import, update, use and remove profiles, their overrides, restoring a backup
+    accounts   the provider accounts and their subscriptions as profiles (docs/accounts.md)
     plans      the routing mode, the plans, the pool settings, the routing editor's queries
     exits      the WARP account and the VPN Gate list (docs/exits.md)
     networks   the mesh networks added in the app (docs/mesh.md §10)
@@ -20,7 +21,8 @@ from collections.abc import Callable
 
 from openweir.host.base import TunnelHost
 from openweir.models import plans as plan_model
-from openweir.models.credentials import CredentialStore
+from openweir.models.credentials import CredentialStore, ProviderTokens
+from openweir.models.library.accounts import Accounts
 from openweir.models.library.core import LibraryCore, Routing, live_options
 from openweir.models.library.exits import Exits
 from openweir.models.library.networks import Networks
@@ -34,6 +36,8 @@ from openweir.models.library.profiles import (
 )
 from openweir.models.library.tunnel import Tunnel
 from openweir.models.profiles import ProfileList
+from openweir.models.provider.api import HttpProviderApi
+from openweir.models.provider.types import ProviderApi
 from openweir.models.settings import Settings
 from openweir.models.store import ProfileStore
 from openweir.models.subscription import Fetcher
@@ -41,6 +45,7 @@ from openweir.models.subscription import Fetcher
 __all__ = [
     "DEFAULT_AUTO_UPDATE_HOURS",
     "RETRY_AFTER_S",
+    "Accounts",
     "ProfileLibrary",
     "ProfileRules",
     "Removal",
@@ -60,13 +65,24 @@ class ProfileLibrary:
         settings: Callable[[], Settings] = Settings,
         locale: Callable[[], str] = plan_model.ui_locale,
         credentials: CredentialStore | None = None,
+        provider_api: ProviderApi | None = None,
+        provider_tokens: ProviderTokens | None = None,
     ) -> None:
         """``settings`` returns the current settings; it is read on the asyncio thread.
         ``locale`` names the groups the core generates for a plan (routing.md §8.5).
-        ``credentials`` keeps the WARP account and the mesh networks' secrets; the system's
-        store by default."""
+        ``credentials`` keeps the WARP account, the mesh networks' secrets and the provider
+        accounts' sessions; the system's store by default. ``provider_api`` reaches the
+        providers (HTTP by default), and ``provider_tokens`` keeps their sessions, in
+        ``credentials`` by default."""
         self._core = LibraryCore(store, host, clock, settings, locale, credentials)
         self.profiles = Profiles(self._core, fetcher)
+        self.accounts = Accounts(
+            self._core,
+            self.profiles,
+            provider_api or HttpProviderApi(),
+            provider_tokens or ProviderTokens(self._core.credentials),
+        )
+        self.profiles.accounts = self.accounts
         self.plans = Plans(self._core)
         self.exits: Exits = self._core.exits
         self.networks: Networks = self._core.networks

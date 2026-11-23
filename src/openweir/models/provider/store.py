@@ -19,7 +19,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import uuid
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
 
@@ -190,6 +190,15 @@ class ProviderStore:
                     (profile_id, data, now, profile_id, KIND_PROVIDER, subscription.id),
                 ).rowcount
         return written
+
+    def forget_subscriptions(self, profile_ids: Iterable[str]) -> None:
+        """Drop what billing said of these profiles: their subscriptions left the account, so a
+        provider profile without a row is one the last sync did not find (已不在账户中)."""
+        with _stored(), self._database.transaction() as connection:
+            connection.executemany(
+                "DELETE FROM provider_subscriptions WHERE profile_id = ?",
+                [(profile_id,) for profile_id in profile_ids],
+            )
 
 
 @contextmanager
