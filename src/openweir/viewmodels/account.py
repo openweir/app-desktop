@@ -75,14 +75,19 @@ from openweir.models.provider.types import (
 from openweir.viewmodels.common.async_runner import AsyncRunner
 from openweir.viewmodels.common.keyed_list import KeyedListModel
 from openweir.viewmodels.feedback import failure_text
-from openweir.viewmodels.profiles import condition_status, sign_out_text
+from openweir.viewmodels.profiles import sign_out_text
+from openweir.viewmodels.provider_text import (
+    TONE_DANGER,
+    TONE_WARNING,
+    account_status,
+    condition_status,
+    listed,
+    notice_status,
+)
 
 QML_IMPORT_NAME = "OpenWeir"
 QML_IMPORT_MAJOR_VERSION = 1
 
-# The colour a status is written in: "" is the default one (DESIGN.md "服务商的订阅行").
-TONE_WARNING = "warning"
-TONE_DANGER = "danger"
 # What a row of 此账户的订阅 offers after its status.
 ACTION_USE = "use"  # 使用
 ACTION_RENEW = "renew"  # 续费, in the browser: it cannot be used until renewed
@@ -509,15 +514,12 @@ class AccountViewModel(QObject):
     ) -> tuple[str, str]:
         """A subscription's status and its tone: 有效, or what billing says of it
         (docs/accounts.md §5.5), or why its config is kept; 试用 before it."""
-        if summary.notices.get(subscription.id) == PROVIDER_LINK_UNAVAILABLE:
-            text, tone = self.tr("没有订阅链接"), TONE_WARNING
+        notice = summary.notices.get(subscription.id)
+        if notice == PROVIDER_LINK_UNAVAILABLE:
+            status = notice_status(notice)
         else:
             status = condition_status(subscription, now)
-            text = status.text or self.tr("有效")
-            tone = TONE_DANGER if status.danger else TONE_WARNING if status.text else ""
-        if subscription.trial:
-            text = self.tr("试用 · {status}").format(status=text)
-        return text, tone
+        return listed(status, subscription.trial), status.tone
 
     def _expiry(self, subscription: RemoteSubscription) -> str:
         if subscription.expire_at is None:
@@ -1050,9 +1052,9 @@ class AccountViewModel(QObject):
         view.status, view.tone = self._status(summary)
         signed_out = self._signed_out(summary)
         if summary is not None and signed_out:
-            disabled = summary.state == ProviderState.ACCOUNT_DISABLED
-            view.sign_in = self.tr("账户已停用") if disabled else self.tr("需要重新登录")
-            view.sign_in_danger = disabled
+            signed_out_status = account_status(summary.state)
+            view.sign_in = signed_out_status.text
+            view.sign_in_danger = signed_out_status.danger
         current = self._current(summary, now) if summary is not None else None
         if summary is not None and current is not None:
             view.current = current

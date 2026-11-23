@@ -4,7 +4,6 @@ rows like the others, with what the account says of them (docs/accounts.md §7.2
 
 from __future__ import annotations
 
-import math
 import time
 from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, fields
@@ -28,19 +27,9 @@ from openweir.models.profiles import Profile, ProfileList, Usage
 from openweir.models.provider import web
 from openweir.models.provider.sync import blocked, has_config, most_left
 from openweir.models.provider.types import (
-    CONDITION_DISABLED,
-    CONDITION_EXPIRED,
-    CONDITION_EXPIRING,
-    CONDITION_NOT_STARTED,
-    CONDITION_TRAFFIC_LOW,
-    CONDITION_TRAFFIC_USED_UP,
-    CONDITION_UNUSABLE,
     KEEPS_CONFIG,
     PROVIDER_LINK_UNAVAILABLE,
-    PROVIDER_SUBSCRIPTION_DISABLED,
-    PROVIDER_SUBSCRIPTION_EXPIRED,
     PROVIDER_SUBSCRIPTION_MISSING,
-    PROVIDER_SUBSCRIPTION_UNUSABLE,
     AccountSummary,
     ProviderError,
     ProviderRemoval,
@@ -52,6 +41,13 @@ from openweir.models.subscription import web_link
 from openweir.viewmodels.common.async_runner import AsyncRunner
 from openweir.viewmodels.common.keyed_list import KeyedListModel
 from openweir.viewmodels.feedback import failure_text
+from openweir.viewmodels.provider_text import (
+    ProviderStatus,
+    account_status,
+    condition_status,
+    notice_status,
+    trial,
+)
 
 QML_IMPORT_NAME = "OpenWeir"
 QML_IMPORT_MAJOR_VERSION = 1
@@ -147,88 +143,22 @@ def _usage(usage: Usage | None) -> tuple[str, float | None]:
     return fmt.usage(usage.used, usage.total), min(usage.used / usage.total, 1.0)
 
 
-@dataclass(frozen=True)
-class ProviderStatus:
-    """What a provider subscription's row says of it after its caption (DESIGN.md "服务商的
-    订阅行"), and what the overview offers with it."""
-
-    text: str = ""
-    danger: bool = False  # the provider stopped it: danger, not warning
-    renew: bool = False  # it runs out, or ran out: the overview offers 续费
-
-
-def _expires_in(seconds: float) -> str:
-    """「3 天后到期」, in hours on the last day."""
-    if seconds >= 86400:
-        days = math.ceil(seconds / 86400)
-        return QCoreApplication.translate("ProfilesViewModel", "%n 天后到期", None, days)
-    hours = max(1, math.ceil(seconds / 3600))
-    return QCoreApplication.translate("ProfilesViewModel", "%n 小时后到期", None, hours)
-
-
-def condition_status(subscription: RemoteSubscription, now: float) -> ProviderStatus:
-    """The status billing gives (docs/accounts.md §5.5); none while it is active. The
-    account page words its subscriptions with it too."""
-    condition = subscription.condition(now)
-    if condition == CONDITION_EXPIRING:
-        assert subscription.expire_at is not None
-        return ProviderStatus(_expires_in(subscription.expire_at - now), renew=True)
-    if condition == CONDITION_TRAFFIC_LOW:
-        assert subscription.total
-        percent = min(100, subscription.used * 100 // subscription.total)
-        text = QCoreApplication.translate("ProfilesViewModel", "流量已用 {percent}%")
-        return ProviderStatus(text.format(percent=percent))
-    if condition == CONDITION_EXPIRED:
-        return ProviderStatus(_expired(), renew=True)
-    if condition == CONDITION_TRAFFIC_USED_UP:
-        return ProviderStatus(QCoreApplication.translate("ProfilesViewModel", "流量已用完"))
-    if condition == CONDITION_NOT_STARTED:
-        return ProviderStatus(QCoreApplication.translate("ProfilesViewModel", "未开始"))
-    if condition == CONDITION_DISABLED:
-        return ProviderStatus(_stopped(), danger=True)
-    if condition == CONDITION_UNUSABLE:
-        return ProviderStatus(_unusable())
-    return ProviderStatus()
-
-
-def _expired() -> str:
-    return QCoreApplication.translate("ProfilesViewModel", "已到期")
-
-
-def _stopped() -> str:
-    return QCoreApplication.translate("ProfilesViewModel", "已停用")
-
-
-def _unusable() -> str:
-    return QCoreApplication.translate("ProfilesViewModel", "暂不可用")
-
-
 def provider_status(profile: Profile, summary: AccountSummary, now: float) -> ProviderStatus:
     """The one status a provider subscription's row shows: the account's comes first, then
     why its last update kept its config, then what billing says (docs/accounts.md §5.4, §5.5).
     These take the place of 更新失败: keeping the last config is what is meant to happen."""
-    if summary.state == ProviderState.SIGN_IN_REQUIRED:
-        return ProviderStatus(QCoreApplication.translate("ProfilesViewModel", "需要重新登录"))
-    if summary.state == ProviderState.ACCOUNT_DISABLED:
-        text = QCoreApplication.translate("ProfilesViewModel", "账户已停用")
-        return ProviderStatus(text, danger=True)
+    status = account_status(summary.state)
+    if status.text:
+        return status
     notice = summary.notices.get(profile.remote_id or 0, "")
-    if notice == PROVIDER_SUBSCRIPTION_MISSING:
-        return ProviderStatus(QCoreApplication.translate("ProfilesViewModel", "已不在账户中"))
-    if notice == PROVIDER_LINK_UNAVAILABLE:
-        return ProviderStatus(QCoreApplication.translate("ProfilesViewModel", "没有订阅链接"))
+    if notice in (PROVIDER_SUBSCRIPTION_MISSING, PROVIDER_LINK_UNAVAILABLE):
+        return notice_status(notice)
     subscription = _billing(profile, summary)
     status = condition_status(subscription, now) if subscription is not None else ProviderStatus()
     if status.text or not notice:
         return status
     # Billing changed since the update that kept the config; the code still says why.
-    if notice == PROVIDER_SUBSCRIPTION_EXPIRED:
-        return ProviderStatus(_expired(), renew=True)
-    if notice == PROVIDER_SUBSCRIPTION_DISABLED:
-        return ProviderStatus(_stopped(), danger=True)
-    if notice == PROVIDER_SUBSCRIPTION_UNUSABLE:
-        return ProviderStatus(_unusable())
-    return status
+    return notice_status(notice)
 
 
 def _billing(profile: Profile, summary: AccountSummary | None) -> RemoteSubscription | None:
@@ -624,7 +554,7 @@ class ProfilesViewModel(QObject):
             return _source(profile)
         parts = []
         if billing is not None and billing.trial:
-            parts.append(self.tr("试用"))
+            parts.append(trial())
         if summary is None:
             parts.append(self.tr("服务商"))  # until the accounts are read
         else:

@@ -425,18 +425,6 @@
         <translation>{account} · {site}</translation>
     </message>
     <message>
-        <source>没有订阅链接</source>
-        <translation>No subscription link</translation>
-    </message>
-    <message>
-        <source>有效</source>
-        <translation>Active</translation>
-    </message>
-    <message>
-        <source>试用 · {status}</source>
-        <translation>Trial · {status}</translation>
-    </message>
-    <message>
         <source>长期有效</source>
         <translation>Never expires</translation>
     </message>
@@ -569,14 +557,6 @@
     <message>
         <source>已退款</source>
         <translation>Refunded</translation>
-    </message>
-    <message>
-        <source>账户已停用</source>
-        <translation>Account disabled</translation>
-    </message>
-    <message>
-        <source>需要重新登录</source>
-        <translation>Sign in again</translation>
     </message>
     <message>
         <source>{used} · 不限流量</source>
@@ -3472,60 +3452,6 @@ prepend-rules:
             <numerusform>Update every %n hours</numerusform>
         </translation>
     </message>
-    <message numerus="yes">
-        <source>%n 天后到期</source>
-        <translation>
-            <numerusform>Expires in %n day</numerusform>
-            <numerusform>Expires in %n days</numerusform>
-        </translation>
-    </message>
-    <message numerus="yes">
-        <source>%n 小时后到期</source>
-        <translation>
-            <numerusform>Expires in %n hour</numerusform>
-            <numerusform>Expires in %n hours</numerusform>
-        </translation>
-    </message>
-    <message>
-        <source>流量已用 {percent}%</source>
-        <translation>{percent}% of traffic used</translation>
-    </message>
-    <message>
-        <source>流量已用完</source>
-        <translation>Traffic used up</translation>
-    </message>
-    <message>
-        <source>未开始</source>
-        <translation>Not started</translation>
-    </message>
-    <message>
-        <source>已到期</source>
-        <translation>Expired</translation>
-    </message>
-    <message>
-        <source>已停用</source>
-        <translation>Disabled</translation>
-    </message>
-    <message>
-        <source>暂不可用</source>
-        <translation>Unavailable for now</translation>
-    </message>
-    <message>
-        <source>需要重新登录</source>
-        <translation>Sign-in required</translation>
-    </message>
-    <message>
-        <source>账户已停用</source>
-        <translation>Account disabled</translation>
-    </message>
-    <message>
-        <source>已不在账户中</source>
-        <translation>No longer in the account</translation>
-    </message>
-    <message>
-        <source>没有订阅链接</source>
-        <translation>No subscription link</translation>
-    </message>
     <message>
         <source>「{name}」</source>
         <translation>“{name}”</translation>
@@ -3564,10 +3490,6 @@ prepend-rules:
     <message>
         <source>{removed}服务商那边的订阅不受影响。</source>
         <translation>{removed} The subscriptions stay with the provider.</translation>
-    </message>
-    <message>
-        <source>试用</source>
-        <translation>Trial</translation>
     </message>
     <message>
         <source>服务商</source>
@@ -3839,9 +3761,16 @@ prepend-rules:
         <translation>Send code</translation>
     </message>
     <message>
-        <source>试用 · {status}</source>
-        <translation>Trial · {status}</translation>
+        <source>已用 {usage}</source>
+        <translation>{usage} used</translation>
     </message>
+    <message>
+        <source>{date} 到期</source>
+        <translation>Expires {date}</translation>
+    </message>
+</context>
+<context>
+    <name>ProviderText</name>
     <message numerus="yes">
         <source>%n 天后到期</source>
         <translation>
@@ -3849,17 +3778,16 @@ prepend-rules:
             <numerusform>Expires in %n days</numerusform>
         </translation>
     </message>
+    <message numerus="yes">
+        <source>%n 小时后到期</source>
+        <translation>
+            <numerusform>Expires in %n hour</numerusform>
+            <numerusform>Expires in %n hours</numerusform>
+        </translation>
+    </message>
     <message>
         <source>流量已用 {percent}%</source>
         <translation>{percent}% of traffic used</translation>
-    </message>
-    <message>
-        <source>有效</source>
-        <translation>Active</translation>
-    </message>
-    <message>
-        <source>已到期</source>
-        <translation>Expired</translation>
     </message>
     <message>
         <source>流量已用完</source>
@@ -3870,20 +3798,44 @@ prepend-rules:
         <translation>Not started</translation>
     </message>
     <message>
+        <source>已不在账户中</source>
+        <translation>No longer in the account</translation>
+    </message>
+    <message>
+        <source>没有订阅链接</source>
+        <translation>No subscription link</translation>
+    </message>
+    <message>
+        <source>需要重新登录</source>
+        <translation>Sign-in required</translation>
+    </message>
+    <message>
+        <source>账户已停用</source>
+        <translation>Account disabled</translation>
+    </message>
+    <message>
+        <source>有效</source>
+        <translation>Active</translation>
+    </message>
+    <message>
+        <source>试用 · {status}</source>
+        <translation>Trial · {status}</translation>
+    </message>
+    <message>
+        <source>试用</source>
+        <translation>Trial</translation>
+    </message>
+    <message>
+        <source>已到期</source>
+        <translation>Expired</translation>
+    </message>
+    <message>
         <source>已停用</source>
         <translation>Disabled</translation>
     </message>
     <message>
         <source>暂不可用</source>
         <translation>Unavailable</translation>
-    </message>
-    <message>
-        <source>已用 {usage}</source>
-        <translation>{usage} used</translation>
-    </message>
-    <message>
-        <source>{date} 到期</source>
-        <translation>Expires {date}</translation>
     </message>
 </context>
 <context>

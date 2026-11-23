@@ -42,7 +42,8 @@ from openweir.models.store import ProfileStore
 from openweir.viewmodels import profiles as profiles_module
 from openweir.viewmodels.common.async_runner import AsyncRunner
 from openweir.viewmodels.feedback import failure_text
-from openweir.viewmodels.profiles import ProfilesViewModel, ProviderStatus, provider_status
+from openweir.viewmodels.profiles import ProfilesViewModel, provider_status
+from openweir.viewmodels.provider_text import ProviderStatus, listed
 from tests.support.credentials import MemoryProviderTokens
 from tests.support.i18n import ui_language
 from tests.support.provider_server import (
@@ -178,6 +179,21 @@ def test_the_account_comes_before_its_subscriptions(
     expected: ProviderStatus,
 ) -> None:
     assert provider_status(own(), account(billing(), state=state, notices=notices), NOW) == expected
+
+
+def test_one_wording_for_every_list(qapp: QCoreApplication) -> None:
+    """The sign-in dialog's picker and the account page write a status as the subscriptions
+    page does, in one translation context: 有效 for none, after 试用 for a trial, and its
+    colour by what it says."""
+    assert (listed(ProviderStatus(), trial=False), ProviderStatus().tone) == ("有效", "")
+    expiring = provider_status(own(), account(billing(expire_at=NOW + 2.5 * DAY)), NOW)
+    assert (listed(expiring, trial=True), expiring.tone) == ("试用 · 3 天后到期", "warning")
+    stopped = provider_status(own(), account(billing(status=STATUS_DISABLED)), NOW)
+    assert (listed(stopped, trial=False), stopped.tone) == ("已停用", "danger")
+    with ui_language("en"):
+        assert listed(ProviderStatus(), trial=True) == "Trial · Active"
+        signed_out = account(billing(), state=ProviderState.SIGN_IN_REQUIRED)
+        assert provider_status(own(), signed_out, NOW).text == "Sign-in required"
 
 
 # -- the subscriptions page ------------------------------------------------------------------------
