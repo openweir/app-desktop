@@ -1,10 +1,14 @@
 """The window's own title band (DESIGN.md "顶部区域", docs/ui.md §8).
 
-The layout is checked in both platforms' styles on the offscreen platform. The Windows hit test
-runs against a stand-in for user32; only a Windows machine shows what the system does with it.
+The layout is checked in each platform's style on the offscreen platform. The Windows hit test
+runs against a stand-in for user32; only a Windows machine shows what the system does with it,
+and only a Linux desktop how its title bar looks.
 """
 
+import asyncio
 import ctypes
+import os
+from pathlib import Path
 
 import pytest
 from PySide6.QtCore import QCoreApplication, QPoint, QRect, QRectF, Qt
@@ -18,6 +22,7 @@ from openweir.desktop.titlebar import (
     HTCLIENT,
     HTMAXBUTTON,
     HTTOP,
+    LINUX,
     MAC,
     MINIMIZE,
     MSG,
@@ -37,17 +42,20 @@ from openweir.desktop.titlebar import (
     WindowsFrame,
     double_click_action,
     titlebar_style,
+    use_wayland_decoration,
+    wayland_decoration,
     window_flags,
 )
 from openweir.viewmodels import titlebar as titlebar_view_model
 from openweir.viewmodels.titlebar import TitleBar
+from tests.support.simulated import SimulatedHost
 from tests.support.window import Loaded, accessible, find_all, kind
 
 # DESIGN.md's spacing tokens.
 TITLEBAR_HEIGHT = 48
 TITLEBAR_PAGE_TOP = 6
 CAPTION_BUTTON_WIDTH = 46
-SIDEBAR_TOP = {MAC: 36, WINDOWS: 16}
+SIDEBAR_TOP = {MAC: 36, WINDOWS: 16, LINUX: 16}
 HWND = 0x1234
 HTLEFT = 10
 ALT = 1 << 29
@@ -56,6 +64,13 @@ ALT = 1 << 29
 def test_the_style_follows_the_system() -> None:
     assert titlebar_style("darwin") == MAC
     assert titlebar_style("win32") == WINDOWS
+    assert titlebar_style("linux") == LINUX
+
+
+def test_linux_keeps_the_systems_title_bar() -> None:
+    """D64: no hints at all, so the window manager or Qt's decoration plugin draws the title
+    bar and its buttons."""
+    assert window_flags(LINUX) == Qt.WindowType.Window
 
 
 def test_only_windows_customizes_the_title_bar_away() -> None:
@@ -86,6 +101,52 @@ def test_a_double_click_does_what_macos_is_set_to(preference: str | None, action
 def test_off_macos_a_double_click_zooms(qapp: object) -> None:
     assert TitleBar(MAC).doubleClickAction() == ZOOM  # the offscreen platform
     assert TitleBar(WINDOWS).doubleClickAction() == ZOOM
+    assert TitleBar(LINUX).doubleClickAction() == ZOOM
+
+
+@pytest.mark.parametrize(
+    ("desktop", "plugins", "decoration"),
+    [
+        ("GNOME", ["libadwaita.so", "libbradient.so"], "adwaita"),
+        ("ubuntu:GNOME", ["libbradient.so", "libadwaita.so"], "adwaita"),
+        ("pop:GNOME", ["libbradient.so"], "bradient"),  # a Qt without Adwaita's
+        ("GNOME", [], None),
+        ("KDE", ["libadwaita.so", "libbradient.so"], None),  # KWin draws the title bar
+        ("", ["libadwaita.so"], None),
+    ],
+)
+def test_gnome_on_wayland_gets_adwaitas_title_bar(
+    desktop: str, plugins: list[str], decoration: str | None
+) -> None:
+    assert wayland_decoration({"XDG_CURRENT_DESKTOP": desktop}, plugins) == decoration
+
+
+def test_the_users_own_decoration_stays(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    plugins = tmp_path / "plugins" / "wayland-decoration-client"
+    plugins.mkdir(parents=True)
+    (plugins / "libadwaita.so").touch()
+    monkeypatch.setenv("XDG_CURRENT_DESKTOP", "ubuntu:GNOME")
+    monkeypatch.delenv("QT_WAYLAND_DECORATION", raising=False)
+    use_wayland_decoration([str(tmp_path / "missing"), str(tmp_path / "plugins")])
+    assert os.environ["QT_WAYLAND_DECORATION"] == "adwaita"
+
+    monkeypatch.setenv("QT_WAYLAND_DECORATION", "bradient")
+    use_wayland_decoration([str(tmp_path / "plugins")])
+    assert os.environ["QT_WAYLAND_DECORATION"] == "bradient"
+
+
+def test_off_wayland_the_decoration_is_left_alone(
+    qapp: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    named: list[object] = []
+    monkeypatch.setattr(titlebar_view_model, "use_wayland_decoration", named.append)
+    TitleBar(LINUX)  # the offscreen platform
+    assert named == []
+    monkeypatch.setattr(QGuiApplication, "platformName", lambda: "wayland")
+    TitleBar(WINDOWS)
+    assert named == []
+    TitleBar(LINUX)
+    assert len(named) == 1
 
 
 def test_macos_sets_up_the_native_window_qt_creates_again(
@@ -270,7 +331,7 @@ def test_the_filter_answers_for_its_window_only(
 
 
 # -- the band in the window ---------------------------------------------------------------------
-@pytest.fixture(params=[MAC, WINDOWS])
+@pytest.fixture(params=[MAC, WINDOWS, LINUX])
 def style(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> str:
     """The window in this style, whatever system the tests run on. Request it before
     ``loaded``."""
@@ -314,15 +375,19 @@ def test_the_band_lays_out_as_designed(qtbot: QtBot, style: str, loaded: Loaded)
     brand = mark.parentItem()  # the mark, the app's name and what is in use
     assert scene_rect(brand).top() == SIDEBAR_TOP[style]
     assert scene_rect(sidebar).top() == 0
-    if style == WINDOWS:
+    if style != MAC:
         # The app's name is level with the page title, clear of the window's top edge.
         name = brand.childItems()[1].childItems()[0]
         assert scene_rect(name).center().y() == pytest.approx(TITLEBAR_HEIGHT / 2, abs=1)
 
     buttons = caption_buttons(loaded)
-    if style == MAC:
+    if style != WINDOWS:
+        # The system's buttons: the header runs to the page's margin.
         assert buttons == []
         assert header.right() == window.width() - 32
+        assert loaded.item(lambda i: kind(i) == "PageHeader").property("rowWidth") == (
+            header.width()
+        )
         return
     # Windows: three buttons in the top right corner; the header keeps 138 + 8 px clear.
     assert [scene_rect(b) for b in buttons] == [
@@ -335,6 +400,23 @@ def test_the_band_lays_out_as_designed(qtbot: QtBot, style: str, loaded: Loaded)
     assert rule > TITLEBAR_HEIGHT
     bar = loaded.view_models.desktop.title_bar
     assert bar.maximize_area == scene_rect(buttons[1])
+
+
+@pytest.mark.parametrize("style", [LINUX], indirect=True)
+def test_without_a_tray_the_systems_close_button_quits(
+    qtbot: QtBot, style: str, loaded: Loaded
+) -> None:
+    """GNOME without the AppIndicator extension has no tray (D65): closing the window from
+    the system's title bar quits OpenWeir, which disconnects first (D41)."""
+    desktop, overview = loaded.view_models.desktop, loaded.view_models.overview
+    host = loaded.view_models.host
+    assert isinstance(host, SimulatedHost)
+    assert not desktop.property("trayAvailable")
+    assert caption_buttons(loaded) == []
+    qtbot.waitUntil(lambda: overview.property("connected"))
+    with qtbot.waitSignal(desktop.quitRequested):
+        loaded.window.close()  # as the title bar's close button does
+    assert asyncio.run(host.get_status()).state != "running"
 
 
 @pytest.mark.usefixtures("screen_reader")

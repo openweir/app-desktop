@@ -153,6 +153,7 @@ QtObject {
     readonly property int captionButtonWidth: 46  // spacing.caption-button-width
     readonly property int sidebarTopMacos: 36  // spacing.sidebar-top-macos
     readonly property int sidebarTopWindows: 16  // spacing.sidebar-top-windows
+    readonly property int sidebarTopLinux: 16  // spacing.sidebar-top-linux
     readonly property int controlSm: 32  // spacing.control-sm
     readonly property int controlMd: 36  // spacing.control-md
     readonly property int rowSingle: 44  // spacing.row-single
