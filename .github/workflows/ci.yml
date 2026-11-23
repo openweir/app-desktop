@@ -158,16 +158,29 @@ jobs:
       # A mirror that fails is retried, and the whole install twice more.
       - name: Qt system libraries
         if: runner.os == 'Linux'
+        # The runner images usually have them; a mirror that stops answering once held this
+        # step until the job's time ran out, so apt only runs for what is missing, and every
+        # call has a deadline.
+        timeout-minutes: 15
         run: |
           packages=(libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3 libglib2.0-0t64 libx11-6)
+          missing=()
+          for package in "${packages[@]}"; do
+            dpkg-query -W -f='${Status}\n' "$package" 2>/dev/null | grep -qx 'install ok installed' ||
+              missing+=("$package")
+          done
+          if [ "${#missing[@]}" -eq 0 ]; then
+            echo "Qt's system libraries are installed"
+            exit 0
+          fi
+          apt=(sudo timeout 240 apt-get -q -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30)
           for attempt in 1 2 3; do
-            if sudo apt-get -q -o Acquire::Retries=3 update &&
-              sudo apt-get -q -y -o Acquire::Retries=3 install --no-install-recommends "${packages[@]}"; then
+            if "${apt[@]}" update && "${apt[@]}" -y install --no-install-recommends "${missing[@]}"; then
               exit 0
             fi
             if [ "$attempt" -lt 3 ]; then sleep $((attempt * 30)); fi
           done
-          echo "::error::apt-get could not install Qt's system libraries"
+          echo "::error::apt-get could not install Qt's system libraries: ${missing[*]}"
           exit 1
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
         with:
@@ -225,16 +238,29 @@ jobs:
       # As in the python job.
       - name: Qt system libraries
         if: runner.os == 'Linux'
+        # The runner images usually have them; a mirror that stops answering once held this
+        # step until the job's time ran out, so apt only runs for what is missing, and every
+        # call has a deadline.
+        timeout-minutes: 15
         run: |
           packages=(libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3 libglib2.0-0t64 libx11-6)
+          missing=()
+          for package in "${packages[@]}"; do
+            dpkg-query -W -f='${Status}\n' "$package" 2>/dev/null | grep -qx 'install ok installed' ||
+              missing+=("$package")
+          done
+          if [ "${#missing[@]}" -eq 0 ]; then
+            echo "Qt's system libraries are installed"
+            exit 0
+          fi
+          apt=(sudo timeout 240 apt-get -q -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30)
           for attempt in 1 2 3; do
-            if sudo apt-get -q -o Acquire::Retries=3 update &&
-              sudo apt-get -q -y -o Acquire::Retries=3 install --no-install-recommends "${packages[@]}"; then
+            if "${apt[@]}" update && "${apt[@]}" -y install --no-install-recommends "${missing[@]}"; then
               exit 0
             fi
             if [ "$attempt" -lt 3 ]; then sleep $((attempt * 30)); fi
           done
-          echo "::error::apt-get could not install Qt's system libraries"
+          echo "::error::apt-get could not install Qt's system libraries: ${missing[*]}"
           exit 1
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
         with:
