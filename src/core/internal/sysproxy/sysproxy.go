@@ -1,11 +1,19 @@
 // Package sysproxy reads and writes a user's WinINet proxy settings: the system proxy the
 // Windows service points at the core's mixed port for its owner (docs/architecture.md §5.5).
+// On Linux it reads and writes the same settings in the user's desktop, GNOME's and KDE's
+// (D63, sysproxy_linux.go).
 package sysproxy
 
 import (
+	"errors"
 	"net"
 	"strconv"
 )
+
+// ErrUnsupportedDesktop: the user's desktop keeps its proxy settings nowhere the service can
+// set them (Linux has GNOME's and KDE's only, D63), so the system proxy is not available to
+// them.
+var ErrUnsupportedDesktop = errors.New("the desktop keeps no proxy settings OpenWeir can set; only GNOME's and KDE's are supported")
 
 // WinINet's PROXY_TYPE_* bits for Settings.Flags.
 const (
@@ -30,10 +38,11 @@ type Settings struct {
 // that is present: GNOME's org.gnome.system.proxy keys and KDE's kioslaverc [Proxy Settings]
 // entries, each value as the desktop's own tool reads and writes it. Giving them back
 // restores exactly what the user had, which the WinINet fields cannot hold
-// (docs/architecture.md "Linux (in progress)", D63). Not read or written yet.
+// (docs/architecture.md "Linux (in progress)", D63). A nil map is a store the desktop did not
+// have; an empty one a store with none of the keys set, which giving back deletes again.
 type Desktop struct {
-	GNOME map[string]string `json:"gnome,omitempty"`
-	KDE   map[string]string `json:"kde,omitempty"`
+	GNOME map[string]string `json:"gnome"`
+	KDE   map[string]string `json:"kde"`
 }
 
 // Bypass keeps loopback and private addresses off the proxy; "<local>" covers plain host
