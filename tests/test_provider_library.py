@@ -373,17 +373,29 @@ def test_the_link_serves_when_the_app_may_not(scene: Scene) -> None:
     assert scene.store.read_config(scene.own(7).id) == SAMPLE_CONFIG
 
 
-def test_a_link_that_cannot_be_reached_falls_back_to_its_mirrors(scene: Scene) -> None:
+@pytest.fixture
+def mirror(provider: FakeProvider) -> Iterator[FakeProvider]:
+    """A second subscription domain serving the provider's links."""
+    fake = FakeProvider(seed=False)
+    fake.subscriptions, fake.link_tokens = provider.subscriptions, provider.link_tokens
+    fake.config = provider.config
+    provider.mirror = fake.base
+    yield fake
+    fake.close()
+
+
+def test_a_link_that_cannot_be_reached_falls_back_to_its_mirrors(
+    scene: Scene, mirror: FakeProvider
+) -> None:
     scene.provider.access = "link"
-    scene.provider.mirror = scene.provider.base.replace("127.0.0.1", "localhost")
     pid = scene.sign_in().provider.id
     scene.provider.fail("link", 502)
 
     run(lambda: scene.accounts.sync(pid))
 
-    first, second = scene.provider.requests_for("link")
-    assert first.header("host") != second.header("host")
-    assert second.header("host") == scene.provider.mirror.removeprefix("http://")
+    assert scene.requests("link") == 1
+    (served,) = mirror.requests_for("link")
+    assert served.bearer is None
     assert scene.store.read_config(scene.own(7).id) == SAMPLE_CONFIG
 
 
