@@ -7,11 +7,18 @@ import "net"
 // the numeric uid. macOS provider messages carry no identity because the system only
 // hands the tunnel session to this app.
 type Identity struct {
-	UserID    string
+	UserID string
+	// SessionID is the Windows session; on Linux it is the uid again, since the service
+	// follows logind's users rather than their sessions.
 	SessionID uint32
+	// ProcessID is the caller's process on Linux, by which the owner asks logind which
+	// session it runs in; 0 elsewhere.
+	ProcessID uint32
 	// Administrator says the caller runs with an administrator's rights: on Windows its
 	// token has the Administrators group enabled, which UAC leaves out of an administrator's
-	// processes until they confirm an elevation (decision D5b). Unix callers never have it.
+	// processes until they confirm an elevation (decision D5b); on Linux it is the service's
+	// own executable run as root, which pkexec does once an administrator confirmed it (D66).
+	// The development socket's callers never have it.
 	Administrator bool
 }
 
