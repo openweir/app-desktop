@@ -319,6 +319,39 @@ def test_deleting_a_row_focuses_the_one_that_takes_its_place(qtbot: QtBot, loade
     assert loaded.warnings == []
 
 
+def test_moving_a_rule_from_its_menu_keeps_the_focus_on_it(qtbot: QtBot, loaded: Loaded) -> None:
+    """上移 and 下移 reorder the rows in place: the focus follows the rule to its new row
+    (DESIGN.md "可排序列表")."""
+    routing = loaded.view_models.routing
+    show_page(qtbot, loaded, "routing")
+    with qtbot.waitSignal(routing.routingChanged):
+        routing.setMode("plan")
+    rows = routing.plan_rules().property("rows")
+    qtbot.waitUntil(lambda: len(rows.rows) == 6)
+    qtbot.wait(100)
+    first, second = rows.rows[0].name, rows.rows[1].name
+    page = loaded.item(lambda i: kind(i) == "RoutingPage")
+
+    def more(name: str) -> QQuickItem:
+        found = find(page, lambda i: accessible_name(i) == f"「{name}」的更多操作")
+        assert found is not None
+        return found
+
+    top, below = more(first), more(second)
+    open_menu_item(qtbot, loaded, top, "下移")
+    qtbot.waitUntil(lambda: [r.name for r in rows.rows[:2]] == [second, first])
+    qtbot.waitUntil(lambda: accessible_name(loaded.focused()) == f"「{first}」的更多操作")
+    assert loaded.focused() is below  # the second row shows it now
+    assert below.property("visualFocus")
+
+    open_menu_item(qtbot, loaded, below, "上移")
+    qtbot.waitUntil(lambda: [r.name for r in rows.rows[:2]] == [first, second])
+    qtbot.waitUntil(lambda: loaded.focused() is top)
+    assert accessible_name(top) == f"「{first}」的更多操作"
+    assert top.property("visualFocus")
+    assert loaded.warnings == []
+
+
 def test_saving_an_override_returns_to_the_rows_more_button(qtbot: QtBot, loaded: Loaded) -> None:
     profiles = loaded.view_models.profiles
     show_page(qtbot, loaded, "profiles")

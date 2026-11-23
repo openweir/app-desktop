@@ -21,6 +21,16 @@ Group {
         return ruleRepeater.itemAt(Math.max(0, Math.min(index, ruleRepeater.count - 1))) as RuleRow
     }
 
+    // The row that shows the rule, if the search or the filter shows it.
+    function rowOf(ruleId: string): RuleRow {
+        for (let i = 0; i < ruleRepeater.count; i++) {
+            const row = ruleRepeater.itemAt(i) as RuleRow
+            if (row?.ruleId === ruleId)
+                return row
+        }
+        return null
+    }
+
     // A removed rule takes the focus with it: it goes to the rule that takes its place, the
     // one above when it was the last, or 添加规则 when none is left.
     function ruleRemoved(index: int, row: RuleRow) {
@@ -365,6 +375,15 @@ Group {
             openBelow(anchor)
         }
 
+        // The rows stay in place and show the rules in their new order, so the rule moves
+        // to another row: the focus goes with it (DESIGN.md "可排序列表").
+        function moveBy(delta: int) {
+            ruleList.rules.moveRuleBy(ruleId, delta)
+            const row = ruleList.rowOf(ruleId)
+            if (row)
+                retarget(row.moreButton)
+        }
+
         AppMenuItem {
             text: qsTr("编辑…")
             enabled: ruleMenu.editable
@@ -377,13 +396,13 @@ Group {
         AppMenuItem {
             text: qsTr("上移")
             enabled: !ruleMenu.first
-            onTriggered: ruleList.rules.moveRuleBy(ruleMenu.ruleId, -1)
+            onTriggered: ruleMenu.moveBy(-1)
         }
 
         AppMenuItem {
             text: qsTr("下移")
             enabled: !ruleMenu.last
-            onTriggered: ruleList.rules.moveRuleBy(ruleMenu.ruleId, 1)
+            onTriggered: ruleMenu.moveBy(1)
         }
 
         AppMenuSeparator {}
