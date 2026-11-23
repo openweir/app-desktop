@@ -39,6 +39,8 @@ from tests.support.simulated import (
 from tests.support.window import Loaded, accessible, find, find_all, kind
 
 Role = QAccessible.Role
+# How long to wait for the stand-in provider and the library, which a full test run slows.
+WAIT = 20_000
 # What an external-link button's name ends in (DESIGN.md "外链按钮").
 BROWSER = "（在浏览器中打开）"  # noqa: RUF001
 
@@ -119,9 +121,9 @@ def ready(view_models: ViewModels) -> bool:
 def show(qtbot: QtBot, loaded: Loaded) -> QQuickItem:
     """Open the account page from the sidebar once it lists it, and wait for its data."""
     view_models = loaded.view_models
-    qtbot.waitUntil(lambda: "account" in listed(view_models))
+    qtbot.waitUntil(lambda: "account" in listed(view_models), timeout=WAIT)
     view_models.shell.setPage("account")
-    qtbot.waitUntil(lambda: ready(view_models), timeout=10000)
+    qtbot.waitUntil(lambda: ready(view_models), timeout=WAIT)
     qtbot.wait(50)
     return loaded.item(lambda i: kind(i) == "AccountPage")
 
@@ -150,6 +152,12 @@ def press(qtbot: QtBot, loaded: Loaded, control: QQuickItem) -> None:
 
 def pick(qtbot: QtBot, loaded: Loaded, text: str) -> None:
     """Reach an item of the open menu with the arrows, and run it."""
+    qtbot.waitUntil(
+        lambda: any(
+            i.isVisible() for i in loaded.overlay_items(lambda i: kind(i) == "AppMenuItem")
+        ),
+        timeout=WAIT,
+    )
     for _ in range(8):
         loaded.key(qtbot, Qt.Key.Key_Down, wait=10)
         if loaded.focused_text() == text:
@@ -316,7 +324,7 @@ def test_auto_renew_is_the_one_change_and_goes_back_when_refused(
     press(qtbot, window, switch)
     # At once, and the switch waits for the provider before it takes another change.
     assert prop(account, "autoRenew")
-    qtbot.waitUntil(lambda: prop(account, "canSetAutoRenew"))
+    qtbot.waitUntil(lambda: prop(account, "canSetAutoRenew"), timeout=WAIT)
     assert prop(account, "autoRenew")
     (patch,) = provider.requests_for("auto_renew")
     assert patch.path.endswith("/subscriptions/7")
@@ -326,8 +334,8 @@ def test_auto_renew_is_the_one_change_and_goes_back_when_refused(
     # Refused: back where it was, the reason under it in danger.
     provider.fail("auto_renew", 500)
     press(qtbot, window, switch)
-    qtbot.waitUntil(lambda: prop(account, "autoRenewError") != "")
-    qtbot.waitUntil(lambda: prop(account, "canSetAutoRenew"))
+    qtbot.waitUntil(lambda: prop(account, "autoRenewError") != "", timeout=WAIT)
+    qtbot.waitUntil(lambda: prop(account, "canSetAutoRenew"), timeout=WAIT)
     assert prop(account, "autoRenew")
     assert switch.property("checked")
     assert "无法连接服务商" in prop(account, "autoRenewError")
@@ -374,7 +382,7 @@ def test_every_purchase_opens_the_user_center_and_is_read_again_on_return(
         press(qtbot, window, target)
         assert opened[count:] == [base + address], text
     pid = prop(view_models.account, "providerId")
-    qtbot.waitUntil(lambda: len(watched) == 9)
+    qtbot.waitUntil(lambda: len(watched) == 9, timeout=WAIT)
     assert set(watched) == {pid}
 
     # The more menu's 在用户中心打开.
@@ -394,7 +402,7 @@ def test_every_purchase_opens_the_user_center_and_is_read_again_on_return(
     # Back in the window, what was bought or paid for is read again.
     wallets = len(provider.requests_for("wallet"))
     view_models.desktop.activated.emit()
-    qtbot.waitUntil(lambda: len(provider.requests_for("wallet")) > wallets)
+    qtbot.waitUntil(lambda: len(provider.requests_for("wallet")) > wallets, timeout=WAIT)
     assert window.warnings == []
 
 
@@ -407,7 +415,7 @@ def test_an_account_to_sign_in_again_keeps_its_data_and_offers_the_way_back(
     page = show(qtbot, window)
     provider.revoke()
     account.refresh()
-    qtbot.waitUntil(lambda: prop(account, "needsSignIn"))
+    qtbot.waitUntil(lambda: prop(account, "needsSignIn"), timeout=WAIT)
     assert (prop(account, "status"), prop(account, "statusTone")) == (
         "需要重新登录 · 示例服务商",
         "warning",
@@ -430,10 +438,10 @@ def test_an_account_to_sign_in_again_keeps_its_data_and_offers_the_way_back(
     again.forceActiveFocus(Qt.FocusReason.TabFocusReason)
     sign_in = view_models.provider_sign_in
     window.key(qtbot, Qt.Key.Key_Space)
-    qtbot.waitUntil(lambda: prop(sign_in, "active"))
+    qtbot.waitUntil(lambda: prop(sign_in, "active"), timeout=WAIT)
     assert prop(sign_in, "address") == provider.base
     window.key(qtbot, Qt.Key.Key_Escape)
-    qtbot.waitUntil(lambda: window.focused() is again)
+    qtbot.waitUntil(lambda: window.focused() is again, timeout=WAIT)
 
     # Signed in again: the account is read again, and so are its wallet, plans and orders.
     accounts = view_models.library.accounts
@@ -446,8 +454,8 @@ def test_an_account_to_sign_in_again_keeps_its_data_and_offers_the_way_back(
 
     pid = call(view_models, signing_in())
     sign_in.signedIn.emit(pid)
-    qtbot.waitUntil(lambda: not prop(account, "needsSignIn"))
-    qtbot.waitUntil(lambda: ready(view_models), timeout=10000)
+    qtbot.waitUntil(lambda: not prop(account, "needsSignIn"), timeout=WAIT)
+    qtbot.waitUntil(lambda: ready(view_models), timeout=WAIT)
     assert prop(account, "status") == "user@example.com · 示例服务商"
     assert window.warnings == []
 
@@ -461,13 +469,13 @@ def test_offline_the_page_says_when_it_last_synced(
     provider.fail("subscriptions", 503, times=3)
     call(view_models, view_models.library.accounts.sync_all(max_age=0))  # recorded, not raised
     account.reload()
-    qtbot.waitUntil(lambda: prop(account, "status") == "上次同步 刚刚")
+    qtbot.waitUntil(lambda: prop(account, "status") == "上次同步 刚刚", timeout=WAIT)
     assert prop(account, "statusTone") == ""
     assert prop(account, "currentName") == "专业版"  # what it said then
 
     # 刷新 that fails says why, in danger.
     account.refresh()
-    qtbot.waitUntil(lambda: prop(account, "statusTone") == "danger")
+    qtbot.waitUntil(lambda: prop(account, "statusTone") == "danger", timeout=WAIT)
     assert prop(account, "status").startswith("无法连接服务商")
     assert not prop(account, "busy")
 
@@ -478,12 +486,14 @@ def test_a_group_that_cannot_be_read_says_why_and_the_others_show(
     view_models = window.view_models
     account = view_models.account
     provider.fail("wallet", 500, times=5)
-    qtbot.waitUntil(lambda: "account" in listed(view_models))
+    qtbot.waitUntil(lambda: "account" in listed(view_models), timeout=WAIT)
     view_models.shell.setPage("account")
-    qtbot.waitUntil(lambda: prop(account, "walletNoteDanger"))
+    qtbot.waitUntil(lambda: prop(account, "walletNoteDanger"), timeout=WAIT)
     assert prop(account, "walletNote").startswith("无法连接服务商")
     assert prop(account, "walletBalance") == ""
-    qtbot.waitUntil(lambda: prop(account, "ordersNote") == "" and prop(account, "plansNote") == "")
+    qtbot.waitUntil(
+        lambda: prop(account, "ordersNote") == "" and prop(account, "plansNote") == "", timeout=WAIT
+    )
     page = window.item(lambda i: kind(i) == "AccountPage")
     assert button(page, "充值").isVisible()  # the user center still works
     assert window.warnings == []
@@ -497,10 +507,10 @@ def test_using_a_subscription_of_the_account(
     account, profiles = view_models.account, view_models.profiles
     page = show(qtbot, window)
     use = button(page, "使用")
-    with qtbot.waitSignal(account.applied, timeout=10000):
+    with qtbot.waitSignal(account.applied, timeout=WAIT):
         press(qtbot, window, use)
-    qtbot.waitUntil(lambda: prop(account, "subscriptions").rows[0].inUse)
-    qtbot.waitUntil(lambda: prop(profiles, "activeName") == "专业版")
+    qtbot.waitUntil(lambda: prop(account, "subscriptions").rows[0].inUse, timeout=WAIT)
+    qtbot.waitUntil(lambda: prop(profiles, "activeName") == "专业版", timeout=WAIT)
     assert find(page, lambda i: i.property("text") == "使用中") is not None
     assert provider.requests_for("config")  # its config, downloaded first
     assert window.warnings == []
@@ -515,7 +525,7 @@ def test_signing_out_of_the_last_account_goes_to_the_subscriptions_page(
     pid = prop(account, "providerId")
     call(view_models, view_models.library.accounts.use(pid, 7))
     view_models.profiles.reload()
-    qtbot.waitUntil(lambda: prop(account, "subscriptions").rows[0].inUse)
+    qtbot.waitUntil(lambda: prop(account, "subscriptions").rows[0].inUse, timeout=WAIT)
     page = window.item(lambda i: kind(i) == "AccountPage")
 
     # From 账户与安全, by the keyboard: a destructive confirmation that names what goes and
@@ -523,7 +533,7 @@ def test_signing_out_of_the_last_account_goes_to_the_subscriptions_page(
     sign_out = button(page, "退出登录")
     sign_out.forceActiveFocus(Qt.FocusReason.TabFocusReason)
     window.key(qtbot, Qt.Key.Key_Space)
-    qtbot.waitUntil(lambda: window.focused_text() == "取消")
+    qtbot.waitUntil(lambda: window.focused_text() == "取消", timeout=WAIT)
     assert prop(account, "signOutTitle") == "退出「示例服务商」？"  # noqa: RUF001
     text = prop(account, "signOutText")
     assert "「专业版」、「基础版」会从本机删除。" in text
@@ -533,12 +543,12 @@ def test_signing_out_of_the_last_account_goes_to_the_subscriptions_page(
     window.key(qtbot, Qt.Key.Key_Return)
 
     # The page and its tab go; 添加 on the subscriptions page has the focus, with its ring.
-    qtbot.waitUntil(lambda: "account" not in listed(view_models))
+    qtbot.waitUntil(lambda: "account" not in listed(view_models), timeout=WAIT)
     assert prop(shell, "currentPage") == "profiles"
     add = window.item(lambda i: kind(i) == "MenuButton" and i.property("text") == "添加")
-    qtbot.waitUntil(lambda: window.focused() is add)
+    qtbot.waitUntil(lambda: window.focused() is add, timeout=WAIT)
     assert add.property("visualFocus")
-    qtbot.waitUntil(lambda: len(prop(profiles, "model").rows) == 3)
+    qtbot.waitUntil(lambda: len(prop(profiles, "model").rows) == 3, timeout=WAIT)
     assert prop(profiles, "activeName") == "示例订阅 A"
     assert provider.requests_for("sign_out")
     assert window.warnings == []
@@ -551,12 +561,12 @@ def test_signing_out_on_the_subscriptions_page_takes_the_page_away(
     shell, profiles = view_models.shell, view_models.profiles
     show(qtbot, window)
     shell.setPage("profiles")
-    qtbot.waitUntil(lambda: len(prop(profiles, "model").rows) == 5)
+    qtbot.waitUntil(lambda: len(prop(profiles, "model").rows) == 5, timeout=WAIT)
     row = next(r for r in prop(profiles, "model").rows if r.isProvider)
-    with qtbot.waitSignal(profiles.signOutRequested):
+    with qtbot.waitSignal(profiles.signOutRequested, timeout=WAIT):
         profiles.requestSignOut(row.profileId)
     profiles.confirmSignOut()
-    qtbot.waitUntil(lambda: "account" not in listed(view_models))
+    qtbot.waitUntil(lambda: "account" not in listed(view_models), timeout=WAIT)
     assert prop(shell, "currentPage") == "profiles"
     assert not prop(view_models.account, "hasAccounts")
     assert window.warnings == []
@@ -586,8 +596,10 @@ def test_several_providers_are_chosen_in_the_header(
         second = call(view_models, signing_in())
         # The sign-in dialog says so as it completes: the page shows that account.
         view_models.provider_sign_in.signedIn.emit(second)
-        qtbot.waitUntil(lambda: prop(account, "multiple"))
-        qtbot.waitUntil(lambda: prop(account, "status") == "user@example.com · 另一个服务商")
+        qtbot.waitUntil(lambda: prop(account, "multiple"), timeout=WAIT)
+        qtbot.waitUntil(
+            lambda: prop(account, "status") == "user@example.com · 另一个服务商", timeout=WAIT
+        )
         assert prop(account, "providerId") == second
         assert [(o["label"], o["note"]) for o in prop(account, "providerOptions")] == [
             ("示例服务商", "user@example.com"),
@@ -596,24 +608,24 @@ def test_several_providers_are_chosen_in_the_header(
         select = find(page, lambda i: kind(i) == "AppSelect")
         assert select is not None
         assert select.property("current") == second
-        qtbot.waitUntil(lambda: other.requests_for("wallet") != [])
+        qtbot.waitUntil(lambda: other.requests_for("wallet") != [], timeout=WAIT)
 
         account.selectProvider(first)
         assert prop(account, "status") == "user@example.com · 示例服务商"
         wallets = len(provider.requests_for("wallet"))
-        qtbot.waitUntil(lambda: len(provider.requests_for("wallet")) > wallets)
+        qtbot.waitUntil(lambda: len(provider.requests_for("wallet")) > wallets, timeout=WAIT)
 
         # Signing out of one from the more menu leaves the page on the other.
         more = more_button(page)
         press(qtbot, window, more)
         pick(qtbot, window, "退出登录")
-        qtbot.waitUntil(lambda: window.focused_text() == "取消")
+        qtbot.waitUntil(lambda: window.focused_text() == "取消", timeout=WAIT)
         window.key(qtbot, Qt.Key.Key_Tab)
         window.key(qtbot, Qt.Key.Key_Return)
-        qtbot.waitUntil(lambda: not prop(account, "multiple"))
+        qtbot.waitUntil(lambda: not prop(account, "multiple"), timeout=WAIT)
         assert prop(account, "providerId") == second
         assert prop(shell, "currentPage") == "account"
-        qtbot.waitUntil(lambda: window.focused() is more)
+        qtbot.waitUntil(lambda: window.focused() is more, timeout=WAIT)
         assert window.warnings == []
     finally:
         other.close()
@@ -690,10 +702,10 @@ def test_the_smallest_window_reaches_every_control_in_order_with_its_name(
 @pytest.mark.parametrize("window", ["en"], indirect=True)
 def test_in_english_the_links_say_they_open_the_browser(qtbot: QtBot, window: Loaded) -> None:
     view_models = window.view_models
-    qtbot.waitUntil(lambda: "account" in listed(view_models))
+    qtbot.waitUntil(lambda: "account" in listed(view_models), timeout=WAIT)
     view_models.shell.setPage("account")
     account = view_models.account
-    qtbot.waitUntil(lambda: prop(account, "walletBalance").startswith("¥"), timeout=10000)
+    qtbot.waitUntil(lambda: prop(account, "walletBalance").startswith("¥"), timeout=WAIT)
     page = window.item(lambda i: kind(i) == "AccountPage")
     renew = button(page, "Renew")
     assert accessible(renew).name == "Renew (opens in browser)"
