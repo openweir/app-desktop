@@ -157,6 +157,42 @@ def test_native_collection_requires_openweir_identity(tmp_path: Path) -> None:
     }
 
 
+# The real one; tests/conftest.py keeps every test to its own directory.
+REAL_DEFAULT_SOURCES = crashes.default_sources
+
+
+def test_the_linux_service_crashes_are_the_users_own(tmp_path: Path) -> None:
+    if sys.platform != "linux":
+        pytest.skip("the Linux service's home")
+    ui = tmp_path / "ui"
+    ui.mkdir()
+    state = tmp_path / "state"
+    sources = REAL_DEFAULT_SOURCES(ui, linux_state=state)
+    service = state / "users" / str(os.getuid()) / "crashes"
+    assert sources == [(ui, "ui"), (service, "service")]
+    # Never owned the tunnel: the service made no home for this user.
+    assert crashes.collect(ui, sources=sources) == crashes.Inventory(())
+    service.mkdir(parents=True, mode=0o750)
+    (service / "go-1-2.log").write_text("panic: boom\n")
+    (service / "owner.json").write_text("{}")  # not a crash log
+    (ui / "ui-exception-3-4.log").write_text("Traceback\n")
+    inventory = crashes.collect(ui, sources=sources)
+    assert {(report.kind, report.path.name) for report in inventory.reports} == {
+        ("service", "go-1-2.log"),
+        ("ui", "ui-exception-3-4.log"),
+    }
+    # A home the user may not read, as for a user the service never gave the ACL to.
+    service.chmod(0)
+    try:
+        if os.access(service, os.R_OK):
+            pytest.skip("running as root, which reads anything")
+        inventory = crashes.collect(ui, sources=sources)
+        assert inventory.unavailable == ("service",)
+        assert [report.kind for report in inventory.reports] == ["ui"]
+    finally:
+        service.chmod(0o750)
+
+
 def test_links_are_not_collected_or_pruned(tmp_path: Path) -> None:
     target = tmp_path / "private.txt"
     target.write_text("keep")
