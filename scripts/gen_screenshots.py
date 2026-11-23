@@ -8,19 +8,22 @@ sample profiles that scripts/preview.py runs with: nothing connects, takes over 
 or reaches the network. The window has a fixed size and Chinese text; the title band and the
 settings follow macOS, as on the platform this runs on, so run it on a Mac. The tunnel is
 connected and routes with the first sample profile's rules; the routing page's shots show my
-plan, the default template. Run this after a change to a page that a screenshot shows, look
-at the result, and commit the images (docs/development.md).
+plan, the default template. The account page's shot is signed in to a stand-in provider on a
+loopback port, as scripts/preview.py --provider is, in a window of its own: the other shots
+show OpenWeir without an account. Run this after a change to a page that a screenshot shows,
+look at the result, and commit the images (docs/development.md).
 Source-tree only, like the preview: the simulated host never ships in the package.
 """
 
 from __future__ import annotations
 
 import argparse
+import contextlib
 import os
 import sys
 import tempfile
 import time
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -48,8 +51,15 @@ from openweir.viewmodels.composition import ViewModels, compose  # noqa: E402
 from tests.support.appearance import SystemColorScheme  # noqa: E402
 from tests.support.credentials import MemoryCredentials  # noqa: E402
 from tests.support.icloud import FakeICloud  # noqa: E402
+from tests.support.provider_server import FakeProvider  # noqa: E402
 from tests.support.releases import offline_updater  # noqa: E402
-from tests.support.simulated import SimulatedFetcher, SimulatedHost, seed_profiles  # noqa: E402
+from tests.support.simulated import (  # noqa: E402
+    SAMPLE_CONFIG,
+    SimulatedFetcher,
+    SimulatedHost,
+    seed_profiles,
+    seed_provider,
+)
 from tests.support.window import find, kind  # noqa: E402
 
 OUTPUT = ROOT / "docs" / "images"
@@ -71,6 +81,10 @@ class Shot:
     prepare: Callable[[QQuickItem], None] | None = None
     # What routes: the profile's own rules, whose groups the simulated core lists, or my plan.
     mode: str = MODE_PROFILE
+    # Signed in to a stand-in provider (tests/support/provider_server.py).
+    provider: bool = False
+    # Whether the page has what the shot shows, which may come from the network.
+    ready: Callable[[ViewModels], bool] | None = None
 
 
 def _tab(name: str) -> Callable[[QQuickItem], None]:
@@ -82,6 +96,17 @@ def _tab(name: str) -> Callable[[QQuickItem], None]:
     return prepare
 
 
+def _account_read(view_models: ViewModels) -> bool:
+    """The account synced, and its wallet, plans and orders read."""
+    account = view_models.account
+    return (
+        account.property("subscriptionCount") > 0
+        and bool(account.property("walletBalance"))
+        and account.property("plansNote") == ""
+        and account.property("ordersNote") == ""
+    )
+
+
 SHOTS = {
     "overview": Shot("overview"),
     "proxies": Shot("proxies"),
@@ -90,6 +115,7 @@ SHOTS = {
     "settings": Shot("settings"),
     "routing": Shot("routing", _tab("rules"), MODE_PLAN),
     "routing-groups": Shot("routing", _tab("groups"), MODE_PLAN),
+    "account": Shot("account", provider=True, ready=_account_read),
 }
 # The pages' items in Main.qml's StackLayout, by the sidebar's page.
 PAGE_TYPES = {
@@ -172,8 +198,17 @@ def _show(window: QQuickWindow, view_models: ViewModels, shot: Shot) -> None:
         lambda: routing.property("mode") == shot.mode and not routing.property("busy"),
         f"routing with {shot.mode}",
     )
-    shell.setPage(shot.page)
-    wait_until(lambda: shell.property("currentPage") == shot.page, f"the page {shot.page}")
+
+    def opened() -> bool:
+        # The sidebar lists the account page only once the accounts are read.
+        if shell.property("currentPage") != shot.page:
+            shell.setPage(shot.page)
+        return shell.property("currentPage") == shot.page
+
+    wait_until(opened, f"the page {shot.page}")
+    if shot.ready is not None:
+        ready = shot.ready
+        wait_until(lambda: ready(view_models), f"the page {shot.page}'s data")
     if shot.prepare is not None:
         page = find(window.contentItem(), lambda item: kind(item) == PAGE_TYPES[shot.page])
         assert page is not None
@@ -181,10 +216,36 @@ def _show(window: QQuickWindow, view_models: ViewModels, shot: Shot) -> None:
     QTest.qWait(SETTLE_MS)
 
 
+@contextlib.contextmanager
+def _stand_in(wanted: bool) -> Iterator[FakeProvider | None]:
+    """A stand-in provider on a loopback port when ``wanted``, reached past any proxy the
+    machine has, with rules of its own so that it can be used."""
+    if not wanted:
+        yield None
+        return
+    previous = os.environ.get("no_proxy")
+    os.environ["no_proxy"] = "127.0.0.1"
+    provider = FakeProvider()
+    provider.config = SAMPLE_CONFIG.encode()
+    try:
+        yield provider
+    finally:
+        provider.close()
+        if previous is None:
+            os.environ.pop("no_proxy", None)
+        else:
+            os.environ["no_proxy"] = previous
+
+
 def _load(
-    store: ProfileStore, appearance: str, clock: WarpClock
+    store: ProfileStore, appearance: str, clock: WarpClock, provider: FakeProvider | None
 ) -> tuple[ViewModels, QQmlApplicationEngine]:
     seed_profiles(store, time.time())
+    # Credentials stay in memory: the WARP account, and the provider's session as the sign-in
+    # dialog would have left it.
+    credentials = MemoryCredentials()
+    if provider is not None:
+        seed_provider(store, provider, credentials, time.time())
     # My plan is the default template, there to switch to.
     routing = RoutingStore(store.database)
     plan = default_plan()
@@ -198,7 +259,7 @@ def _load(
         login_item=InstalledLoginItem(),
         tray_available=True,  # the menu bar's, as on a Mac
         updater=offline_updater(store.directory),
-        credentials=MemoryCredentials(),
+        credentials=credentials,
         icloud=ICloudProvider(FakeICloud()),
     )
     engine = QQmlApplicationEngine()
@@ -208,16 +269,34 @@ def _load(
 
 
 def capture(output: Path, appearance: str, names: Iterable[str]) -> list[Path]:
-    """Save the shots ``names`` in ``appearance`` to ``output``; returns the files."""
+    """Save the shots ``names`` in ``appearance`` to ``output``; returns the files. The shots
+    signed in to a provider are taken in a window of their own, after the others."""
     app = QCoreApplication.instance()
     assert app is not None, "needs a QGuiApplication"
+    wanted = [name for name in SHOTS if name in names]
     translations = Translations(app)
     translations.apply("zh")
+    saved: list[Path] = []
+    try:
+        for signed_in in (False, True):
+            group = [name for name in wanted if SHOTS[name].provider == signed_in]
+            if group:
+                saved += _session(output, appearance, group, signed_in)
+    finally:
+        translations.remove()
+    return saved
+
+
+def _session(output: Path, appearance: str, names: list[str], signed_in: bool) -> list[Path]:
+    """Take the shots ``names`` in one window, signed in to a stand-in provider or not."""
     clock = WarpClock()
     saved = []
-    with tempfile.TemporaryDirectory(prefix="openweir-screenshots-") as directory:
+    with (
+        tempfile.TemporaryDirectory(prefix="openweir-screenshots-") as directory,
+        _stand_in(signed_in) as provider,
+    ):
         store = ProfileStore(Path(directory))
-        view_models, engine = _load(store, appearance, clock)
+        view_models, engine = _load(store, appearance, clock, provider)
         try:
             (window,) = engine.rootObjects()
             assert isinstance(window, QQuickWindow)
@@ -229,7 +308,7 @@ def capture(output: Path, appearance: str, names: Iterable[str]) -> list[Path]:
                 clock.skip(10)
                 QTest.qWait(1100)
             QTest.qWait(2000)  # the connections' rates over real seconds again
-            for name in [name for name in SHOTS if name in names]:
+            for name in names:
                 _show(window, view_models, SHOTS[name])
                 path = output / f"{name}-{appearance}.png"
                 path.parent.mkdir(parents=True, exist_ok=True)
@@ -245,7 +324,6 @@ def capture(output: Path, appearance: str, names: Iterable[str]) -> list[Path]:
             del engine
             QTest.qWait(0)
             store.close()
-            translations.remove()
     return saved
 
 

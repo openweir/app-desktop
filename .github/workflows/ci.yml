@@ -202,8 +202,18 @@ jobs:
         run: |
           uv run ruff check .
           uv run ruff format --check .
+      # pyright runs on every OS, whose packages differ (pyobjc, pywin32, the Linux-only
+      # jeepney and secretstorage); its errors are repeated as annotations, readable without
+      # the logs.
       - name: Types
-        run: uv run pyright
+        shell: bash
+        run: |
+          uv run pyright 2>&1 | tee "$RUNNER_TEMP/pyright.log" || {
+            status=$?
+            grep -E ' - error: ' "$RUNNER_TEMP/pyright.log" | head -30 |
+              sed -e 's/%/%25/g' -e 's/^[[:space:]]*/::error title=pyright::/'
+            exit "$status"
+          }
       # Theme and translation freshness are covered by pytest, once per platform.
       - name: Protocol bindings are current
         if: matrix.os == 'macos-26' && needs.changes.outputs.protocol == 'true'

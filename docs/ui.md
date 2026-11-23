@@ -4,7 +4,8 @@
 
 本文描述 Python 界面的结构和各部分的设计：宿主接口、配置存储、订阅、覆写、多语言、外观、连接与日志、设置与桌面行为。
 系统整体的架构见 [architecture.md](architecture.md)，视觉规范见 [DESIGN.md](../DESIGN.md)。备份的设计见
-[storage.md](storage.md)，界面部分见第 8 节；自定义分流的设计见 [routing.md](routing.md)，界面部分见第 9 节。
+[storage.md](storage.md)，界面部分见第 8 节；自定义分流的设计见 [routing.md](routing.md)，界面部分见第 9 节；服务商账户
+（登录对话框、订阅页和概览上服务商的订阅、账户页）见 [accounts.md](accounts.md) 第 7 节。
 文中的决策编号（D4 等）见 [decisions.md](decisions.md)。
 
 ## 0. 结构
@@ -161,7 +162,8 @@
 ## 3. 订阅与切换
 
 - **下载**在用户上下文中进行（urllib，在工作线程里执行），跟随系统代理设置。User-Agent 为
-  `openweir/<版本> clash.meta`，让订阅服务返回 Clash YAML。只接受 http 和 https；超过一个请求帧能装下的
+  `OpenWeir/<版本> (Windows|macOS|Linux) clash.meta`（D48）：OpenWeir 服务商据此返回 OpenWeir 模板，其他订阅服务返回
+  Clash YAML。只接受 http 和 https；超过一个请求帧能装下的
   大小（16 MiB 减 1 MiB）即拒绝。`Content-Disposition` 里的文件名作为默认名称。
 - 首次导入时，手填名称优先于 `Profile-Title`（文本或 `base64:` UTF-8）、文件名和主机名。勾选自动更新并留空间隔时采用 `Profile-Update-Interval` 建议的正整数小时，无有效建议用 12 小时。以后刷新保留已保存的名称和间隔。
 - 「编辑信息…」按需显示服务端的 `Profile-Web-Page-Url` 和 `Support-Url`，仅在用户点击时打开 HTTP(S) 页面。
@@ -500,6 +502,10 @@ UI 只保存和传递覆写原文，解析与合并在内核里做；模拟宿�
     「代理」上时移到当前页的导航项，键盘放上去的仍带焦点框。侧栏的页面是 `KeyedListModel`，增删「代理」时其余
     导航项原地保留，焦点、Tab 顺序和读屏名称不受影响。页面切换没有快捷键，启动时总是打开概览，不恢复上次的页面；
     安装链接只打开订阅页，托盘菜单不打开页面。
+  - **侧栏的「账户」**（DESIGN.md「侧栏导航」，accounts.md 7.1 节）：侧栏依次是概览、代理、订阅、分流、连接、日志、
+    账户、设置。「账户」只在至少有一个服务商时列出（`ShellViewModel.ACCOUNT_PAGES`，机制同 `TUNNEL_PAGES`），需要重新
+    登录的也算：`AccountViewModel.accountsChanged` 交给 `ShellViewModel.has_accounts`。停在账户页时退出了最后一个
+    服务商，先发 `leavingPage`，窗口回到订阅页，焦点交给「添加」。概览的「续费」切到账户页并选中那份订阅的服务商。
   - **接管方式**：连接时能接管什么由宿主决定（`TunnelHost.takeover`）。宿主发出的每份 `RunOptions` 都先经
     `taken_over` 改写，不论设置怎么写：
 

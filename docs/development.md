@@ -163,8 +163,10 @@ uv run python scripts/gen_i18n.py
 ```
 
 README 和使用指南里的截图（`docs/images/`）由下面的脚本生成：在 offscreen 平台渲染真实界面，宿主和数据与预览相同，
-窗口 1280 × 800、2 倍像素，浅色和深色各一张。标题栏和设置页随运行的平台变化，所以在 macOS 上生成。界面改动涉及截图里的
-页面时重新生成，逐张看过后与改动一起提交；只更新其中几张时把名称写在后面，如 `overview proxies`：
+窗口 1280 × 800、2 倍像素，浅色和深色各一张。账户页（`account`）在单独的窗口里登录回环端口上的假服务商，与
+`preview.py --provider` 相同，其余截图里没有账户。标题栏、侧栏上沿、字体和设置页随运行的平台变化，所以在 macOS 上
+生成。界面改动涉及截图里的页面时重新生成，逐张看过后与改动一起提交；只更新其中几张时把名称写在后面，如
+`overview proxies`：
 
 ```bash
 uv run python scripts/gen_screenshots.py

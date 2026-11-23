@@ -39,13 +39,6 @@ from openweir.models.provider import web
 from openweir.models.provider.api import origin as make_origin
 from openweir.models.provider.sync import blocked, most_left, names
 from openweir.models.provider.types import (
-    CONDITION_ACTIVE,
-    CONDITION_DISABLED,
-    CONDITION_EXPIRED,
-    CONDITION_EXPIRING,
-    CONDITION_NOT_STARTED,
-    CONDITION_TRAFFIC_LOW,
-    CONDITION_TRAFFIC_USED_UP,
     PROVIDER_ACCOUNT_CONFLICT,
     PROVIDER_CAPTCHA_REQUIRED,
     PROVIDER_CODE_INVALID,
@@ -67,6 +60,7 @@ from openweir.models.provider.types import (
 )
 from openweir.viewmodels.common.async_runner import AsyncRunner
 from openweir.viewmodels.feedback import failure_text
+from openweir.viewmodels.provider_text import condition_status, listed
 
 QML_IMPORT_NAME = "OpenWeir"
 QML_IMPORT_MAJOR_VERSION = 1
@@ -94,15 +88,6 @@ FIELD_TWO_FACTOR = "twoFactor"
 # 发送验证码 waits this long before it may send again (DESIGN.md "服务商登录对话框").
 RESEND_S = 60
 TICK_MS = 1000
-DAY_S = 86400.0
-
-# What a subscription's condition looks like in the picker: "" is the default colour.
-TONE_WARNING = "warning"
-TONE_DANGER = "danger"
-_TONES = {
-    CONDITION_ACTIVE: "",
-    CONDITION_DISABLED: TONE_DANGER,
-}
 
 # Which field a refused sign-in names, by the method used.
 _PASSWORD_FIELDS = {
@@ -798,37 +783,18 @@ class ProviderSignInViewModel(QObject):
         rows = []
         for subscription in self._subscriptions:
             usable = not blocked(subscription, now)
-            condition = subscription.condition(now)
-            status = self._condition(subscription, condition, now)
-            if subscription.trial:
-                status = self.tr("试用 · {status}").format(status=status)
+            status = condition_status(subscription, now)
             rows.append(
                 {
                     "remoteId": subscription.id,
                     "name": titles[subscription.id],
-                    "status": status,
-                    "tone": _TONES.get(condition, TONE_WARNING),
+                    "status": listed(status, subscription.trial),
+                    "tone": status.tone,
                     "details": self._details(subscription, now),
                     "usable": usable,
                 }
             )
         return rows
-
-    def _condition(self, subscription: RemoteSubscription, condition: str, now: float) -> str:
-        if condition == CONDITION_EXPIRING:
-            days = max(1, math.ceil(((subscription.expire_at or now) - now) / DAY_S))
-            return self.tr("%n 天后到期", "", days)
-        if condition == CONDITION_TRAFFIC_LOW:
-            percent = math.floor(subscription.used * 100 / (subscription.total or 1))
-            return self.tr("流量已用 {percent}%").format(percent=percent)
-        texts = {
-            CONDITION_ACTIVE: self.tr("有效"),
-            CONDITION_EXPIRED: self.tr("已到期"),
-            CONDITION_TRAFFIC_USED_UP: self.tr("流量已用完"),
-            CONDITION_NOT_STARTED: self.tr("未开始"),
-            CONDITION_DISABLED: self.tr("已停用"),
-        }
-        return texts.get(condition, self.tr("暂不可用"))
 
     def _details(self, subscription: RemoteSubscription, now: float) -> str:
         if subscription.total:
