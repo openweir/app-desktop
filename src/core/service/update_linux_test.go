@@ -108,6 +108,24 @@ func TestTheSignatureCoversSHA256SUMS(t *testing.T) {
 	}
 }
 
+// The formats are RFC 8032's, as scripts/sign_sums.py writes them and the UI reads them
+// (tests/test_sign_sums.py checks the same vector): the public key's 32 bytes in base64, and
+// the signature's 64 bytes as they are. This is §7.1's TEST 2, over the message 0x72.
+func TestTheFormatsAreRFC8032s(t *testing.T) {
+	public, _ := hex.DecodeString("3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c")
+	signature, _ := hex.DecodeString("92a009a9f0d4cab8720e820b5f642540a2b27b5416503f8fb3762223ebdb69da" +
+		"085ac1e43e15996e458f3613d0f11d8c387b2eaeb4302aeeb00d291612bb0c00")
+	key, err := updateKey(base64.StdEncoding.EncodeToString(public))
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	sums := write(t, filepath.Join(dir, "SHA256SUMS"), []byte{0x72})
+	if err := checkSums(key, sums, write(t, filepath.Join(dir, "SHA256SUMS.sig"), signature)); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestThePackageMatchesItsLineInSHA256SUMS(t *testing.T) {
 	dir := t.TempDir()
 	name := "OpenWeir-1.1.0-linux-x64.deb"
