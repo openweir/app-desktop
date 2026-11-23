@@ -303,6 +303,27 @@ class FakeProvider:
             self.link_tokens[f"tok{secrets.token_hex(12)}"] = remote_id
         return subscription
 
+    def move_to(self, now: float) -> None:
+        """Date everything around ``now`` rather than NOW, for a window that runs by the real
+        clock (scripts/preview.py, the account page's tests): subscriptions start, reset and
+        expire, and orders were placed, as long before or after it."""
+        shift = now - self.now
+        with self._lock:
+            items = [*self.subscriptions.values(), *(o for x in self.orders.values() for o in x)]
+            for item in items:
+                for key, value in item.items():
+                    if isinstance(value, str) and (key.endswith("At") or key == "periodStart"):
+                        moved = datetime.fromisoformat(value).timestamp() + shift
+                        item[key] = iso(moved)
+            self.now = now
+
+    def session(self, user_id: str = "user-1") -> str:
+        """A session of ``user_id``, as signing in opens one: its bearer token."""
+        token = secrets.token_urlsafe(24)
+        with self._lock:
+            self.sessions[token] = user_id
+        return _signed(token)
+
     def update_subscription(self, remote_id: int, **fields: Any) -> None:
         with self._lock:
             self.subscriptions[remote_id].update(fields)

@@ -99,6 +99,7 @@ PAGE_TYPES = {
     "routing": "RoutingPage",
     "connections": "ConnectionsPage",
     "logs": "LogsPage",
+    "account": "AccountPage",
     "settings": "SettingsPage",
 }
 
