@@ -45,6 +45,7 @@ from openweir.viewmodels.provider_text import (
     ProviderStatus,
     account_status,
     condition_status,
+    no_nodes_status,
     notice_status,
     trial,
 )
@@ -155,6 +156,9 @@ def provider_status(profile: Profile, summary: AccountSummary, now: float) -> Pr
         return notice_status(notice)
     subscription = _billing(profile, summary)
     status = condition_status(subscription, now) if subscription is not None else ProviderStatus()
+    if not status.text and not notice and profile.proxy_count == 0:
+        # Usable, yet the config it gave has no node: nothing to connect through
+        return no_nodes_status()
     if status.text or not notice:
         return status
     # Billing changed since the update that kept the config; the code still says why.

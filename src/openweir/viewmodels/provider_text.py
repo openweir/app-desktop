@@ -100,6 +100,12 @@ def notice_status(code: str) -> ProviderStatus:
     return ProviderStatus()
 
 
+def no_nodes_status() -> ProviderStatus:
+    """A usable subscription whose config has no node: the provider grants none yet (a plan
+    waiting for a server, or no rule for it), so the user is pointed at its support."""
+    return ProviderStatus(QCoreApplication.translate("ProviderText", "暂无可用节点，请联系客服"))
+
+
 def account_status(state: ProviderState) -> ProviderStatus:
     """What the account's state says of everything in it (docs/accounts.md §4.2): it needs
     signing in again, or the provider disabled it; none otherwise."""

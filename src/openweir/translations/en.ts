@@ -3830,6 +3830,10 @@ prepend-rules:
         <translation>No subscription link</translation>
     </message>
     <message>
+        <source>暂无可用节点，请联系客服</source>
+        <translation>No nodes yet; please contact support</translation>
+    </message>
+    <message>
         <source>需要重新登录</source>
         <translation>Sign-in required</translation>
     </message>

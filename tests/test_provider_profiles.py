@@ -181,6 +181,21 @@ def test_the_account_comes_before_its_subscriptions(
     assert provider_status(own(), account(billing(), state=state, notices=notices), NOW) == expected
 
 
+def test_a_usable_subscription_without_nodes_points_at_support(qapp: QCoreApplication) -> None:
+    """The provider grants no node yet (a plan waiting for a server, or no rule for it): the row
+    says so instead of 有效. Before its config is read the count isn't known, so it says nothing."""
+    empty = Profile(
+        "profile-7", "专业版", KIND_PROVIDER, provider_id="p-1", remote_id=7, proxy_count=0
+    )
+    status = provider_status(empty, account(billing()), NOW)
+    assert status.text.startswith("暂无可用节点")
+    assert not status.danger
+    assert provider_status(own(), account(billing()), NOW) == ProviderStatus()
+    # What billing says comes first
+    expired = account(billing(status=STATUS_EXPIRED, usable=False))
+    assert provider_status(empty, expired, NOW) == ProviderStatus("已到期", renew=True)
+
+
 def test_one_wording_for_every_list(qapp: QCoreApplication) -> None:
     """The sign-in dialog's picker and the account page write a status as the subscriptions
     page does, in one translation context: 有效 for none, after 试用 for a trial, and its
