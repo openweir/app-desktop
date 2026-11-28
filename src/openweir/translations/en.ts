@@ -539,12 +539,20 @@
         <translation>One-time</translation>
     </message>
     <message>
+        <source>有名额时自动开通，期限从开通时起算</source>
+        <translation>Opens by itself when a place frees up; the term starts then</translation>
+    </message>
+    <message>
         <source>已超时</source>
         <translation>Timed out</translation>
     </message>
     <message>
         <source>待支付</source>
         <translation>Awaiting payment</translation>
+    </message>
+    <message>
+        <source>已付款待分配</source>
+        <translation>Paid, waiting for a server</translation>
     </message>
     <message>
         <source>已完成</source>

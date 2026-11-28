@@ -625,6 +625,7 @@ ScrollView {
                                 required property string amount
                                 required property string status
                                 required property bool pending
+                                required property bool waiting
 
                                 divider: index > 0
                                 verticalPadding: Theme.space2
@@ -662,7 +663,7 @@ ScrollView {
                                         Layout.alignment: Qt.AlignRight
                                         text: orderRow.status
                                         role: Theme.type.caption
-                                        color: orderRow.pending ? Theme.warning : Theme.textMuted
+                                        color: orderRow.pending || orderRow.waiting ? Theme.warning : Theme.textMuted
                                     }
                                 }
 

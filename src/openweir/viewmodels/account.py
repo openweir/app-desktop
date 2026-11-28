@@ -143,6 +143,7 @@ class OrderRow:
     amount: str
     status: str
     pending: bool  # waiting for payment: 去支付, the status in warning
+    waiting: bool = False  # 已付款待分配: paid, no server yet; status in warning, no 去支付
 
     @property
     def id(self) -> str:
@@ -1016,12 +1017,15 @@ class AccountViewModel(QObject):
             else:
                 title, parts = order.plan_name, [kind]
             parts += [self._period(order.period), fmt.date(order.created_at)]
+            # Paid while the plan's servers are all taken: it opens by itself, never pay again.
+            if order.waiting:
+                parts.append(self.tr("有名额时自动开通，期限从开通时起算"))
             # An unpaid order past its time is cancelled by the provider within minutes.
             timed_out = order.pending and order.expires_at is not None and order.expires_at <= now
             pending = order.pending and not timed_out
             status = {
                 ORDER_PENDING: self.tr("已超时") if timed_out else self.tr("待支付"),
-                ORDER_COMPLETED: self.tr("已完成"),
+                ORDER_COMPLETED: self.tr("已付款待分配") if order.waiting else self.tr("已完成"),
                 ORDER_CANCELLED: self.tr("已取消"),
                 ORDER_REFUNDED: self.tr("已退款"),
             }.get(order.status, order.status)
@@ -1035,6 +1039,7 @@ class AccountViewModel(QObject):
                     amount=fmt.money(amount, order.currency, currency),
                     status=status,
                     pending=pending,
+                    waiting=order.waiting,
                 )
             )
         return rows

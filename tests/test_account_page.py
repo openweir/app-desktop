@@ -302,6 +302,24 @@ def test_the_page_shows_the_account(qtbot: QtBot, window: Loaded, provider: Fake
     assert window.warnings == []
 
 
+def test_a_paid_order_waiting_for_a_server_never_asks_to_pay(
+    qtbot: QtBot, window: Loaded, provider: FakeProvider
+) -> None:
+    # Paid while the plan's servers were all taken: 已付款待分配, and no 去支付.
+    orders = provider.orders["user-1"]
+    orders[0].update(status="completed", delivery="waiting", deliveryReason="full")
+    page = show(qtbot, window)
+    account = window.view_models.account
+    rows = prop(account, "orders").rows
+    assert [(r.status, r.pending, r.waiting) for r in rows] == [
+        ("已付款待分配", False, True),
+        ("已完成", False, False),
+    ]
+    assert "有名额时自动开通" in rows[0].detail
+    pay = find_all(page, lambda i: kind(i) == "ExternalButton" and i.property("text") == "去支付")
+    assert not any(button.property("visible") for button in pay)
+
+
 def test_an_order_paid_in_part_shows_what_it_cost(
     qtbot: QtBot, window: Loaded, provider: FakeProvider
 ) -> None:

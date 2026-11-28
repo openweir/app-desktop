@@ -356,6 +356,8 @@ class FakeProvider:
             "channelId": None,
             "expiresAt": iso(NOW + DAY),
             "paidAt": iso(NOW - DAY) if status == "completed" else None,
+            "delivery": None,
+            "deliveryReason": None,
             "createdAt": iso(NOW - DAY),
             "updatedAt": iso(NOW - DAY),
         }

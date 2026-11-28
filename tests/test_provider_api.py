@@ -604,6 +604,27 @@ def test_wallet_plans_and_orders(client: HttpProviderApi, provider: FakeProvider
     assert (changed.discount, changed.credit, changed.total) == (300, 1000, 1700)
 
 
+def test_a_paid_order_can_wait_for_a_server(
+    client: HttpProviderApi, provider: FakeProvider
+) -> None:
+    # A plan whose servers are all taken: completed and paid, nothing opened yet.
+    session = sign_in(client, provider)
+    waiting = provider.order(
+        "o-4", "new", "completed", planId="pro", delivery="waiting", deliveryReason="full"
+    )
+    provider.answer("orders", 200, {"items": [waiting], "total": 1})
+    [order] = run(lambda: client.orders(provider.base, session.token, 5))
+    assert (order.delivery, order.delivery_reason) == (types.DELIVERY_WAITING, "full")
+    assert order.waiting
+    assert not order.pending
+    # Providers from before places send no delivery: nothing waits.
+    older = provider.order("o-5", "new", "completed", planId="pro")
+    del older["delivery"], older["deliveryReason"]
+    provider.answer("orders", 200, {"items": [older], "total": 1})
+    [plain] = run(lambda: client.orders(provider.base, session.token, 5))
+    assert (plain.delivery, plain.waiting) == (None, False)
+
+
 def test_withdrawals_stay_out_of_orders(client: HttpProviderApi, provider: FakeProvider) -> None:
     session = sign_in(client, provider)
     withdrawal = provider.order("w-1", "withdrawal", "completed")

@@ -103,6 +103,9 @@ ORDER_PENDING = "pending"  # waiting for payment: 去支付 opens /orders
 ORDER_COMPLETED = "completed"
 ORDER_CANCELLED = "cancelled"
 ORDER_REFUNDED = "refunded"
+# OrderSummary ``delivery``: plans whose servers have a limited number of places
+DELIVERY_WAITING = "waiting"  # 已付款待分配: paid, no server yet; opens by itself, never pay again
+DELIVERY_ALLOCATED = "allocated"
 
 # -- RemoteSubscription.condition, what the app shows of a subscription ---------------------------
 CONDITION_ACTIVE = "active"  # 有效
@@ -540,10 +543,19 @@ class OrderSummary:
     subscription_id: int | None = None  # ``subscriptionId``
     expires_at: float | None = None  # ``expiresAt``: an unpaid order is cancelled then
     paid_at: float | None = None  # ``paidAt``
+    delivery: str | None = None  # ``delivery``: DELIVERY_WAITING, DELIVERY_ALLOCATED or null
+    # ``deliveryReason``, why it waits: full, no_candidates, account_exhausted or stopped
+    delivery_reason: str | None = None
 
     @property
     def pending(self) -> bool:
         return self.status == ORDER_PENDING
+
+    @property
+    def waiting(self) -> bool:
+        """Paid for a plan whose servers are all taken: completed, but nothing opened yet. It opens
+        by itself when a place frees up and its term starts then."""
+        return self.status == ORDER_COMPLETED and self.delivery == DELIVERY_WAITING
 
     @property
     def total(self) -> int:

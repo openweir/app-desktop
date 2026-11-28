@@ -714,6 +714,8 @@ def _orders(value: object) -> tuple[OrderSummary, ...]:
                 subscription_id=fields.optional_integer("subscriptionId"),
                 expires_at=fields.optional_time("expiresAt"),
                 paid_at=fields.optional_time("paidAt"),
+                delivery=fields.optional_text("delivery"),
+                delivery_reason=fields.optional_text("deliveryReason"),
             )
         )
     return tuple(orders)
